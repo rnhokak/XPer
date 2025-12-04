@@ -7,8 +7,7 @@ type Transaction = {
   category?: { id?: string | null; name?: string | null } | null;
 };
 
-const formatNumber = (value: number) =>
-  Number(value).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+const formatNumber = (value: number) => Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
 
 const startOfWeekMonday = (d: Date) => {
   const date = new Date(d);
@@ -128,28 +127,34 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {(Object.keys(summaries) as PeriodKey[]).map((key) => {
           const item = summaries[key];
           return (
-            <div key={key} className="rounded-xl border bg-white p-4 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground/70">{periodMeta[key].label}</p>
-              <p className="text-xs text-muted-foreground">{periodMeta[key].description}</p>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className={`text-2xl font-semibold ${item.net >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            <div
+              key={key}
+              className="flex min-h-[140px] flex-col justify-between rounded-lg border bg-white/90 p-2.5 shadow-sm ring-1 ring-black/5 sm:min-h-[150px] sm:rounded-xl sm:p-3"
+            >
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70 sm:text-[11px]">
+                  {periodMeta[key].label}
+                </p>
+                <p className="text-[10px] text-muted-foreground sm:text-[11px]">{periodMeta[key].description}</p>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-1.5 sm:mt-2 sm:gap-2">
+                <span className={`text-lg font-semibold sm:text-2xl ${item.net >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                   {item.net >= 0 ? "+" : ""}
                   {formatNumber(item.net)}
                 </span>
-                <span className="text-sm text-muted-foreground">net</span>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-md bg-emerald-50 px-2 py-1">
-                  <p className="text-[11px] uppercase tracking-wide text-emerald-700">Thu</p>
-                  <p className="font-semibold text-emerald-700">+{formatNumber(item.income)}</p>
+              <div className="mt-1.5 flex flex-col gap-1 text-[9px] sm:mt-2 sm:gap-2 sm:text-[10px]">
+                <div className="inline-flex w-fit self-end items-center justify-between rounded-full bg-emerald-50 px-2 py-1 sm:px-2.5">
+                  <span className="text-[9px] uppercase tracking-wide text-emerald-700 sm:text-[10px]">Thu</span>
+                  <span className="font-semibold text-emerald-700 leading-tight">+{formatNumber(item.income)}</span>
                 </div>
-                <div className="rounded-md bg-red-50 px-2 py-1">
-                  <p className="text-[11px] uppercase tracking-wide text-red-700">Chi</p>
-                  <p className="font-semibold text-red-700">-{formatNumber(item.expense)}</p>
+                <div className="inline-flex w-fit self-end items-center justify-between rounded-full bg-red-50 px-2 py-1 sm:px-2.5">
+                  <span className="text-[9px] uppercase tracking-wide text-red-700 sm:text-[10px]">Chi</span>
+                  <span className="font-semibold text-red-700 leading-tight">-{formatNumber(item.expense)}</span>
                 </div>
               </div>
             </div>
@@ -166,7 +171,7 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
           <span className="text-xs text-muted-foreground">Đỉnh: {formatNumber(maxDaily)}</span>
         </div>
         <div className="mt-4 overflow-x-auto pb-2">
-          <div className="flex min-w-[320px] items-end gap-3">
+          <div className="flex min-w-[260px] items-end gap-2 sm:min-w-[320px] sm:gap-3">
             {dailySeries.map((d) => {
               const incHeight = Math.max(6, (d.income / maxDaily) * 120);
               const expHeight = Math.max(6, (d.expense / maxDaily) * 120);
@@ -174,12 +179,12 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
                 <div key={d.label} className="flex flex-col items-center gap-1">
                   <div className="flex items-end gap-1">
                     <div
-                      className="w-5 rounded-md bg-emerald-500/80"
+                      className="w-4 rounded-md bg-emerald-500/80 sm:w-5"
                       style={{ height: `${incHeight}px` }}
                       title={`Thu ${formatNumber(d.income)}`}
                     />
                     <div
-                      className="w-5 rounded-md bg-red-500/80"
+                      className="w-4 rounded-md bg-red-500/80 sm:w-5"
                       style={{ height: `${expHeight}px` }}
                       title={`Chi ${formatNumber(d.expense)}`}
                     />

@@ -978,7 +978,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                 </div>
               </div>
               <div className="mt-3 overflow-x-auto pb-2">
-                <div className="flex min-w-[320px] items-end gap-3 min-h-[140px]">
+                <div className="flex min-w-[260px] items-end gap-2 min-h-[140px] sm:min-w-[320px] sm:gap-3">
                   {metrics.pnlSeries.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Chưa có dữ liệu.</p>
                   ) : (
@@ -993,12 +993,12 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                         <div key={point.label} className="flex flex-col items-center gap-1">
                           <div className="flex items-end gap-1">
                             <div
-                              className="w-4 rounded-md bg-emerald-500"
+                              className="w-3 rounded-md bg-emerald-500 sm:w-4"
                               style={{ height: `${winHeight}px`, opacity: point.win > 0 ? 1 : 0.2 }}
                               title={`${point.label}: Win ${formatNumber(point.win)}`}
                             />
                             <div
-                              className="w-4 rounded-md bg-red-500"
+                              className="w-3 rounded-md bg-red-500 sm:w-4"
                               style={{ height: `${lossHeight}px`, opacity: point.loss > 0 ? 1 : 0.2 }}
                               title={`${point.label}: Lose ${formatNumber(point.loss)}`}
                             />
@@ -1024,7 +1024,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                 </div>
               </div>
               <div className="mt-3 overflow-x-auto pb-2">
-                <div className="flex min-w-[320px] items-end gap-2 min-h-[140px]">
+                <div className="flex min-w-[260px] items-end gap-1.5 min-h-[140px] sm:min-w-[320px] sm:gap-2">
                   {metrics.lotsSeries.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Chưa có dữ liệu.</p>
                   ) : (
@@ -1034,7 +1034,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                       return (
                         <div key={point.label} className="flex flex-col items-center gap-1">
                           <div
-                            className="w-10 rounded-md bg-primary/80"
+                            className="w-8 rounded-md bg-primary/80 sm:w-10"
                             style={{ height: `${heightPx}px` }}
                             title={`${point.label}: ${formatNumber(point.value, 3)} lots`}
                           />
