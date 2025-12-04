@@ -548,14 +548,7 @@ export interface Database {
           total_repay: number | null;
           balance: number | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: null;
-            columns: ["partner_id"];
-            referencedRelation: "partners";
-            referencedColumns: ["id"];
-          }
-        ];
+        Relationships: [];
       };
     };
     Functions: Record<string, never>;

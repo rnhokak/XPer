@@ -181,7 +181,7 @@ export function PartnerTransactionFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Loại giao dịch</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange} disabled={Boolean(presetDirection)}>
+                    <Select value={field.value ?? "lend"} onValueChange={field.onChange} disabled={Boolean(presetDirection)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -192,7 +192,7 @@ export function PartnerTransactionFormDialog({
                         <SelectItem value="receive">{directionLabel.receive}</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">{directionNote[field.value]}</p>
+                    <p className="text-xs text-muted-foreground">{directionNote[field.value ?? "lend"]}</p>
                     <FormMessage>{form.formState.errors.direction?.message}</FormMessage>
                   </FormItem>
                 )}
