@@ -40,6 +40,8 @@ const formatNumber = (value?: number | null, fractionDigits = 2) =>
     ? "—"
     : Number(value).toLocaleString(undefined, { maximumFractionDigits: fractionDigits, minimumFractionDigits: fractionDigits });
 
+const getOrderNetPnl = (order: OrderRow) => Number(order.pnl_amount ?? 0) + Number(order.commission_usd ?? 0);
+
 type ChartPoint = { label: string; value: number };
 type PnlPoint = { label: string; win: number; loss: number };
 type PeriodSummary = {
@@ -50,6 +52,7 @@ type PeriodSummary = {
   winAmount: number;
   loseAmount: number;
   winRate: number;
+  commission: number;
 };
 type WinRateComparison = {
   current: number;
@@ -148,7 +151,7 @@ const buildLastNDaysPnlSeries = (
     if (Number.isNaN(d.getTime())) return;
     const label = localDateLabel(d);
     if (!map.has(label)) return;
-    const pnl = Number(order.pnl_amount ?? 0);
+    const pnl = getOrderNetPnl(order);
     const current = map.get(label)!;
     if (pnl >= 0) {
       current.win += pnl;
@@ -196,10 +199,12 @@ const getPeriodSummaries = (orders: OrderRow[], keys: Array<"open_time" | "close
     let losses = 0;
     let winAmount = 0;
     let loseAmount = 0;
+    let commission = 0;
     orders.forEach((order) => {
       const d = getDateFromOrder(order, keys);
       if (!d || !predicate(d)) return;
-      const val = Number(order.pnl_amount ?? 0);
+      const val = getOrderNetPnl(order);
+      commission += Number(order.commission_usd ?? 0);
       pnl += val;
       if (val > 0) wins += 1;
       if (val < 0) losses += 1;
@@ -208,7 +213,7 @@ const getPeriodSummaries = (orders: OrderRow[], keys: Array<"open_time" | "close
     });
     const totalTrades = wins + losses;
     const winRate = totalTrades === 0 ? 0 : Math.round((wins / totalTrades) * 100);
-    return { label, pnl, wins, losses, winAmount, loseAmount, winRate };
+    return { label, pnl, wins, losses, winAmount, loseAmount, winRate, commission };
   };
 
   return {
@@ -224,11 +229,13 @@ const summarizeRange = (orders: OrderRow[], keys: Array<"open_time" | "close_tim
   let losses = 0;
   let winAmount = 0;
   let loseAmount = 0;
+  let commission = 0;
 
   orders.forEach((order) => {
     const d = getDateFromOrder(order, keys);
     if (!d || d < start || d >= end) return;
-    const val = Number(order.pnl_amount ?? 0);
+    const val = getOrderNetPnl(order);
+    commission += Number(order.commission_usd ?? 0);
     pnl += val;
     if (val > 0) {
       wins += 1;
@@ -249,6 +256,7 @@ const summarizeRange = (orders: OrderRow[], keys: Array<"open_time" | "close_tim
     winAmount,
     loseAmount,
     winRate,
+    commission,
   };
 };
 
@@ -329,7 +337,7 @@ const getWinRateComparison = (orders: OrderRow[], keys: Array<"open_time" | "clo
     orders.forEach((order) => {
       const d = getDateFromOrder(order, keys);
       if (!d || d < start || d >= end) return;
-      const val = Number(order.pnl_amount ?? 0);
+      const val = getOrderNetPnl(order);
       if (val > 0) wins += 1;
       if (val < 0) losses += 1;
     });
@@ -503,10 +511,10 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
 
   const metrics = useMemo(() => {
     const closedOrders = filteredOrders.filter((o) => o.status === "closed");
-    const winCount = closedOrders.filter((o) => Number(o.pnl_amount ?? 0) > 0).length;
+    const winCount = closedOrders.filter((o) => getOrderNetPnl(o) > 0).length;
     const closedCount = closedOrders.length;
     const winRate = closedCount === 0 ? 0 : Math.round((winCount / closedCount) * 100);
-    const totalPnl = closedOrders.reduce((acc, o) => acc + Number(o.pnl_amount ?? 0), 0);
+    const totalPnl = closedOrders.reduce((acc, o) => acc + getOrderNetPnl(o), 0);
 
     const lotsSeries = buildLastNDaysSeries(filteredOrders, ["open_time", "close_time"], (o) => Number(o.volume ?? 0), 7);
     const pnlSeries = buildLastNDaysPnlSeries(closedOrders, ["close_time", "open_time"], 7);
@@ -528,6 +536,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
   const activePrevious = activeComparison.previous;
   const pnlDelta = activeSummary.pnl - activePrevious.pnl;
   const winRateDelta = activeSummary.winRate - activePrevious.winRate;
+  const commissionDelta = activeSummary.commission - activePrevious.commission;
   const totalTrades = activeSummary.wins + activeSummary.losses;
   const prevTrades = activePrevious.wins + activePrevious.losses;
   const tradeDelta = totalTrades - prevTrades;
@@ -826,7 +835,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                   </div>
                 </div>
               </div>
-              <div className="relative mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="relative mt-4 grid gap-3 sm:grid-cols-4">
                 <div className="rounded-lg bg-white/80 p-3 shadow-sm">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Giao dịch đóng</p>
                   <p className="text-lg font-semibold text-foreground">{totalTrades}</p>
@@ -841,6 +850,14 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                     {formatNumber(activeSummary.winAmount)} / {formatNumber(activeSummary.loseAmount)}
                   </p>
                   <p className="text-xs text-muted-foreground">Win chiếm {winShare}% tổng biến động</p>
+                </div>
+                <div className="rounded-lg bg-white/80 p-3 shadow-sm">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Commission</p>
+                  <p className="text-lg font-semibold text-foreground">{formatNumber(activeSummary.commission)}</p>
+                  <p className={`text-xs ${commissionDelta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {commissionDelta >= 0 ? "+" : ""}
+                    {formatNumber(commissionDelta)} vs kỳ trước
+                  </p>
                 </div>
                 <div className="rounded-lg bg-white/80 p-3 shadow-sm">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Nhịp kỳ trước</p>
@@ -940,6 +957,9 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                       {summary.winRate}% win · {summary.wins}/{summary.losses}
                     </span>
                   </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Commission: {formatNumber(summary.commission)}
+                  </p>
                   <p className={`mt-1 text-xs ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                     {delta >= 0 ? "+" : ""}
                     {formatNumber(delta)} vs kỳ trước
@@ -1166,11 +1186,11 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                         <p className="text-foreground">{formatDateTime(order.close_time)}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground/70">PnL</p>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground/70">PnL (net)</p>
                         {order.pnl_amount !== null && order.pnl_amount !== undefined ? (
                           <div className="text-foreground">
-                            <span className={order.pnl_amount >= 0 ? "text-emerald-600" : "text-red-600"}>
-                              {formatNumber(order.pnl_amount)}
+                            <span className={getOrderNetPnl(order) >= 0 ? "text-emerald-600" : "text-red-600"}>
+                              {formatNumber(getOrderNetPnl(order))}
                             </span>
                             {order.pnl_percent !== null && order.pnl_percent !== undefined ? (
                               <span className="ml-1 text-xs text-muted-foreground">({formatNumber(order.pnl_percent, 2)}%)</span>
@@ -1214,7 +1234,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                       <TableHead>Status</TableHead>
                       <TableHead>Open</TableHead>
                       <TableHead>Close</TableHead>
-                      <TableHead>PnL</TableHead>
+                      <TableHead>PnL (net)</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1252,10 +1272,10 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                         <TableCell className="whitespace-nowrap text-sm">{formatDateTime(order.open_time)}</TableCell>
                         <TableCell className="whitespace-nowrap text-sm">{formatDateTime(order.close_time)}</TableCell>
                         <TableCell>
-                          {order.pnl_amount !== null && order.pnl_amount !== undefined ? (
-                            <div className="space-y-0.5">
-                              <div className={order.pnl_amount >= 0 ? "text-emerald-600" : "text-red-600"}>
-                                {formatNumber(order.pnl_amount)}
+                        {order.pnl_amount !== null && order.pnl_amount !== undefined ? (
+                          <div className="space-y-0.5">
+                              <div className={getOrderNetPnl(order) >= 0 ? "text-emerald-600" : "text-red-600"}>
+                                {formatNumber(getOrderNetPnl(order))}
                               </div>
                               {order.pnl_percent !== null && order.pnl_percent !== undefined ? (
                                 <div className="text-xs text-muted-foreground">{formatNumber(order.pnl_percent, 2)}%</div>
