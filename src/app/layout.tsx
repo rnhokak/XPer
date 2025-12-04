@@ -14,15 +14,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="bg-muted">
-      <link rel="manifest" href="/manifest.json" />
-      <link rel="icon" href="/favicon.ico" />
-      <meta name="apple-mobile-web-app-capable" content="yes" />
-      <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      <meta name="apple-mobile-web-app-title" content="XPer Finance" />
-      <meta name="application-name" content="XPer Finance" />
-      <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-      <body className={inter.className}>
+    <html lang="en" className="bg-slate-50">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/favicon.ico" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="XPer Finance" />
+        <meta name="application-name" content="XPer Finance" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+      </head>
+      <body className={`${inter.className} min-h-screen bg-slate-50 text-slate-900 antialiased`}>
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

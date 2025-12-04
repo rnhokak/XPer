@@ -103,13 +103,13 @@ export function PartnerListPageClient({ partners, accounts, categories, defaultC
   const accountOptions: AccountOption[] = accounts.map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">Quản lý mọi dòng tiền theo từng đối tác</p>
           <h1 className="text-2xl font-semibold">Money by Partner</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <PartnerTransactionFormDialog
             partners={partnerOptions}
             accounts={accountOptions}
@@ -123,20 +123,20 @@ export function PartnerListPageClient({ partners, accounts, categories, defaultC
         </div>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle>Tổng quan</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Họ nợ tôi</p>
             <p className="text-2xl font-semibold">{formatNumber(totals.theyOwe)} {defaultCurrency}</p>
           </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Tôi nợ họ</p>
             <p className="text-2xl font-semibold">{formatNumber(totals.iOwe)} {defaultCurrency}</p>
           </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Net balance</p>
             <p className={`text-2xl font-semibold ${totals.net >= 0 ? "text-emerald-700" : "text-red-600"}`}>
               {formatNumber(totals.net)} {defaultCurrency}
@@ -146,19 +146,19 @@ export function PartnerListPageClient({ partners, accounts, categories, defaultC
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
-        <Card className="h-full">
+        <Card className="h-full rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
           <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>Đối tác</CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   placeholder="Tìm theo tên"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-[220px]"
+                  className="w-full sm:w-[220px]"
                 />
                 <Select value={sort} onValueChange={(v: typeof sort) => setSort(v)}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue placeholder="Sort" />
                   </SelectTrigger>
                   <SelectContent>
@@ -176,8 +176,8 @@ export function PartnerListPageClient({ partners, accounts, categories, defaultC
             ) : (
               <div className="space-y-3">
                 {filtered.map((p) => (
-                  <div key={p.id} className="rounded-lg border bg-white p-4 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-lg font-semibold">{p.name}</p>
                         <p className="text-xs text-muted-foreground">
@@ -185,7 +185,7 @@ export function PartnerListPageClient({ partners, accounts, categories, defaultC
                           {p.phone ? ` · ${p.phone}` : ""}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline">Net {formatNumber(p.net)} {defaultCurrency}</Badge>
                         <Button asChild size="sm" variant="outline">
                           <Link href={`/partners/${p.id}`}>Xem chi tiết</Link>
@@ -253,7 +253,7 @@ export function PartnerListPageClient({ partners, accounts, categories, defaultC
           </CardContent>
         </Card>
 
-        <Card className="h-full">
+        <Card className="h-full rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
           <CardHeader>
             <CardTitle>{showCreate ? "Thêm/ sửa đối tác" : "Quản lý đối tác"}</CardTitle>
           </CardHeader>

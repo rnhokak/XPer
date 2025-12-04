@@ -154,28 +154,27 @@ export default async function DashboardPage() {
   const openOrders = orders.filter((o) => o.status === "open");
   const closedThisMonth = orders.filter((o) => o.status === "closed" && o.close_time && o.close_time >= monthStart);
   const pnlThisMonth = closedThisMonth.reduce((sum, o) => sum + Number(o.pnl_amount ?? 0), 0);
-  // Withdraw - deposit: coi withdraw là phần rút về (realized)
   const fundingNet = funding.reduce((sum, f) => (f.type === "withdraw" ? sum + Number(f.amount) : sum - Number(f.amount)), 0);
 
   const latestOrders = orders.slice(0, 5);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Chụp nhanh ba module: cashflow, debts và trading.</p>
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">Ảnh nhanh cashflow · debts · trading</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <Button asChild variant="outline" className="justify-center gap-2">
+            <Link href="/settings">
+              Cấu hình nhanh
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </Button>
         </div>
-        <Button asChild variant="outline" className="gap-2">
-          <Link href="/settings">
-            Cấu hình nhanh
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-        </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-0 bg-white/90 shadow-sm ring-1 ring-black/5">
+      <div className="grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
+        <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
           <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -186,13 +185,13 @@ export default async function DashboardPage() {
                 Tính từ {new Date(monthStart).toLocaleDateString("vi-VN", { day: "2-digit", month: "short" })} đến hôm nay.
               </CardDescription>
             </div>
-            <Button asChild variant="outline">
+            <Button asChild size="sm" variant="outline">
               <Link href="/cashflow">Mở Cashflow</Link>
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Net</p>
                 <p className={`text-2xl font-semibold ${cashflowNet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                   {cashflowNet >= 0 ? "+" : ""}
@@ -200,14 +199,14 @@ export default async function DashboardPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">Thu - Chi</p>
               </div>
-              <div className="rounded-lg border bg-emerald-50 px-4 py-3 shadow-sm">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-emerald-700">Thu</p>
                 <p className="text-2xl font-semibold text-emerald-700">
                   +{formatNumber(totalIncome, 0)} <span className="text-base font-normal text-emerald-700/80">{defaultCurrency}</span>
                 </p>
                 <p className="text-xs text-emerald-700/80">Giao dịch thu tháng này</p>
               </div>
-              <div className="rounded-lg border bg-red-50 px-4 py-3 shadow-sm">
+              <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-red-700">Chi</p>
                 <p className="text-2xl font-semibold text-red-700">
                   -{formatNumber(totalExpense, 0)} <span className="text-base font-normal text-red-700/80">{defaultCurrency}</span>
@@ -221,10 +220,13 @@ export default async function DashboardPage() {
                 <p className="text-sm font-semibold text-foreground">Giao dịch mới nhất</p>
                 <Badge variant="outline">{transactions.length} giao dịch tháng này</Badge>
               </div>
-              <div className="divide-y rounded-lg border bg-white">
+              <div className="space-y-2">
                 {latestTransactions.length ? (
                   latestTransactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
+                    >
                       <div className="space-y-1">
                         <p className="font-medium">
                           {tx.category?.name ?? (tx.type === "income" ? "Income" : "Expense")}
@@ -240,7 +242,7 @@ export default async function DashboardPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Chưa có giao dịch trong tháng.
                   </div>
@@ -250,9 +252,9 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 bg-white/90 shadow-sm ring-1 ring-black/5">
+        <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
           <CardHeader className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="flex items-center gap-2">
                 <HandCoins className="h-5 w-5 text-primary" />
                 Debts
@@ -264,8 +266,8 @@ export default async function DashboardPage() {
             <CardDescription>Theo dõi khoản cho vay / đi vay.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg border bg-white px-3 py-3 shadow-sm">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Đang cho vay</p>
                 <p className="mt-1 text-xl font-semibold">
                   {formatNumber(lendOutstanding, 0)} <span className="text-sm font-normal text-muted-foreground">{defaultCurrency}</span>
@@ -274,7 +276,7 @@ export default async function DashboardPage() {
                   {debtsWithOutstanding.filter((d) => d.direction === "lend").length} khoản
                 </Badge>
               </div>
-              <div className="rounded-lg border bg-white px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Đang đi vay</p>
                 <p className="mt-1 text-xl font-semibold">
                   {formatNumber(borrowOutstanding, 0)} <span className="text-sm font-normal text-muted-foreground">{defaultCurrency}</span>
@@ -287,23 +289,30 @@ export default async function DashboardPage() {
 
             <div className="space-y-2">
               <p className="text-sm font-semibold">Sắp đến hạn</p>
-              <div className="divide-y rounded-lg border bg-white">
+              <div className="space-y-2">
                 {upcomingDue.length ? (
                   upcomingDue.map((debt) => (
-                    <div key={debt.id} className="flex items-center justify-between px-3 py-3 text-sm">
-                      <div className="space-y-1">
-                        <p className="font-medium">{debt.partner?.name ?? "Không có đối tác"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Đến hạn {new Date(debt.due_date ?? "").toLocaleDateString("vi-VN")} · {debt.direction === "lend" ? "Cho vay" : "Đi vay"}
+                    <div
+                      key={debt.id}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="font-medium">{debt.partner?.name ?? "Không có đối tác"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Đến hạn {new Date(debt.due_date ?? "").toLocaleDateString("vi-VN")} · {debt.direction === "lend" ? "Cho vay" : "Đi vay"}
+                          </p>
+                        </div>
+                        <p className="text-right text-sm font-semibold text-foreground">
+                          {formatNumber(debt.outstanding ?? debt.principal_amount, 0)} {debt.currency ?? defaultCurrency}
                         </p>
                       </div>
-                      <p className="text-right text-sm font-semibold text-foreground">
-                        {formatNumber(debt.outstanding ?? debt.principal_amount, 0)} {debt.currency ?? defaultCurrency}
-                      </p>
                     </div>
                   ))
                 ) : (
-                  <div className="px-3 py-4 text-sm text-muted-foreground">Không có khoản đến hạn.</div>
+                  <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-sm text-muted-foreground">
+                    Không có khoản đến hạn.
+                  </div>
                 )}
               </div>
             </div>
@@ -311,7 +320,7 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <Card className="border-0 bg-white/90 shadow-sm ring-1 ring-black/5">
+      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -320,7 +329,7 @@ export default async function DashboardPage() {
             </CardTitle>
             <CardDescription>PnL và funding gần đây.</CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">
               <Link href="/trading/orders">Orders</Link>
             </Button>
@@ -330,8 +339,8 @@ export default async function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">PnL tháng này</p>
               <p className={`mt-1 text-2xl font-semibold ${pnlThisMonth >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {pnlThisMonth >= 0 ? "+" : ""}
@@ -339,12 +348,12 @@ export default async function DashboardPage() {
               </p>
               <p className="text-xs text-muted-foreground">{closedThisMonth.length} lệnh đã đóng</p>
             </div>
-            <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Open orders</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{openOrders.length}</p>
               <p className="text-xs text-muted-foreground">Chờ đóng</p>
             </div>
-            <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Funding net</p>
               <p className={`mt-1 text-2xl font-semibold ${fundingNet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {fundingNet >= 0 ? "+" : ""}
@@ -352,7 +361,7 @@ export default async function DashboardPage() {
               </p>
               <p className="text-xs text-muted-foreground">Withdraw - Deposit</p>
             </div>
-            <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Tổng lệnh theo tháng</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{orders.length}</p>
               <p className="text-xs text-muted-foreground">Đã ghi nhận tháng này</p>
@@ -361,10 +370,13 @@ export default async function DashboardPage() {
 
           <div className="space-y-2">
             <p className="text-sm font-semibold">Lệnh mới nhất</p>
-            <div className="divide-y rounded-lg border bg-white">
+            <div className="space-y-2">
               {latestOrders.length ? (
                 latestOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
+                  >
                     <div className="space-y-1">
                       <p className="font-medium">
                         {order.symbol} · {order.side.toUpperCase()} · {formatNumber(order.volume, 2)} lot
@@ -380,7 +392,9 @@ export default async function DashboardPage() {
                   </div>
                 ))
               ) : (
-                <div className="px-4 py-6 text-sm text-muted-foreground">Chưa có lệnh nào trong tháng.</div>
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-sm text-muted-foreground">
+                  Chưa có lệnh nào trong tháng.
+                </div>
               )}
             </div>
           </div>

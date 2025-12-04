@@ -30,8 +30,8 @@ export default async function NewDebtPage() {
   const defaultCurrency = defaultAccount?.currency ?? "VND";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">Tạo khoản vay mới</p>
           <h1 className="text-2xl font-semibold">Debts</h1>

@@ -106,24 +106,24 @@ export default async function DebtsPage() {
     .reduce((sum, d) => sum + (d.outstanding_principal ?? d.principal_amount), 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Debts</h1>
           <p className="text-sm text-muted-foreground">Quản lý cho vay/đi vay và tự động ghi nhận cashflow.</p>
+          <h1 className="text-2xl font-semibold">Debts</h1>
         </div>
         <Button asChild>
           <Link href="/debts/new">Thêm khoản vay mới</Link>
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
+          <CardHeader className="pb-3">
             <CardTitle>Tổng kết nhanh</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Đang cho vay</p>
               <p className="mt-1 text-2xl font-semibold">
                 {totalLendOutstanding.toLocaleString()} <span className="text-base font-normal text-muted-foreground">{defaultCurrency}</span>
@@ -132,7 +132,7 @@ export default async function DebtsPage() {
                 {debts.filter((d) => d.direction === "lend").length} khoản
               </Badge>
             </div>
-            <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Đang đi vay</p>
               <p className="mt-1 text-2xl font-semibold">
                 {totalBorrowOutstanding.toLocaleString()}{" "}
@@ -145,8 +145,8 @@ export default async function DebtsPage() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
-          <CardHeader>
+        <Card className="h-full rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
+          <CardHeader className="pb-3">
             <CardTitle>Quản lý đối tác</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">

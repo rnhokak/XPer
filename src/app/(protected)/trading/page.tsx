@@ -1,12 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { redirect } from "next/navigation";
 
 export default function TradingPage() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Trading</CardTitle>
-      </CardHeader>
-      <CardContent className="text-muted-foreground">Trading journal and orders will appear soon.</CardContent>
-    </Card>
-  );
+  redirect("/trading/orders");
 }

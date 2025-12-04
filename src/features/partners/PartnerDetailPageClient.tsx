@@ -96,8 +96,8 @@ export function PartnerDetailPageClient({ partner, balance, transactions, accoun
   const accountOptions: AccountOption[] = accounts.map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">Tổng hợp giao dịch với đối tác</p>
           <h1 className="text-2xl font-semibold">{partner.name}</h1>
@@ -146,22 +146,22 @@ export function PartnerDetailPageClient({ partner, balance, transactions, accoun
         </div>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader>
           <CardTitle>Trạng thái tiền</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Họ nợ tôi</p>
             <p className="text-2xl font-semibold text-emerald-700">{formatNumber(totals.theyOwe)} {defaultCurrency}</p>
             <p className="text-xs text-muted-foreground">Đã cho vay {formatNumber(totals.totalLent)} · Đã nhận {formatNumber(totals.totalReceive)}</p>
           </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Tôi nợ họ</p>
             <p className="text-2xl font-semibold text-amber-700">{formatNumber(totals.iOwe)} {defaultCurrency}</p>
             <p className="text-xs text-muted-foreground">Đã vay {formatNumber(totals.totalBorrowed)} · Đã trả {formatNumber(totals.totalRepay)}</p>
           </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Net balance</p>
             <p className={`text-2xl font-semibold ${totals.net >= 0 ? "text-emerald-700" : "text-red-600"}`}>
               {formatNumber(totals.net)} {defaultCurrency}
@@ -171,7 +171,7 @@ export function PartnerDetailPageClient({ partner, balance, transactions, accoun
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <CardTitle>Thông tin đối tác</CardTitle>
@@ -196,11 +196,11 @@ export function PartnerDetailPageClient({ partner, balance, transactions, accoun
             />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Liên hệ</p>
                 <p className="text-sm font-semibold">{partner.phone || "Chưa cập nhật"}</p>
               </div>
-              <div className="rounded-lg border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Ghi chú</p>
                 <p className="text-sm text-muted-foreground">{partner.note || "—"}</p>
               </div>
@@ -209,72 +209,121 @@ export function PartnerDetailPageClient({ partner, balance, transactions, accoun
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader>
           <CardTitle>Lịch sử giao dịch</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Loại</TableHead>
-                  <TableHead>Ngày</TableHead>
-                  <TableHead>Cashflow</TableHead>
-                  <TableHead>Gốc/Lãi</TableHead>
-                  <TableHead>Ghi chú</TableHead>
-                  <TableHead className="text-right">Số tiền</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.length === 0 ? (
+        <CardContent className="space-y-3">
+          <div className="space-y-3 md:hidden">
+            {transactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Chưa có giao dịch nào với đối tác này.</p>
+            ) : (
+              transactions.map((tx) => (
+                <div key={tx.id} className="space-y-2 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${directionDisplay[tx.direction].tone}`}>
+                      {directionDisplay[tx.direction].label}
+                    </span>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(tx.date)}</p>
+                  </div>
+                  <div className="text-sm">
+                    {tx.transaction ? (
+                      <>
+                        <p className={tx.transaction.type === "income" ? "text-emerald-700" : "text-red-600"}>
+                          {tx.transaction.type === "income" ? "+" : "-"}
+                          {formatNumber(tx.transaction.amount)} {tx.transaction.currency}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {tx.transaction.account?.name ? `${tx.transaction.account.name} · ${tx.transaction.account.currency || ""}` : "Không gắn tài khoản"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{tx.transaction.category?.name ?? "Không phân loại"}</p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Không tìm thấy bản ghi cashflow</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-lg bg-slate-50 px-3 py-2">
+                      <p className="text-xs text-muted-foreground">Gốc</p>
+                      <p className="font-semibold">{formatNumber(tx.principal_amount)}</p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                      <p className="text-xs text-emerald-700">Lãi</p>
+                      <p className="font-semibold text-emerald-700">{formatNumber(tx.interest_amount)}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{tx.note || tx.transaction?.note || "—"}</p>
+                  <p className={`text-right text-sm font-semibold ${Number(tx.amount ?? 0) >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                    {formatNumber(tx.amount)} {tx.transaction?.currency ?? defaultCurrency}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden md:block">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                      Chưa có giao dịch nào với đối tác này.
-                    </TableCell>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Ngày</TableHead>
+                    <TableHead>Cashflow</TableHead>
+                    <TableHead>Gốc/Lãi</TableHead>
+                    <TableHead>Ghi chú</TableHead>
+                    <TableHead className="text-right">Số tiền</TableHead>
                   </TableRow>
-                ) : (
-                  transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${directionDisplay[tx.direction].tone}`}>
-                          {directionDisplay[tx.direction].label}
-                        </span>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.date)}</TableCell>
-                      <TableCell className="space-y-1 text-sm">
-                        {tx.transaction ? (
-                          <>
-                            <p className={tx.transaction.type === "income" ? "text-emerald-700" : "text-red-600"}>
-                              {tx.transaction.type === "income" ? "+" : "-"}
-                              {formatNumber(tx.transaction.amount)} {tx.transaction.currency}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {tx.transaction.account?.name ? `${tx.transaction.account.name} · ${tx.transaction.account.currency || ""}` : "Không gắn tài khoản"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {tx.transaction.category?.name ?? "Không phân loại"}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">Không tìm thấy bản ghi cashflow</p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <p>Gốc: {formatNumber(tx.principal_amount)}</p>
-                        <p>Lãi: {formatNumber(tx.interest_amount)}</p>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[220px]">
-                        {tx.note || tx.transaction?.note || "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-semibold">
-                        {formatNumber(tx.amount)} {tx.transaction?.currency ?? defaultCurrency}
+                </TableHeader>
+                <TableBody>
+                  {transactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                        Chưa có giao dịch nào với đối tác này.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    transactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>
+                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${directionDisplay[tx.direction].tone}`}>
+                            {directionDisplay[tx.direction].label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.date)}</TableCell>
+                        <TableCell className="space-y-1 text-sm">
+                          {tx.transaction ? (
+                            <>
+                              <p className={tx.transaction.type === "income" ? "text-emerald-700" : "text-red-600"}>
+                                {tx.transaction.type === "income" ? "+" : "-"}
+                                {formatNumber(tx.transaction.amount)} {tx.transaction.currency}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {tx.transaction.account?.name ? `${tx.transaction.account.name} · ${tx.transaction.account.currency || ""}` : "Không gắn tài khoản"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {tx.transaction.category?.name ?? "Không phân loại"}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">Không tìm thấy bản ghi cashflow</p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <p>Gốc: {formatNumber(tx.principal_amount)}</p>
+                          <p>Lãi: {formatNumber(tx.interest_amount)}</p>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-[220px]">
+                          {tx.note || tx.transaction?.note || "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold">
+                          {formatNumber(tx.amount)} {tx.transaction?.currency ?? defaultCurrency}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>

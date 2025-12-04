@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, ChevronLeft, ChevronRight, Gauge, HandCoins, LogOut, Menu, Settings, Wallet } from "lucide-react";
+import { BarChart3, Gauge, HandCoins, LogOut, Menu, Settings, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -60,31 +60,36 @@ const navItems: NavItem[] = [
 ];
 
 interface MainLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
   userEmail?: string | null;
   userDisplayName?: string | null;
 }
 
-// Layout for authenticated pages with responsive sidebar, collapse toggle, and user menu
+// Mobile-first layout with bottom navigation and a compact sidebar for larger screens
 export default function MainLayout({ children, userEmail, userDisplayName }: MainLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isSidebarOpen, toggleSidebar, closeSidebar } = useUIStore();
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const preferredName = userDisplayName || userEmail || "User";
   const initials = useMemo(() => preferredName.charAt(0).toUpperCase(), [preferredName]);
+
+  const activeNav = useMemo(() => {
+    const exact = navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+    if (exact) return exact;
+    return (
+      navItems.find((item) =>
+        item.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`))
+      ) ?? null
+    );
+  }, [pathname]);
 
   const handleLogout = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace("/auth/login");
   }, [router]);
-
-  const handleNavClick = useCallback(() => {
-    closeSidebar();
-  }, [closeSidebar]);
 
   // Close user menu on outside click or Escape
   useEffect(() => {
@@ -105,80 +110,67 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
       <aside
         className={cn(
-          "fixed inset-y-0 z-20 flex flex-col border-r bg-white/90 shadow-sm backdrop-blur transition-all duration-200",
+          "fixed inset-y-0 left-0 z-30 w-72 transform border-r border-slate-200 bg-white/90 px-3 py-4 shadow-lg backdrop-blur transition-transform duration-200",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full",
-          isCollapsed ? "w-[4.5rem]" : "w-64",
           "md:translate-x-0"
         )}
       >
-        <div className="flex h-16 items-center justify-between px-3">
-          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              X
+        <div className="flex items-center justify-between px-1 pb-4">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-base font-semibold text-white shadow-sm">
+              xP
             </span>
-            {!isCollapsed && <span className="text-lg">XPer</span>}
+            <div>
+              <p className="text-sm font-semibold leading-tight">XPer Finance</p>
+              <p className="text-xs text-muted-foreground">iOS-first workspace</p>
+            </div>
           </Link>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={toggleSidebar}
-              aria-label="Toggle menu"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden md:inline-flex"
-              onClick={() => setIsCollapsed((v) => !v)}
-              aria-label="Collapse sidebar"
-            >
-              {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Đóng menu">
+            <Menu className="h-5 w-5" />
+          </Button>
         </div>
 
-        <nav className="flex-1 space-y-1 px-2 py-2">
+        <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active =
-              pathname === item.href || item.children?.some((child) => pathname.startsWith(child.href));
+              pathname === item.href ||
+              pathname.startsWith(`${item.href}/`) ||
+              item.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
 
             return (
               <div key={item.href} className="space-y-1">
                 <Link
                   href={item.href}
-                  onClick={handleNavClick}
+                  onClick={closeSidebar}
                   className={cn(
-                    "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    active && "bg-primary/10 text-primary shadow-sm"
+                    "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-slate-100 hover:text-foreground",
+                    active && "bg-emerald-50 text-emerald-700 shadow-sm"
                   )}
+                  aria-current={active ? "page" : undefined}
                 >
-                  <Icon className="h-4 w-4 transition-transform group-hover:scale-105" />
-                  {!isCollapsed && item.label}
-                  
+                  <Icon className={cn("h-4 w-4", active && "text-emerald-600")} />
+                  {item.label}
                 </Link>
 
-                {item.children && !isCollapsed ? (
-                  <div className="ml-9 space-y-1">
+                {item.children ? (
+                  <div className="ml-8 space-y-1">
                     {item.children.map((child) => {
-                      const childActive = pathname.startsWith(child.href);
+                      const childActive = pathname === child.href || pathname.startsWith(`${child.href}/`);
                       return (
                         <Link
                           key={child.href}
                           href={child.href}
-                          onClick={handleNavClick}
+                          onClick={closeSidebar}
                           className={cn(
-                            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                            childActive && "bg-primary/10 text-primary"
+                            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-slate-100 hover:text-foreground",
+                            childActive && "bg-emerald-50 text-emerald-700"
                           )}
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
                           {child.label}
                         </Link>
                       );
@@ -190,90 +182,122 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
           })}
         </nav>
 
-        <div className="border-t px-3 py-3">
-          <div className="flex items-center justify-center gap-3 rounded-lg bg-muted/70 px-3 py-2 text-sm">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700">
               {initials}
             </div>
-            {!isCollapsed && (
-              <div className="space-y-0.5">
-                <p className="font-medium text-sm">{preferredName}</p>
-                <p className="text-xs text-muted-foreground">Logged in</p>
-              </div>
-            )}
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold">{preferredName}</p>
+              <p className="text-xs text-muted-foreground">Đang đăng nhập</p>
+            </div>
           </div>
+          <Button
+            variant="ghost"
+            className="mt-3 w-full justify-start gap-2 text-sm text-emerald-700 hover:bg-emerald-50"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            Đăng xuất
+          </Button>
         </div>
       </aside>
 
-      {/* Mobile overlay to close sidebar on outside click */}
       {isSidebarOpen && (
         <button
           type="button"
-          aria-label="Close sidebar"
-          className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm md:hidden"
+          aria-label="Đóng sidebar"
+          className="fixed inset-0 z-20 bg-black/30 backdrop-blur-sm md:hidden"
           onClick={closeSidebar}
         />
       )}
 
-      <div
-        className={cn(
-          "flex min-h-screen flex-1 flex-col transition-all duration-200",
-          isCollapsed ? "md:pl-[4.5rem]" : "md:pl-64"
-        )}
-      >
-        <header className="sticky top-0 z-10 flex h-16 items-center border-b bg-white/90 px-3 sm:px-4 shadow-sm backdrop-blur">
-          <div className="flex flex-1 items-center gap-2">
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Toggle menu">
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div>
-              <p className="text-sm text-muted-foreground">Welcome back</p>
-              <p className="text-base font-semibold">{preferredName}</p>
+      <div className="flex min-h-screen flex-1 flex-col md:pl-72">
+        <header
+          className="sticky z-40 border-b border-slate-200 bg-white/90 backdrop-blur"
+          style={{ top: "env(safe-area-inset-top)" }}
+        >
+          <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-2 py-3 sm:px-6">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Mở menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+              <div>
+                <p className="text-xs text-muted-foreground">{activeNav?.label ?? "XPer"}</p>
+                <p className="text-base font-semibold leading-tight">{preferredName}</p>
+              </div>
             </div>
-          </div>
 
-          <div className="relative" ref={menuRef}>
-            <Button
-              variant="ghost"
-              className="flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-haspopup="menu"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-indigo-500 text-sm font-semibold text-white shadow-sm">
-                {initials}
-              </span>
-              <div className="hidden text-left md:block">
-                <p className="text-sm font-medium leading-tight">{preferredName}</p>
-                <p className="text-xs text-muted-foreground leading-tight">Account menu</p>
-              </div>
-            </Button>
+            <div className="relative" ref={menuRef}>
+              <Button
+                variant="ghost"
+                className="flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white shadow-sm">
+                  {initials}
+                </span>
+                <span className="hidden text-sm font-medium sm:inline">{preferredName}</span>
+              </Button>
 
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-white p-2 shadow-lg ring-1 ring-black/5">
-                <div className="px-3 py-2 text-sm">
-                  <p className="font-semibold">{preferredName}</p>
-                  <p className="text-xs text-muted-foreground">Signed in</p>
+              {menuOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-white p-2 shadow-lg ring-1 ring-black/5">
+                  <div className="px-3 py-2 text-sm">
+                    <p className="font-semibold">{preferredName}</p>
+                    <p className="text-xs text-muted-foreground">{userEmail ?? "Signed in"}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-sm hover:bg-emerald-50"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Đăng xuất
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-2 text-sm hover:bg-primary/10"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    handleLogout();
-                  }}
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 md:p-8">
-          <div className="mx-auto max-w-6xl space-y-6">{children}</div>
+        <main className="flex-1">
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-2 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-4 sm:px-6 md:max-w-5xl md:pb-12">
+            {children}
+          </div>
         </main>
       </div>
+
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2 shadow-2xl backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active =
+              pathname === item.href ||
+              pathname.startsWith(`${item.href}/`) ||
+              item.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeSidebar}
+                className={cn(
+                  "flex flex-1 flex-col items-center gap-1 rounded-xl px-3 py-3 text-[11px] font-semibold transition min-h-[52px]",
+                  active ? "bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100" : "text-muted-foreground hover:bg-slate-100"
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon className={cn("h-5 w-5", active && "text-emerald-600")} />
+                <span className="leading-none">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

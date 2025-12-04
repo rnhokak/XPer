@@ -105,28 +105,28 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
   const remainingPrincipal = computeOutstanding(debt.direction as "lend" | "borrow", debt.principal_amount, paymentRows);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">Chi tiết khoản {debt.direction === "lend" ? "cho vay" : "đi vay"}</p>
           <h1 className="text-2xl font-semibold">{debt.partner?.name ?? "Không rõ đối tác"}</h1>
           <p className="text-sm text-muted-foreground">Bắt đầu {new Date(debt.start_date).toLocaleDateString()}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{debt.direction === "lend" ? "Cho vay" : "Đi vay"}</Badge>
           <Badge>{debt.status}</Badge>
           <Button asChild variant="outline" size="sm">
-            <Link href="/debts">Quay lại danh sách</Link>
+            <Link href="/debts">Quay lại</Link>
           </Button>
         </div>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader>
           <CardTitle>Thông tin chính</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2 rounded-lg border bg-white p-4 shadow-sm">
+        <CardContent className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">Gốc ban đầu</p>
               <p className="text-lg font-semibold">
@@ -149,7 +149,7 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
-          <div className="space-y-2 rounded-lg border bg-white p-4 shadow-sm">
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold">Chi tiết lãi suất</p>
             <p className="text-sm text-muted-foreground">
               Loại: {debt.interest_type}
@@ -174,63 +174,109 @@ export default async function DebtDetailPage({ params }: { params: Promise<{ id:
         remainingPrincipal={remainingPrincipal}
       />
 
-      <Card>
+      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader>
           <CardTitle>Lịch sử thanh toán</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Loại</TableHead>
-                  <TableHead>Ngày</TableHead>
-                  <TableHead className="text-right">Số tiền</TableHead>
-                  <TableHead className="text-right">Gốc</TableHead>
-                  <TableHead className="text-right">Lãi</TableHead>
-                  <TableHead>Cashflow</TableHead>
-                  <TableHead>Ghi chú</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paymentRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                      Chưa có giao dịch nào.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paymentRows.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <Badge variant={p.payment_type === "disbursement" ? "secondary" : "default"}>{p.payment_type}</Badge>
-                      </TableCell>
-                      <TableCell>{new Date(p.payment_date).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">
+        <CardContent className="space-y-3">
+          <div className="space-y-3 md:hidden">
+            {paymentRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Chưa có giao dịch nào.</p>
+            ) : (
+              paymentRows.map((p) => (
+                <div key={p.id} className="space-y-2 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <Badge variant={p.payment_type === "disbursement" ? "secondary" : "default"}>{p.payment_type}</Badge>
+                    <p className="text-xs text-muted-foreground">{new Date(p.payment_date).toLocaleString()}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="rounded-lg bg-slate-50 px-3 py-2">
+                      <p className="text-xs text-muted-foreground">Số tiền</p>
+                      <p className="font-semibold">
                         {p.amount.toLocaleString()} {p.transaction?.currency ?? debt.currency}
-                      </TableCell>
-                      <TableCell className="text-right">{(p.principal_amount ?? 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{(p.interest_amount ?? 0).toLocaleString()}</TableCell>
-                      <TableCell>
-                        {p.transaction ? (
-                          <div className="text-sm">
-                            <div className="font-semibold">{p.transaction.type}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {p.transaction.account?.name ?? "—"} {p.transaction.category?.name ? `· ${p.transaction.category?.name}` : ""}
-                            </div>
-                          </div>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[280px] whitespace-pre-wrap text-sm text-muted-foreground">
-                        {p.note || p.transaction?.note || "—"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                      <p className="text-xs text-emerald-700">Gốc</p>
+                      <p className="font-semibold text-emerald-700">{(p.principal_amount ?? 0).toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-lg bg-amber-50 px-3 py-2">
+                      <p className="text-xs text-amber-700">Lãi</p>
+                      <p className="font-semibold text-amber-700">{(p.interest_amount ?? 0).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {p.transaction ? (
+                      <div>
+                        <p className="font-semibold text-foreground">{p.transaction.type}</p>
+                        <p>
+                          {p.transaction.account?.name ?? "—"} {p.transaction.category?.name ? `· ${p.transaction.category?.name}` : ""}
+                        </p>
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{p.note || p.transaction?.note || "—"}</p>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden md:block">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Loại</TableHead>
+                    <TableHead>Ngày</TableHead>
+                    <TableHead className="text-right">Số tiền</TableHead>
+                    <TableHead className="text-right">Gốc</TableHead>
+                    <TableHead className="text-right">Lãi</TableHead>
+                    <TableHead>Cashflow</TableHead>
+                    <TableHead>Ghi chú</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paymentRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                        Chưa có giao dịch nào.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    paymentRows.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell>
+                          <Badge variant={p.payment_type === "disbursement" ? "secondary" : "default"}>{p.payment_type}</Badge>
+                        </TableCell>
+                        <TableCell>{new Date(p.payment_date).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">
+                          {p.amount.toLocaleString()} {p.transaction?.currency ?? debt.currency}
+                        </TableCell>
+                        <TableCell className="text-right">{(p.principal_amount ?? 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{(p.interest_amount ?? 0).toLocaleString()}</TableCell>
+                        <TableCell>
+                          {p.transaction ? (
+                            <div className="text-sm">
+                              <div className="font-semibold">{p.transaction.type}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {p.transaction.account?.name ?? "—"} {p.transaction.category?.name ? `· ${p.transaction.category?.name}` : ""}
+                              </div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[280px] whitespace-pre-wrap text-sm text-muted-foreground">
+                          {p.note || p.transaction?.note || "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>
