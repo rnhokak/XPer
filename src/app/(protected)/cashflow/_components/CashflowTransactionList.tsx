@@ -358,7 +358,14 @@ export function CashflowTransactionList({
                     <FormItem>
                       <FormLabel>Ghi chú</FormLabel>
                       <FormControl>
-                        <Textarea rows={3} {...field} />
+                        <Textarea
+                          rows={3}
+                          value={field.value ?? ""}
+                          onChange={(event) => field.onChange(event.target.value)}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
                       </FormControl>
                       <FormMessage>{form.formState.errors.note?.message}</FormMessage>
                     </FormItem>

@@ -98,7 +98,8 @@ export async function POST(req: Request) {
     if (existingError) {
       return NextResponse.json({ error: existingError.message }, { status: 500 });
     }
-    existingTickets = existing?.map((r) => r.ticket).filter((t): t is string => Boolean(t)) ?? [];
+    const existingRows: Array<{ ticket: string | null }> = existing ?? [];
+    existingTickets = existingRows.map((r) => r.ticket).filter((t): t is string => Boolean(t)) ?? [];
   }
 
   const filteredRows = rows.filter((row) => !row.ticket || !existingTickets.includes(row.ticket));

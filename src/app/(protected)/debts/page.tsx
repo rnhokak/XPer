@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 type Partner = { id: string; name: string; type: string | null; phone?: string | null };
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
 type Category = { id: string; name: string; type: "income" | "expense" };
+type DebtPayment = { debt_id: string; payment_type: string; principal_amount: number | null; amount: number | null };
 type DebtRow = {
   id: string;
   partner_id: string;
@@ -30,6 +31,7 @@ type DebtRow = {
   partner: Partner | null;
   outstanding_principal: number;
 };
+type DebtRowBase = Omit<DebtRow, "outstanding_principal">;
 
 const computeOutstanding = (
   direction: "lend" | "borrow",
@@ -77,19 +79,20 @@ export default async function DebtsPage() {
   const partners: Partner[] = partnersRes.data ?? [];
   const accounts: Account[] = accountsRes.data ?? [];
   const categories: Category[] = categoriesRes.data ?? [];
-  const payments = paymentsRes.data ?? [];
+  const payments: DebtPayment[] = paymentsRes.data ?? [];
 
-  const paymentMap = new Map<string, Array<{ payment_type: string; principal_amount: number | null; amount: number | null }>>();
+  const paymentMap = new Map<string, DebtPayment[]>();
   payments.forEach((p) => {
     const current = paymentMap.get(p.debt_id) ?? [];
     current.push(p);
     paymentMap.set(p.debt_id, current);
   });
 
+  const debtsData: DebtRowBase[] = debtsRes.data ?? [];
   const debts: DebtRow[] =
-    debtsRes.data?.map((debt) => ({
+    debtsData.map((debt) => ({
       ...debt,
-      outstanding_principal: computeOutstanding(debt.direction as "lend" | "borrow", debt.principal_amount, paymentMap.get(debt.id) ?? []),
+      outstanding_principal: computeOutstanding(debt.direction, debt.principal_amount, paymentMap.get(debt.id) ?? []),
     })) ?? [];
 
   const defaultAccount = accounts.find((a) => a.is_default) ?? accounts[0] ?? null;

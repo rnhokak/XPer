@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { type Database } from "./types";
 
 // Create a Supabase client for client-side usage (persists auth via cookies)
@@ -10,5 +11,10 @@ export const createClient = () => {
     throw new Error("Missing Supabase environment variables");
   }
 
-  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+  return createBrowserClient<Database, "public">(supabaseUrl, supabaseAnonKey) as unknown as SupabaseClient<
+    Database,
+    "public",
+    "public",
+    Database["public"]
+  >;
 };

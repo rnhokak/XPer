@@ -41,6 +41,7 @@ type TradingOrder = {
 };
 
 type TradingFunding = { amount: number; type: "deposit" | "withdraw"; currency: string; transaction_time: string };
+type Account = { id: string; name: string; currency: string; is_default: boolean };
 
 const startOfMonth = (d: Date) => {
   const date = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -112,7 +113,7 @@ export default async function DashboardPage() {
       .limit(20),
   ]);
 
-  const accounts = accountsRes.data ?? [];
+  const accounts: Account[] = accountsRes.data ?? [];
   const transactions: Transaction[] = transactionsRes.data ?? [];
   const debts: Debt[] = debtsRes.data ?? [];
   const payments: DebtPayment[] = paymentsRes.data ?? [];

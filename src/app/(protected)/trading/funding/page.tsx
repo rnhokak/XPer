@@ -31,5 +31,6 @@ export default async function FundingPage() {
     );
   }
 
-  return <FundingPageClient initialData={data ?? []} />;
+  const fundingRows: FundingRow[] = (data ?? []) as FundingRow[];
+  return <FundingPageClient initialData={fundingRows} />;
 }

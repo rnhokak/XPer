@@ -262,7 +262,15 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
                     <FormItem>
                       <FormLabel>Note</FormLabel>
                       <FormControl>
-                        <Textarea {...field} rows={3} placeholder="Optional memo" />
+                        <Textarea
+                          rows={3}
+                          placeholder="Optional memo"
+                          value={field.value ?? ""}
+                          onChange={(event) => field.onChange(event.target.value)}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
                       </FormControl>
                       <FormMessage>{form.formState.errors.note?.message}</FormMessage>
                     </FormItem>

@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { orderFormSchema } from "@/lib/validation/trading";
 
 export const dynamic = "force-dynamic";
+const orderStatuses = ["open", "closed", "cancelled"] as const;
+type OrderStatus = (typeof orderStatuses)[number];
 
 const parseNumber = (value: unknown) => {
   if (value === null || value === undefined || value === "") return undefined;
@@ -32,14 +34,15 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const symbol = searchParams.get("symbol");
-  const status = searchParams.get("status");
+  const statusParam = searchParams.get("status");
+  const status = orderStatuses.includes(statusParam as OrderStatus) ? (statusParam as OrderStatus) : null;
 
   let query = supabase.from("trading_orders").select("*").eq("user_id", user.id);
 
   if (symbol) {
     query = query.ilike("symbol", `%${symbol}%`);
   }
-  if (status && status !== "all") {
+  if (status) {
     query = query.eq("status", status);
   }
 

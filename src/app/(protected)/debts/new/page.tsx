@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { type Database } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { DebtQuickCreateForm } from "../_components/DebtQuickCreateForm";
 
 export const dynamic = "force-dynamic";
+type AccountRow = Pick<Database["public"]["Tables"]["accounts"]["Row"], "id" | "name" | "type" | "currency" | "is_default">;
 
 export default async function NewDebtPage() {
   const user = await requireUser();
@@ -22,7 +24,7 @@ export default async function NewDebtPage() {
   ]);
 
   const partners = partnersRes.data ?? [];
-  const accounts = accountsRes.data ?? [];
+  const accounts: AccountRow[] = accountsRes.data ?? [];
   const categories = categoriesRes.data ?? [];
   const defaultAccount = accounts.find((a) => a.is_default) ?? accounts[0] ?? null;
   const defaultCurrency = defaultAccount?.currency ?? "VND";

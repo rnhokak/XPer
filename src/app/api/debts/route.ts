@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { debtCreateSchema } from "@/lib/validation/debts";
+import { type Database } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
+const debtStatuses = ["ongoing", "paid_off", "overdue", "cancelled"] as const;
+type DebtStatus = (typeof debtStatuses)[number];
+type DebtPayment = { debt_id: string; payment_type: string; principal_amount: number | null; amount: number | null };
 
 const getUserAndClient = async () => {
   const supabase = await createClient();
@@ -45,7 +49,8 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status");
+  const statusParam = searchParams.get("status");
+  const status = debtStatuses.includes(statusParam as DebtStatus) ? (statusParam as DebtStatus) : null;
 
   let debtQuery = supabase
     .from("debts")
@@ -55,7 +60,7 @@ export async function GET(req: Request) {
     .eq("user_id", user.id)
     .order("start_date", { ascending: false });
 
-  if (status && status !== "all") {
+  if (status) {
     debtQuery = debtQuery.eq("status", status);
   }
 
@@ -72,14 +77,17 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  const paymentMap = new Map<string, Array<{ payment_type: string; principal_amount: number | null; amount: number | null }>>();
-  (payments ?? []).forEach((p) => {
+  const paymentMap = new Map<string, DebtPayment[]>();
+  (payments ?? []).forEach((p: DebtPayment) => {
     const arr = paymentMap.get(p.debt_id) ?? [];
     arr.push(p);
     paymentMap.set(p.debt_id, arr);
   });
 
-  const enriched = (debts ?? []).map((debt) => {
+  const debtsData: Array<{ id: string; direction: "lend" | "borrow"; principal_amount: number } & Record<string, any>> =
+    debts ?? [];
+
+  const enriched = debtsData.map((debt) => {
     const related = paymentMap.get(debt.id) ?? [];
     return {
       ...debt,
@@ -136,11 +144,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: debtError?.message ?? "Failed to create debt" }, { status: 500 });
   }
 
-  const transactionPayload = {
+  const transactionType: "income" | "expense" = data.direction === "borrow" ? "income" : "expense";
+
+  const transactionPayload: Database["public"]["Tables"]["transactions"]["Insert"] = {
     user_id: user.id,
     account_id: data.account_id ?? null,
     category_id: data.category_id ?? null,
-    type: data.direction === "borrow" ? "income" : "expense",
+    type: transactionType,
     amount: data.principal_amount,
     currency,
     note: data.note?.trim() || null,

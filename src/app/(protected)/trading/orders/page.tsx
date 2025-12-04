@@ -29,5 +29,6 @@ export default async function OrdersPage() {
     );
   }
 
-  return <OrdersPageClient initialOrders={data ?? []} />;
+  const orders: OrderRow[] = (data ?? []) as OrderRow[];
+  return <OrdersPageClient initialOrders={orders} />;
 }

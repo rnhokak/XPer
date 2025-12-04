@@ -305,10 +305,11 @@ export interface Database {
           {
             foreignKeyName: "debt_payments_user_id_fkey";
             columns: ["user_id"];
-          referencedRelation: "users";
-          referencedColumns: ["id"];
-        }
-      ];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       profiles: {
         Row: {
           id: string;
@@ -342,7 +343,6 @@ export interface Database {
             referencedColumns: ["id"];
           }
         ];
-      };
       };
       trading_funding: {
         Row: {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { debtPaymentSchema } from "@/lib/validation/debts";
+import { type Database } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -77,10 +78,10 @@ export async function POST(req: Request) {
   const currency = resolvedCurrency || "VND";
 
   const paymentType = debt.direction === "borrow" ? "repayment" : "receive";
-  const transactionType = debt.direction === "borrow" ? "expense" : "income";
+  const transactionType: "income" | "expense" = debt.direction === "borrow" ? "expense" : "income";
   const transaction_time = parseDateToIso(data.payment_date, now);
 
-  const transactionPayload = {
+  const transactionPayload: Database["public"]["Tables"]["transactions"]["Insert"] = {
     user_id: user.id,
     account_id: data.account_id ?? null,
     category_id: data.category_id ?? null,
