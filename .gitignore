@@ -1,0 +1,7 @@
+.next
+node_modules
+node_models
+.env
+.env.local
+.env.production
+.env.development
