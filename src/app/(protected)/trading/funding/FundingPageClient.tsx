@@ -406,7 +406,7 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
               </div>
 
               <div className="hidden overflow-x-auto md:block">
-                <Table className="min-w-[720px]">
+                <Table className="min-w-[320px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date / time</TableHead>

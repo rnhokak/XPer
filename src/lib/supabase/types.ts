@@ -310,6 +310,67 @@ export interface Database {
           }
         ];
       };
+      partner_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          partner_id: string;
+          transaction_id: string;
+          direction: "lend" | "borrow" | "repay" | "receive";
+          amount: number;
+          principal_amount: number | null;
+          interest_amount: number | null;
+          date: string;
+          note: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          partner_id: string;
+          transaction_id: string;
+          direction: "lend" | "borrow" | "repay" | "receive";
+          amount: number;
+          principal_amount?: number | null;
+          interest_amount?: number | null;
+          date?: string;
+          note?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          partner_id?: string;
+          transaction_id?: string;
+          direction?: "lend" | "borrow" | "repay" | "receive";
+          amount?: number;
+          principal_amount?: number | null;
+          interest_amount?: number | null;
+          date?: string;
+          note?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "partner_transactions_partner_id_fkey";
+            columns: ["partner_id"];
+            referencedRelation: "partners";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "partner_transactions_transaction_id_fkey";
+            columns: ["transaction_id"];
+            referencedRelation: "transactions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "partner_transactions_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       profiles: {
         Row: {
           id: string;
@@ -477,7 +538,26 @@ export interface Database {
         ];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      partner_balances: {
+        Row: {
+          partner_id: string | null;
+          total_lent: number | null;
+          total_borrowed: number | null;
+          total_receive: number | null;
+          total_repay: number | null;
+          balance: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: null;
+            columns: ["partner_id"];
+            referencedRelation: "partners";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+    };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

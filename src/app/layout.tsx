@@ -14,6 +14,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="bg-muted">
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      <meta name="apple-mobile-web-app-title" content="XPer Finance" />
+      <meta name="application-name" content="XPer Finance" />
+      <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       <body className={inter.className}>
         <QueryProvider>{children}</QueryProvider>
       </body>

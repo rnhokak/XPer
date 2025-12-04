@@ -82,6 +82,10 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
     router.replace("/auth/login");
   }, [router]);
 
+  const handleNavClick = useCallback(() => {
+    closeSidebar();
+  }, [closeSidebar]);
+
   // Close user menu on outside click or Escape
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -149,6 +153,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
               <div key={item.href} className="space-y-1">
                 <Link
                   href={item.href}
+                  onClick={handleNavClick}
                   className={cn(
                     "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                     active && "bg-primary/10 text-primary shadow-sm"
@@ -167,6 +172,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                         <Link
                           key={child.href}
                           href={child.href}
+                          onClick={handleNavClick}
                           className={cn(
                             "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                             childActive && "bg-primary/10 text-primary"

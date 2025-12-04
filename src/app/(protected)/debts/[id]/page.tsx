@@ -53,7 +53,10 @@ const computeOutstanding = (
   return remaining < 0 ? 0 : remaining;
 };
 
-export default async function DebtDetailPage({ params }: { params: { id: string } }) {
+export default async function DebtDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
+  const debtId = resolvedParams?.id;
+  if (!debtId) return notFound();
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -62,7 +65,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .select(
       "id,partner_id,direction,principal_amount,currency,start_date,due_date,status,description,interest_type,interest_rate,interest_cycle,created_at,updated_at,partner:partners(id,name,type,phone,note)"
     )
-    .eq("id", params.id)
+    .eq("id", debtId)
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -71,7 +74,7 @@ export default async function DebtDetailPage({ params }: { params: { id: string 
     .select(
       "id,payment_type,amount,principal_amount,interest_amount,payment_date,note,transaction:transactions(id,type,amount,currency,transaction_time,note,account:accounts(id,name,currency),category:categories(id,name,type))"
     )
-    .eq("debt_id", params.id)
+    .eq("debt_id", debtId)
     .eq("user_id", user.id)
     .order("payment_date", { ascending: false });
 
