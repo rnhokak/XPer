@@ -1,3 +1,4 @@
+
 import { Inter } from "next/font/google";
 import "../styles/globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -14,6 +15,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="bg-muted">
+      <link rel="manifest" href="/manifest.json" />
+      <link rel="icon" href="/favicon.ico" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <meta name="apple-mobile-web-app-title" content="XPer Finance" />
