@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
 type Transaction = {
   id: string;
   type: "income" | "expense";
@@ -7,7 +11,7 @@ type Transaction = {
   category?: { id?: string | null; name?: string | null } | null;
 };
 
-const formatNumber = (value: number) => Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
+const formatNumber = (value: number) => `${Number(value / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}k`;
 
 const startOfWeekMonday = (d: Date) => {
   const date = new Date(d);
@@ -84,40 +88,69 @@ const buildCategoryTotals = (transactions: Transaction[]) => {
   }));
 };
 
-const buildDailySeries = (transactions: Transaction[], days = 7) => {
+const buildDailyExpenseSeries = (transactions: Transaction[], days = 7) => {
   const now = new Date();
   const labels: string[] = [];
-  const buckets = new Map<string, { income: number; expense: number }>();
+  const buckets = new Map<string, number>();
   for (let i = days - 1; i >= 0; i -= 1) {
     const d = new Date(now);
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() - i);
     const label = d.toLocaleDateString("en-CA");
     labels.push(label);
-    buckets.set(label, { income: 0, expense: 0 });
+    buckets.set(label, 0);
   }
 
   transactions.forEach((tx) => {
+    if (tx.type !== "expense") return;
     const d = new Date(tx.transaction_time);
     d.setHours(0, 0, 0, 0);
     const label = d.toLocaleDateString("en-CA");
     if (!buckets.has(label)) return;
     const entry = buckets.get(label)!;
-    if (tx.type === "income") {
-      entry.income += tx.amount;
-    } else {
-      entry.expense += tx.amount;
-    }
+    buckets.set(label, entry + tx.amount);
   });
 
-  return labels.map((label) => ({ label, ...(buckets.get(label) ?? { income: 0, expense: 0 }) }));
+  return labels.map((label) => ({ label, expense: buckets.get(label) ?? 0 }));
 };
 
 export function CashflowReport({ transactions }: { transactions: Transaction[] }) {
   const summaries = summarizePeriods(transactions);
   const categoryTotals = buildCategoryTotals(transactions).sort((a, b) => b.net - a.net);
-  const dailySeries = buildDailySeries(transactions, 7);
-  const maxDaily = Math.max(...dailySeries.map((d) => Math.max(d.income, d.expense)), 1);
+
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const [dayCount, setDayCount] = useState(7);
+
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+
+    const MIN_COL_WIDTH = 28; // approximate room for one bar + gap + label
+    const MAX_DAYS = 20;
+
+    const compute = (width: number) => {
+      const cols = Math.max(1, Math.min(MAX_DAYS, Math.floor(width / MIN_COL_WIDTH)));
+      setDayCount((prev) => (prev === cols ? prev : cols));
+    };
+
+    // initial run
+    compute(el.clientWidth);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry?.contentRect?.width) return;
+      compute(entry.contentRect.width);
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const dailyExpenseSeries = useMemo(() => buildDailyExpenseSeries(transactions, dayCount), [transactions, dayCount]);
+  const maxDailyExpense = useMemo(
+    () => Math.max(...dailyExpenseSeries.map((d) => d.expense), 1),
+    [dailyExpenseSeries],
+  );
 
   const periodMeta: Record<PeriodKey, { label: string; description: string }> = {
     day: { label: "Hôm nay", description: "Từ 00:00 đến hiện tại" },
@@ -165,24 +198,18 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
       <div className="rounded-xl border bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-foreground">Xu hướng 7 ngày</p>
-            <p className="text-xs text-muted-foreground">Thu vs Chi theo ngày</p>
+            <p className="text-sm font-semibold text-foreground">Xu hướng {dayCount} ngày</p>
+            <p className="text-xs text-muted-foreground">Chỉ hiển thị chi theo ngày, tự điều chỉnh theo width (tối đa 20 ngày)</p>
           </div>
-          <span className="text-xs text-muted-foreground">Đỉnh: {formatNumber(maxDaily)}</span>
+          <span className="text-xs text-muted-foreground">Đỉnh chi: {formatNumber(maxDailyExpense)}</span>
         </div>
-        <div className="mt-4 overflow-x-auto pb-2">
-          <div className="flex min-w-[260px] items-end gap-2 sm:min-w-[320px] sm:gap-3">
-            {dailySeries.map((d) => {
-              const incHeight = Math.max(6, (d.income / maxDaily) * 120);
-              const expHeight = Math.max(6, (d.expense / maxDaily) * 120);
+        <div className="mt-4" ref={chartRef}>
+          <div className="flex items-end gap-2 sm:gap-3">
+            {dailyExpenseSeries.map((d) => {
+              const expHeight = Math.max(6, (d.expense / maxDailyExpense) * 120);
               return (
                 <div key={d.label} className="flex flex-col items-center gap-1">
                   <div className="flex items-end gap-1">
-                    <div
-                      className="w-4 rounded-md bg-emerald-500/80 sm:w-5"
-                      style={{ height: `${incHeight}px` }}
-                      title={`Thu ${formatNumber(d.income)}`}
-                    />
                     <div
                       className="w-4 rounded-md bg-red-500/80 sm:w-5"
                       style={{ height: `${expHeight}px` }}
@@ -190,25 +217,13 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
                     />
                   </div>
                   <div className="text-[11px] font-semibold text-foreground">
-                    {d.income >= d.expense ? (
-                      <span className="text-emerald-600">+{formatNumber(d.income - d.expense)}</span>
-                    ) : (
-                      <span className="text-red-600">-{formatNumber(d.expense - d.income)}</span>
-                    )}
+                    <span className="text-red-600">-{formatNumber(d.expense)}</span>
                   </div>
                   <span className="text-[11px] text-muted-foreground">{d.label.slice(5)}</span>
                 </div>
               );
             })}
           </div>
-        </div>
-        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Thu
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Chi
-          </span>
         </div>
       </div>
     </div>

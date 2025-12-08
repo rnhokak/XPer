@@ -74,3 +74,67 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ success: true });
 }
+
+export async function PUT(req: Request) {
+  const { supabase, user } = await getUserAndClient();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  if (!body.id) {
+    return NextResponse.json({ error: "Missing transaction id" }, { status: 400 });
+  }
+
+  const parsed = fundingFormSchema.safeParse({
+    ...body,
+    amount: parseNumber(body.amount),
+  });
+
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? "Invalid payload";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  const payload = {
+    ...parsed.data,
+    transaction_time: new Date(parsed.data.transaction_time).toISOString(),
+    note: parsed.data.note?.trim() ? parsed.data.note.trim() : null,
+  };
+
+  const { error } = await supabase
+    .from("trading_funding")
+    .update(payload)
+    .eq("id", body.id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(req: Request) {
+  const { supabase, user } = await getUserAndClient();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  if (!body.id) {
+    return NextResponse.json({ error: "Missing transaction id" }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("trading_funding")
+    .delete()
+    .eq("id", body.id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -25,18 +25,44 @@ import { fundingFormSchema, type FundingFormValues } from "@/lib/validation/trad
 
 interface FundingPageClientProps {
   initialData: FundingRow[];
+  serverNow?: string;
 }
 
-const defaultDateTimeValue = () => new Date().toISOString().slice(0, 16);
+const toLocalInput = (isoString: string) => {
+  const date = new Date(isoString);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+const defaultDateTimeValue = (anchor?: string | Date) => {
+  const iso = anchor instanceof Date ? anchor.toISOString() : anchor ?? new Date().toISOString();
+  return toLocalInput(iso);
+};
+const toInputDateTime = (value?: string | null, fallback?: string | Date) =>
+  value ? toLocalInput(value) : defaultDateTimeValue(fallback);
 
 const currencyFormatter = (amount: number, currency: string) =>
-  new Intl.NumberFormat(undefined, {
+  new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: currency || "USD",
     maximumFractionDigits: 2,
   }).format(amount);
 
-const formatDateTime = (value?: string | null) => (value ? new Date(value).toLocaleString() : "—");
+const formatDateTime = (value?: string | null) =>
+  value
+    ? new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "UTC",
+      }).format(new Date(value))
+    : "—";
+
+type FundingFormInput = Omit<FundingFormValues, "amount"> & { amount?: number };
+const timePresets = [
+  { label: "Now", minutes: 0 },
+  { label: "-1h", minutes: -60 },
+  { label: "-1d", minutes: -1440 },
+  { label: "-1w", minutes: -10080 },
+];
 
 type MonthlyBucket = {
   label: string;
@@ -44,20 +70,21 @@ type MonthlyBucket = {
   withdraw: number;
 };
 
-const buildMonthlyBuckets = (rows: FundingRow[], months = 6): MonthlyBucket[] => {
-  const now = new Date();
+const buildMonthlyBuckets = (rows: FundingRow[], months = 6, anchorIso?: string): MonthlyBucket[] => {
+  const now = anchorIso ? new Date(anchorIso) : new Date();
+  const anchor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const buckets: MonthlyBucket[] = [];
 
   for (let i = months - 1; i >= 0; i -= 1) {
-    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const label = date.toLocaleString(undefined, { month: "short" });
+    const date = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - i, 1));
+    const label = date.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
     buckets.push({ label, deposit: 0, withdraw: 0 });
   }
 
   rows.forEach((row) => {
     const ts = row.transaction_time ? new Date(row.transaction_time) : null;
     if (!ts) return;
-    const label = ts.toLocaleString(undefined, { month: "short" });
+    const label = ts.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
     const bucket = buckets.find((b) => b.label === label);
     if (!bucket) return;
     if (row.type === "deposit") bucket.deposit += Number(row.amount ?? 0);
@@ -69,10 +96,17 @@ const buildMonthlyBuckets = (rows: FundingRow[], months = 6): MonthlyBucket[] =>
 
 const methodOptions = ["Bank transfer", "Wallet", "Broker transfer", "Refund"];
 
-export default function FundingPageClient({ initialData }: FundingPageClientProps) {
+export default function FundingPageClient({ initialData, serverNow }: FundingPageClientProps) {
   const router = useRouter();
+  const anchorDate = useMemo(() => (serverNow ? new Date(serverNow) : new Date()), [serverNow]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [editingRow, setEditingRow] = useState<FundingRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FundingRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [amountInput, setAmountInput] = useState("");
+  const [mounted, setMounted] = useState(false);
 
   const totals = useMemo(() => {
     const deposited = initialData
@@ -88,32 +122,92 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
     };
   }, [initialData]);
 
-  const monthlyBuckets = useMemo(() => buildMonthlyBuckets(initialData), [initialData]);
+  const initialTransactionTime = useMemo(() => defaultDateTimeValue(anchorDate), [anchorDate]);
+  const monthlyBuckets = useMemo(() => buildMonthlyBuckets(initialData, 6, serverNow), [initialData, serverNow]);
 
-  const form = useForm<FundingFormValues>({
+  const form = useForm<FundingFormInput>({
     resolver: zodResolver(fundingFormSchema),
     defaultValues: {
       type: "deposit",
-      amount: 0,
+      amount: undefined,
       currency: "USD",
       method: methodOptions[0],
       note: undefined,
-      transaction_time: defaultDateTimeValue(),
+      transaction_time: initialTransactionTime,
     },
   });
+  const selectedType = form.watch("type");
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const handleSubmit = async (values: FundingFormValues) => {
+  const openNewDialog = () => {
+    form.reset({
+      type: "deposit",
+      amount: undefined,
+      currency: "USD",
+      method: methodOptions[0],
+      note: undefined,
+      transaction_time: initialTransactionTime,
+    });
+    setAmountInput("");
+    setEditingRow(null);
+    setSubmitError(null);
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (row: FundingRow) => {
+    setEditingRow(row);
+    form.reset({
+      type: row.type,
+      amount: row.amount ?? undefined,
+      currency: row.currency,
+      method: row.method,
+      note: row.note ?? undefined,
+      transaction_time: toInputDateTime(row.transaction_time, anchorDate),
+    });
+    setAmountInput(row.amount !== null && row.amount !== undefined ? String(row.amount) : "");
+    setSubmitError(null);
+    setDialogOpen(true);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setEditingRow(null);
+      setSubmitError(null);
+      setAmountInput("");
+    }
+  };
+
+  const handleAmountChange = (raw: string, onChange: (value?: number) => void) => {
+    setAmountInput(raw);
+    const normalized = raw.replace(",", ".").trim();
+    if (!normalized || normalized === "." || normalized === "-") {
+      onChange(undefined);
+      return;
+    }
+    const parsed = Number(normalized.startsWith(".") ? `0${normalized}` : normalized);
+    onChange(Number.isFinite(parsed) ? parsed : undefined);
+  };
+
+  const handleSubmit = async (values: FundingFormInput) => {
+    if (typeof values.amount !== "number") {
+      setSubmitError("Amount is required");
+      return;
+    }
     setSubmitError(null);
     const payload = {
       ...values,
+      amount: Number(values.amount),
       transaction_time: new Date(values.transaction_time).toISOString(),
       note: values.note?.trim() ? values.note.trim() : null,
     };
 
     const res = await fetch("/api/trading/funding", {
-      method: "POST",
+      method: editingRow ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(editingRow ? { id: editingRow.id, ...payload } : payload),
     });
 
     if (!res.ok) {
@@ -124,14 +218,52 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
 
     form.reset({
       type: "deposit",
-      amount: 0,
+      amount: undefined,
       currency: "USD",
       method: methodOptions[0],
       note: undefined,
-      transaction_time: defaultDateTimeValue(),
+      transaction_time: defaultDateTimeValue(anchorDate),
     });
+    setAmountInput("");
     setDialogOpen(false);
+    setEditingRow(null);
     router.refresh();
+  };
+
+  const formSkeleton = (
+    <div className="space-y-3">
+      <div className="h-10 w-full animate-pulse rounded-xl bg-muted" />
+      <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+      <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+      <div className="h-24 w-full animate-pulse rounded-xl bg-muted" />
+    </div>
+  );
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    setDeleting(true);
+    const res = await fetch("/api/trading/funding", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: deleteTarget.id }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      setDeleteError(error.error ?? "Failed to delete transaction");
+      setDeleting(false);
+      return;
+    }
+
+    setDeleting(false);
+    setDeleteTarget(null);
+    router.refresh();
+  };
+
+  const requestDelete = (row: FundingRow) => {
+    setDeleteError(null);
+    setDeleteTarget(row);
   };
 
   return (
@@ -142,153 +274,207 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
           <p className="text-sm text-muted-foreground">Track deposits and withdrawals tied to your trading balance.</p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
-            <Button size="lg">New transaction</Button>
+            <Button size="lg" onClick={openNewDialog}>
+              New transaction
+            </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="w-[min(520px,calc(100vw-20px))] max-h-[90vh] overflow-y-auto rounded-2xl border-0 bg-gradient-to-b from-white via-white to-muted/40 p-4 shadow-xl sm:max-w-lg sm:p-6">
             <DialogHeader>
-              <DialogTitle>Add transaction</DialogTitle>
-              <DialogDescription>Record a deposit or withdrawal against your trading account.</DialogDescription>
+              <DialogTitle>{editingRow ? "Edit transaction" : "Add transaction"}</DialogTitle>
+              <DialogDescription>
+                {editingRow
+                  ? "Update a deposit or withdrawal entry."
+                  : "Record a deposit or withdrawal against your trading account."}
+              </DialogDescription>
             </DialogHeader>
-            <Form {...form}>
-              <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
-                <div className="grid gap-4 sm:grid-cols-2">
+            {mounted ? (
+              <Form {...form}>
+                <div className="mb-2 flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/80">Quick entry</p>
+                    <p className="text-xs text-muted-foreground">Thiết kế tối ưu cho iOS – thao tác một tay.</p>
+                  </div>
+                  <span
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                      selectedType === "deposit" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                    }`}
+                  >
+                    {selectedType === "deposit" ? "Deposit" : "Withdraw"}
+                  </span>
+                </div>
+                <form className="space-y-4 pb-2 sm:pb-0" onSubmit={form.handleSubmit(handleSubmit)}>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold">Type</FormLabel>
+                          <div className="flex items-center gap-2 rounded-xl bg-muted/60 p-1">
+                            {(["deposit", "withdraw"] as const).map((option) => (
+                              <Button
+                                key={option}
+                                type="button"
+                                variant={field.value === option ? "default" : "ghost"}
+                                className={`flex-1 rounded-lg border border-transparent text-sm ${field.value === option ? "bg-foreground text-white hover:bg-foreground" : "bg-white"}`}
+                                onClick={() => field.onChange(option)}
+                              >
+                                {option === "deposit" ? "Deposit" : "Withdraw"}
+                              </Button>
+                            ))}
+                          </div>
+                          <FormMessage>{form.formState.errors.type?.message}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold">Amount</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              pattern="[0-9]*[.,]?[0-9]*"
+                              inputMode="decimal"
+                              className="h-12 rounded-xl text-base"
+                              value={amountInput}
+                              onChange={(e) => handleAmountChange(e.target.value, field.onChange)}
+                              onBlur={(e) => setAmountInput(e.target.value.trim())}
+                              placeholder="0.00"
+                            />
+                          </FormControl>
+                          <FormMessage>{form.formState.errors.amount?.message}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="currency"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold">Currency</FormLabel>
+                          <FormControl>
+                            <Input {...field} className="h-12 rounded-xl text-base" placeholder="USD" />
+                          </FormControl>
+                          <FormMessage>{form.formState.errors.currency?.message}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="method"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold">Method</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="h-12 rounded-xl text-base">
+                              <SelectValue placeholder="Select method" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {methodOptions.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage>{form.formState.errors.method?.message}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="type"
+                    name="transaction_time"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Type</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="deposit">Deposit</SelectItem>
-                            <SelectItem value="withdraw">Withdraw</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage>{form.formState.errors.type?.message}</FormMessage>
+                        <FormLabel className="text-sm font-semibold">Transaction time</FormLabel>
+                        <div className="space-y-2 rounded-xl border bg-white/70 p-3 shadow-sm">
+                          <div className="flex flex-wrap gap-2">
+                            {timePresets.map((preset) => {
+                              const presetValue = new Date(anchorDate.getTime() + preset.minutes * 60 * 1000);
+                              const presetInput = presetValue.toISOString().slice(0, 16);
+                              const isActive =
+                                field.value &&
+                                Math.abs(new Date(field.value).getTime() - presetValue.getTime()) < 60 * 1000;
+                              return (
+                                <Button
+                                  key={preset.label}
+                                  type="button"
+                                  size="sm"
+                                  variant={isActive ? "default" : "outline"}
+                                  className={`rounded-full px-3 ${isActive ? "bg-foreground text-white hover:bg-foreground" : "bg-white"}`}
+                                  onClick={() => field.onChange(presetInput)}
+                                >
+                                  {preset.label}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                          <FormControl>
+                            <Input
+                              type="datetime-local"
+                              className="h-12 rounded-xl border-muted-foreground/30 bg-white text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/70"
+                              value={field.value}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              step="60"
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Use quick shortcuts or pick a custom date & time.</p>
+                        </div>
+                        <FormMessage>{form.formState.errors.transaction_time?.message}</FormMessage>
                       </FormItem>
                     )}
                   />
 
                   <FormField
                     control={form.control}
-                    name="amount"
+                    name="note"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Amount</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Note</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            inputMode="decimal"
+                          <Textarea
+                            rows={3}
+                            className="rounded-xl text-base"
+                            placeholder="Optional memo"
                             value={field.value ?? ""}
-                            onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-                            placeholder="0.00"
+                            onChange={(event) => field.onChange(event.target.value)}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
                           />
                         </FormControl>
-                        <FormMessage>{form.formState.errors.amount?.message}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="currency"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Currency</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="USD" />
-                        </FormControl>
-                        <FormMessage>{form.formState.errors.currency?.message}</FormMessage>
+                        <FormMessage>{form.formState.errors.note?.message}</FormMessage>
                       </FormItem>
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="method"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Method</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {methodOptions.map((option) => (
-                              <SelectItem key={option} value={option}>
-                                {option}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage>{form.formState.errors.method?.message}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                  {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
 
-                <FormField
-                  control={form.control}
-                  name="transaction_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Transaction time</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="datetime-local"
-                          className="h-11 rounded-lg border-muted-foreground/20 bg-white text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-primary/70"
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          step="60"
-                        />
-                      </FormControl>
-                      <FormMessage>{form.formState.errors.transaction_time?.message}</FormMessage>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="note"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Note</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          rows={3}
-                          placeholder="Optional memo"
-                          value={field.value ?? ""}
-                          onChange={(event) => field.onChange(event.target.value)}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormMessage>{form.formState.errors.note?.message}</FormMessage>
-                    </FormItem>
-                  )}
-                />
-
-                {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-
-                <DialogFooter>
-                  <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? "Saving..." : "Save transaction"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
+                  <DialogFooter className="sticky bottom-0 -mx-4 -mb-4 mt-2 flex flex-col gap-2 border-t bg-white/90 px-4 py-3 backdrop-blur sm:static sm:m-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+                    <Button className="w-full sm:w-auto" type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
+                      Cancel
+                    </Button>
+                    <Button className="w-full sm:w-auto" type="submit" disabled={form.formState.isSubmitting}>
+                      {form.formState.isSubmitting ? "Saving..." : editingRow ? "Update transaction" : "Save transaction"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            ) : (
+              formSkeleton
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -374,14 +560,14 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
             <p className="text-sm text-muted-foreground">No transactions yet. Add your first deposit or withdrawal.</p>
           ) : (
             <div className="space-y-4">
-            <div className="space-y-2 md:hidden">
-              {initialData.map((row) => (
-                <div key={row.id} className="rounded-lg border bg-white p-2 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm text-muted-foreground">{formatDateTime(row.transaction_time)}</div>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${
-                        row.type === "deposit" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+              <div className="space-y-2 md:hidden">
+                {initialData.map((row) => (
+                  <div key={row.id} className="rounded-lg border bg-white p-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm text-muted-foreground">{formatDateTime(row.transaction_time)}</div>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${
+                          row.type === "deposit" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
                         }`}
                       >
                         {row.type === "deposit" ? "Deposit" : "Withdraw"}
@@ -401,6 +587,19 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
                         <p className="text-foreground">{row.note ?? "—"}</p>
                       </div>
                     </div>
+                    <div className="mt-3 flex gap-2">
+                      <Button variant="secondary" size="sm" className="flex-1" onClick={() => openEditDialog(row)}>
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 text-red-600 hover:text-red-600"
+                        onClick={() => requestDelete(row)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -414,6 +613,7 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
                       <TableHead>Amount</TableHead>
                       <TableHead>Method</TableHead>
                       <TableHead>Note</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -435,6 +635,19 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
                         </TableCell>
                         <TableCell className="text-sm">{row.method}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{row.note ?? "—"}</TableCell>
+                        <TableCell className="flex justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(row)}>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-600"
+                            onClick={() => requestDelete(row)}
+                          >
+                            Delete
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -444,6 +657,35 @@ export default function FundingPageClient({ initialData }: FundingPageClientProp
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+            setDeleting(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete transaction</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The transaction will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? <p className="text-sm text-red-500">{deleteError}</p> : null}
+          <DialogFooter>
+            <Button variant="ghost" type="button" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" type="button" disabled={deleting} onClick={confirmDelete}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

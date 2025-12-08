@@ -32,5 +32,6 @@ export default async function FundingPage() {
   }
 
   const fundingRows: FundingRow[] = (data ?? []) as FundingRow[];
-  return <FundingPageClient initialData={fundingRows} />;
+  const serverNow = new Date().toISOString();
+  return <FundingPageClient initialData={fundingRows} serverNow={serverNow} />;
 }

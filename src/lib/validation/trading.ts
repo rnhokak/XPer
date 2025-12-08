@@ -1,8 +1,18 @@
 import { z } from "zod";
 
+const amountPreprocessor = z.preprocess((value) => {
+  if (typeof value === "string") {
+    const normalized = value.replace(",", ".").trim();
+    if (!normalized || normalized === ".") return undefined;
+    const parsed = Number(normalized.startsWith(".") ? `0${normalized}` : normalized);
+    return Number.isFinite(parsed) ? parsed : value;
+  }
+  return value;
+}, z.number().positive("Amount must be greater than 0"));
+
 export const fundingFormSchema = z.object({
   type: z.enum(["deposit", "withdraw"]),
-  amount: z.number().positive("Amount must be greater than 0"),
+  amount: amountPreprocessor,
   currency: z.string().min(1, "Currency is required"),
   method: z.string().min(1, "Method is required"),
   transaction_time: z.string().min(1, "Transaction time is required"),
