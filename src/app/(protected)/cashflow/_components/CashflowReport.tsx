@@ -88,30 +88,36 @@ const buildCategoryTotals = (transactions: Transaction[]) => {
   }));
 };
 
-const buildDailyExpenseSeries = (transactions: Transaction[], days = 7) => {
+const buildDailySeries = (transactions: Transaction[], days = 7) => {
   const now = new Date();
   const labels: string[] = [];
-  const buckets = new Map<string, number>();
+  const buckets = new Map<string, { income: number; expense: number }>();
   for (let i = days - 1; i >= 0; i -= 1) {
     const d = new Date(now);
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() - i);
     const label = d.toLocaleDateString("en-CA");
     labels.push(label);
-    buckets.set(label, 0);
+    buckets.set(label, { income: 0, expense: 0 });
   }
 
   transactions.forEach((tx) => {
-    if (tx.type !== "expense") return;
     const d = new Date(tx.transaction_time);
     d.setHours(0, 0, 0, 0);
     const label = d.toLocaleDateString("en-CA");
     if (!buckets.has(label)) return;
     const entry = buckets.get(label)!;
-    buckets.set(label, entry + tx.amount);
+    if (tx.type === "income") {
+      buckets.set(label, { ...entry, income: entry.income + tx.amount });
+    } else {
+      buckets.set(label, { ...entry, expense: entry.expense + tx.amount });
+    }
   });
 
-  return labels.map((label) => ({ label, expense: buckets.get(label) ?? 0 }));
+  return labels.map((label) => {
+    const entry = buckets.get(label) ?? { income: 0, expense: 0 };
+    return { label, income: entry.income, expense: entry.expense, net: entry.income - entry.expense };
+  });
 };
 
 export function CashflowReport({ transactions }: { transactions: Transaction[] }) {
@@ -146,11 +152,11 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
     return () => observer.disconnect();
   }, []);
 
-  const dailyExpenseSeries = useMemo(() => buildDailyExpenseSeries(transactions, dayCount), [transactions, dayCount]);
-  const maxDailyExpense = useMemo(
-    () => Math.max(...dailyExpenseSeries.map((d) => d.expense), 1),
-    [dailyExpenseSeries],
-  );
+  const dailySeries = useMemo(() => buildDailySeries(transactions, dayCount), [transactions, dayCount]);
+  const maxDailyValue = useMemo(() => {
+    const all = dailySeries.flatMap((d) => [d.income, d.expense]);
+    return Math.max(...all, 1);
+  }, [dailySeries]);
 
   const periodMeta: Record<PeriodKey, { label: string; description: string }> = {
     day: { label: "Hôm nay", description: "Từ 00:00 đến hiện tại" },
@@ -199,33 +205,88 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">Xu hướng {dayCount} ngày</p>
-            <p className="text-xs text-muted-foreground">Chỉ hiển thị chi theo ngày, tự điều chỉnh theo width (tối đa 20 ngày)</p>
+            <p className="text-xs text-muted-foreground">Thu/chi cùng một line, tự co giãn theo chiều rộng (tối đa 20 ngày)</p>
           </div>
-          <span className="text-xs text-muted-foreground">Đỉnh chi: {formatNumber(maxDailyExpense)}</span>
+          <span className="text-xs text-muted-foreground">Đỉnh: {formatNumber(maxDailyValue)}</span>
         </div>
         <div className="mt-4" ref={chartRef}>
-          <div className="flex items-end gap-2 sm:gap-3">
-            {dailyExpenseSeries.map((d) => {
-              const expHeight = Math.max(6, (d.expense / maxDailyExpense) * 120);
-              return (
-                <div key={d.label} className="flex flex-col items-center gap-1">
-                  <div className="flex items-end gap-1">
-                    <div
-                      className="w-4 rounded-md bg-red-500/80 sm:w-5"
-                      style={{ height: `${expHeight}px` }}
-                      title={`Chi ${formatNumber(d.expense)}`}
-                    />
-                  </div>
-                  <div className="text-[11px] font-semibold text-foreground">
-                    <span className="text-red-600">-{formatNumber(d.expense)}</span>
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">{d.label.slice(5)}</span>
-                </div>
-              );
-            })}
+          <div className="space-y-2">
+            <div className="relative h-44 w-full overflow-hidden">
+              <TrendLines series={dailySeries} maxValue={maxDailyValue} />
+            </div>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(24px,1fr))] gap-1 text-[10px] text-muted-foreground">
+              {dailySeries.map((d) => (
+                <span key={d.label} className="text-center">
+                  {d.label.slice(5)}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function TrendLines({ series, maxValue }: { series: ReturnType<typeof buildDailySeries>; maxValue: number }) {
+  if (!series.length) return null;
+  const height = 140;
+  const width = Math.max(80, series.length * 30);
+  const step = series.length === 1 ? width : width / (series.length - 1);
+  const scaleY = (value: number) => height - (value / maxValue) * height;
+
+  const toPoints = (selector: (d: (typeof series)[number]) => number) =>
+    series.map((d, idx) => `${idx * step},${scaleY(selector(d))}`).join(" ");
+
+  const incomePoints = toPoints((d) => d.income);
+  const expensePoints = toPoints((d) => d.expense);
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height + 16}`} preserveAspectRatio="none" className="h-full w-full">
+      <defs>
+        <linearGradient id="incomeFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="rgba(16, 185, 129, 0.35)" />
+          <stop offset="100%" stopColor="rgba(16, 185, 129, 0.05)" />
+        </linearGradient>
+        <linearGradient id="expenseFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="rgba(239, 68, 68, 0.3)" />
+          <stop offset="100%" stopColor="rgba(239, 68, 68, 0.05)" />
+        </linearGradient>
+      </defs>
+      <polyline
+        points={incomePoints}
+        fill="none"
+        stroke="rgba(16, 185, 129, 0.9)"
+        strokeWidth={3}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <polyline
+        points={expensePoints}
+        fill="none"
+        stroke="rgba(239, 68, 68, 0.9)"
+        strokeWidth={3}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <polyline
+        points={`${incomePoints} ${expensePoints.split(" ").reverse().join(" ")}`}
+        fill="url(#incomeFill)"
+        stroke="none"
+        opacity={0.25}
+      />
+      <polyline
+        points={`${expensePoints} ${incomePoints.split(" ").reverse().join(" ")}`}
+        fill="url(#expenseFill)"
+        stroke="none"
+        opacity={0.2}
+      />
+      {series.map((d, idx) => (
+        <g key={d.label}>
+          <circle cx={idx * step} cy={scaleY(d.income)} r={3} fill="rgba(16,185,129,0.95)" />
+          <circle cx={idx * step} cy={scaleY(d.expense)} r={3} fill="rgba(239,68,68,0.95)" />
+        </g>
+      ))}
+    </svg>
   );
 }

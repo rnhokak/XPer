@@ -44,8 +44,11 @@ const navItems: NavItem[] = [
     label: "Trading",
     icon: BarChart3,
     children: [
+      { href: "/trading/dashboard", label: "Dashboard" },
+      { href: "/trading/accounts", label: "Balance Accounts" },
       { href: "/trading/funding", label: "Funding History" },
       { href: "/trading/orders", label: "Orders" },
+      { href: "/trading/ledger", label: "Ledger" },
     ],
   },
   {

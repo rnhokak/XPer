@@ -7,6 +7,11 @@ import FundingPageClient from "./FundingPageClient";
 export const dynamic = "force-dynamic";
 
 export type FundingRow = Database["public"]["Tables"]["trading_funding"]["Row"];
+type FundingAccount = {
+  balance_account_id: string;
+  name: string;
+  currency: string;
+};
 
 export default async function FundingPage() {
   const user = await requireUser();
@@ -17,6 +22,14 @@ export default async function FundingPage() {
     .select("*")
     .eq("user_id", user.id)
     .order("transaction_time", { ascending: false });
+
+  const { data: fundingAccounts } = await supabase
+    .from("balance_accounts")
+    .select("id,name,currency")
+    .eq("user_id", user.id)
+    .eq("account_type", "FUNDING")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
 
   if (error) {
     return (
@@ -32,6 +45,8 @@ export default async function FundingPage() {
   }
 
   const fundingRows: FundingRow[] = (data ?? []) as FundingRow[];
+  const fundingAccountOptions: FundingAccount[] =
+    fundingAccounts?.map((row) => ({ balance_account_id: row.id, name: row.name, currency: row.currency })) ?? [];
   const serverNow = new Date().toISOString();
-  return <FundingPageClient initialData={fundingRows} serverNow={serverNow} />;
+  return <FundingPageClient initialData={fundingRows} fundingAccounts={fundingAccountOptions} serverNow={serverNow} />;
 }

@@ -2,6 +2,7 @@
 import { Inter } from "next/font/google";
 import "../styles/globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { Notifications } from "@/components/ui/notifications";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className={`${inter.className} min-h-screen bg-slate-50 text-slate-900 antialiased`}>
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <Notifications />
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

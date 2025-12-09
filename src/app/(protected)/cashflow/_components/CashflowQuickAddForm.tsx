@@ -24,11 +24,22 @@ type Props = {
   useDialog?: boolean;
 };
 
-const defaultDateTimeValue = () => new Date().toISOString().slice(0, 16);
 const AUTO_VALUE = "__auto__";
 const CUSTOM_CURRENCY = "__custom__";
 const CURRENCIES = ["VND", "USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "CNY"];
 const lastCategoryKey = (type: "income" | "expense") => `cashflow:lastCategory:${type}`;
+const toLocalInput = (input: string | Date) => {
+  const date = input instanceof Date ? input : new Date(input);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+const defaultDateTimeValue = () => toLocalInput(new Date());
+const timePresets = [
+  { label: "Now", minutes: 0 },
+  { label: "-1h", minutes: -60 },
+  { label: "-1d", minutes: -1440 },
+  { label: "-1w", minutes: -10080 },
+];
 
 export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, defaultCurrency, useDialog = false }: Props) {
   const router = useRouter();
@@ -39,6 +50,9 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const [suggestedCategoryId, setSuggestedCategoryId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [amountInput, setAmountInput] = useState("");
+  const [autoThousand, setAutoThousand] = useState(defaultCurrency === "VND");
+  const [recentAmounts, setRecentAmounts] = useState<Array<{ amount: number; ts: number }>>([]);
 
   const form = useForm<CashflowQuickAddValues>({
     resolver: zodResolver(cashflowQuickAddSchema),
@@ -60,6 +74,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   useEffect(() => {
     form.setValue("account_id", defaultAccountId ?? null);
     form.setValue("currency", defaultCurrency);
+    setAutoThousand(defaultCurrency === "VND");
   }, [defaultAccountId, defaultCurrency, form]);
 
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
@@ -67,6 +82,12 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const amount = useWatch({ control: form.control, name: "amount" });
   const accountId = useWatch({ control: form.control, name: "account_id" });
   const transactionTime = useWatch({ control: form.control, name: "transaction_time" });
+  const currency = useWatch({ control: form.control, name: "currency" }) ?? defaultCurrency;
+
+  useEffect(() => {
+    loadRecentAmounts(currency);
+    setAutoThousand(currency === "VND");
+  }, [currency]);
   const quickCategories = useMemo(
     () => categories.filter((c) => c.type === selectedType).slice(0, 8),
     [categories, selectedType]
@@ -154,6 +175,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       transaction_time: defaultDateTimeValue(),
       currency: defaultCurrency,
     });
+    setAmountInput("");
     try {
       if (payload.category_id) {
         localStorage.setItem(lastCategoryKey(payload.type ?? "expense"), payload.category_id);
@@ -164,8 +186,77 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     if (useDialog) {
       setDialogOpen(false);
     }
+    persistRecentAmount(values.amount ?? 0, payload.currency ?? defaultCurrency);
     router.refresh();
   };
+
+  const normalizeAmount = (raw: string) => {
+    const clean = raw.replace(/,/g, ".").replace(/\s+/g, "");
+    if (!clean || clean === "." || clean === "-") return undefined;
+    const val = Number(clean.startsWith(".") ? `0${clean}` : clean);
+    return Number.isFinite(val) ? val : undefined;
+  };
+
+  const applyThousandShortcuts = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!autoThousand || currency !== "VND") return trimmed;
+    if (/^\d{1,3}$/.test(trimmed) && trimmed.length <= 3) {
+      // e.g. "50" -> 50000 for VND
+      return `${trimmed}000`;
+    }
+    return trimmed;
+  };
+
+  const formatSuggestedLabel = (value: number) => {
+    if (currency === "VND") return `${Math.round(value / 1000)}k`;
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+  };
+
+  const suggestedAmounts = useMemo(() => {
+    const sorted: Array<{ label: string; value: number | null }> = recentAmounts
+      .slice()
+      .sort((a, b) => b.ts - a.ts)
+      .map((item) => ({ label: formatSuggestedLabel(item.amount), value: item.amount }))
+      .slice(0, 4);
+    if (currency === "VND") {
+      sorted.push({ label: "+000", value: null }); // special: append 000 to current
+    }
+    return sorted;
+  }, [recentAmounts, currency]);
+
+  const persistRecentAmount = (value: number, curr: string) => {
+    if (!Number.isFinite(value) || value <= 0) return;
+    const key = `cashflow:recentAmounts:${curr}`;
+    try {
+      const existingRaw = localStorage.getItem(key);
+      const existing: Array<{ amount: number; ts: number }> = existingRaw ? JSON.parse(existingRaw) : [];
+      const now = Date.now();
+      const merged = [
+        { amount: value, ts: now },
+        ...existing.filter((item) => item.amount !== value),
+      ].slice(0, 8);
+      localStorage.setItem(key, JSON.stringify(merged));
+      setRecentAmounts(merged);
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const loadRecentAmounts = (curr: string) => {
+    const key = `cashflow:recentAmounts:${curr}`;
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed: Array<{ amount: number; ts: number }> = raw ? JSON.parse(raw) : [];
+      setRecentAmounts(parsed);
+    } catch {
+      setRecentAmounts([]);
+    }
+  };
+
+  useEffect(() => {
+    loadRecentAmounts(currency);
+    setAutoThousand(currency === "VND");
+  }, [currency]);
 
   const formContent = !mounted ? (
     <div className="space-y-3">
@@ -176,12 +267,12 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     </div>
   ) : (
     <div className="space-y-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-50 via-white to-white px-3 py-2 shadow-sm ring-1 ring-emerald-100/70">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Quick add</p>
-          <p className="text-sm text-muted-foreground">Chỉ cần nhập số tiền, mọi thứ khác là tuỳ chọn.</p>
+          <p className="text-xs uppercase tracking-wide text-emerald-700">Quick add</p>
+          <p className="text-sm text-muted-foreground">Nhập tiền nhanh, tối ưu cho điện thoại.</p>
         </div>
-        <div className="inline-flex rounded-full bg-muted px-2 py-1 text-[11px] font-semibold uppercase tracking-wide">
+        <div className="inline-flex rounded-full bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-100">
           {selectedType === "income" ? "Income" : "Expense"}
         </div>
       </div>
@@ -204,20 +295,171 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
           <FormField
             control={form.control}
+            name="transaction_time"
+            render={({ field }) => {
+              const nowLocal = defaultDateTimeValue();
+              const adjustMinutes = (minutes: number) => {
+                const base = field.value ? new Date(field.value) : new Date();
+                base.setMinutes(base.getMinutes() + minutes);
+                const now = new Date();
+                const clamped = base > now ? now : base;
+                field.onChange(toLocalInput(clamped));
+              };
+              return (
+                <FormItem>
+                  <FormLabel className="text-sm font-semibold">Transaction time</FormLabel>
+                  <FormControl>
+                    <div className="space-y-2 rounded-xl border bg-white/70 p-3 shadow-sm">
+                      <div className="flex flex-wrap gap-2">
+                        {timePresets.map((preset) => {
+                          const presetDate = new Date();
+                          presetDate.setMinutes(presetDate.getMinutes() + preset.minutes);
+                          const presetInput = toLocalInput(presetDate);
+                          const isActive = field.value && Math.abs(new Date(field.value).getTime() - presetDate.getTime()) < 60 * 1000;
+                          return (
+                            <Button
+                              key={preset.label}
+                              type="button"
+                              size="sm"
+                              variant={isActive ? "default" : "outline"}
+                              className={`rounded-full px-3 ${isActive ? "bg-foreground text-white hover:bg-foreground" : "bg-white"}`}
+                              onClick={() => field.onChange(presetInput)}
+                            >
+                              {preset.label}
+                            </Button>
+                          );
+                        })}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full px-3"
+                            onClick={() => adjustMinutes(-1440)}
+                          >
+                            -1d
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full px-3"
+                            onClick={() => adjustMinutes(1440)}
+                          >
+                            +1d
+                          </Button>
+                        </div>
+                      </div>
+                      <Input
+                        type="datetime-local"
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const parsed = val ? new Date(val) : null;
+                          const now = new Date();
+                          if (parsed && parsed > now) {
+                            const clamped = toLocalInput(now);
+                            field.onChange(clamped);
+                            setAmountInput((prev) => prev); // keep amount untouched
+                            return;
+                          }
+                          field.onChange(val);
+                        }}
+                        max={nowLocal}
+                        placeholder="Now by default"
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage>{form.formState.errors.transaction_time?.message}</FormMessage>
+                </FormItem>
+              );
+            }}
+          />
+
+          <FormField
+            control={form.control}
             name="amount"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-semibold">Amount *</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    className="text-lg"
-                    value={field.value ?? ""}
-                    onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-                    placeholder="e.g. 120000"
-                  />
+                  <div className="space-y-2 rounded-2xl border bg-slate-50/70 p-3 shadow-inner">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr,110px]">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="text-lg h-12 rounded-xl px-3 w-full"
+                        value={amountInput}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setAmountInput(raw);
+                          const normalized = normalizeAmount(applyThousandShortcuts(raw));
+                          field.onChange(normalized);
+                        }}
+                        onBlur={(e) => {
+                          const normalized = normalizeAmount(applyThousandShortcuts(e.target.value));
+                          setAmountInput(normalized !== undefined ? String(normalized) : "");
+                          field.onChange(normalized);
+                        }}
+                        placeholder="e.g. 120000"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl w-full"
+                          onClick={() => {
+                            setAmountInput("");
+                            field.onChange(undefined);
+                          }}
+                        >
+                          Clear
+                        </Button>
+                        {currency === "VND" ? (
+                          <Button
+                            type="button"
+                            variant={autoThousand ? "default" : "outline"}
+                            size="sm"
+                            className="rounded-xl w-full"
+                            onClick={() => setAutoThousand((v) => !v)}
+                          >
+                            {autoThousand ? "Auto 000" : "No 000"}
+                          </Button>
+                        ) : (
+                          <div className="text-[11px] text-muted-foreground flex items-center justify-center w-full">
+                            Currency: {currency}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {suggestedAmounts.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {suggestedAmounts.map((item) => (
+                          <Button
+                            key={item.label}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full px-3 text-xs"
+                            onClick={() => {
+                              if (item.value === null) {
+                                const appended = `${(amountInput || "0").replace(/\D/g, "")}000`;
+                                setAmountInput(appended);
+                                const normalized = normalizeAmount(appended);
+                                field.onChange(normalized);
+                                return;
+                              }
+                              setAmountInput(String(item.value));
+                              field.onChange(item.value);
+                            }}
+                          >
+                            {item.label}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </FormControl>
                 <FormMessage>{form.formState.errors.amount?.message}</FormMessage>
               </FormItem>
@@ -311,24 +553,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                         </SelectContent>
                       </Select>
                       <FormMessage>{form.formState.errors.account_id?.message}</FormMessage>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="transaction_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Transaction time</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="datetime-local"
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value || "")}
-                          placeholder="Now by default"
-                        />
-                      </FormControl>
-                      <FormMessage>{form.formState.errors.transaction_time?.message}</FormMessage>
                     </FormItem>
                   )}
                 />

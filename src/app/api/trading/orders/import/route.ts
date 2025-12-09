@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-
 export const dynamic = "force-dynamic";
 
 const importRowSchema = z.object({
@@ -26,6 +25,7 @@ const importRowSchema = z.object({
   pnl_amount: z.number().optional().nullable(),
   pnl_percent: z.number().optional().nullable(),
   note: z.string().optional().nullable(),
+  balance_account_id: z.string().uuid(),
 });
 
 const importPayloadSchema = z.object({
@@ -40,6 +40,19 @@ const getUserAndClient = async () => {
   } = await supabase.auth.getUser();
   if (error || !user) return { supabase, user: null };
   return { supabase, user };
+};
+
+const loadBalanceCurrencies = async (supabase: Awaited<ReturnType<typeof createClient>>, balanceAccountIds: string[]) => {
+  const { data, error } = await supabase
+    .from("balance_accounts")
+    .select("id,currency,user_id,account_type")
+    .in("id", balanceAccountIds);
+  if (error) throw new Error(error.message);
+  const map = new Map<string, { currency: string; user_id: string; account_type: string }>();
+  (data ?? []).forEach((row) => {
+    if (row.id) map.set(row.id, { currency: row.currency, user_id: row.user_id, account_type: row.account_type });
+  });
+  return map;
 };
 
 export async function POST(req: Request) {
@@ -83,8 +96,22 @@ export async function POST(req: Request) {
       pnl_percent: row.pnl_percent ?? null,
       note: row.note?.trim() ? row.note.trim() : null,
       user_id: user.id,
+      balance_account_id: row.balance_account_id,
     };
   });
+
+// Validate balance_account_id ownership/type
+const balanceIdsInput = Array.from(new Set(rows.map((r) => r.balance_account_id)));
+const balanceMap = await loadBalanceCurrencies(supabase, balanceIdsInput);
+for (const row of rows) {
+  const acc = balanceMap.get(row.balance_account_id);
+  if (!acc) {
+    return NextResponse.json({ error: "Balance account not found" }, { status: 400 });
+  }
+  if (acc.user_id !== user.id || acc.account_type !== "TRADING") {
+    return NextResponse.json({ error: "Balance account not owned by user or not TRADING type" }, { status: 400 });
+  }
+}
 
   // Skip rows with duplicate tickets for this user
   const tickets = rows.map((r) => r.ticket).filter((t): t is string => Boolean(t));
@@ -108,7 +135,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, count: 0, skipped: tickets.length, message: "All rows were duplicates" });
   }
 
-  const { error } = await supabase.from("trading_orders").insert(filteredRows);
+  const { data: inserted, error } = await supabase.from("trading_orders").insert(filteredRows).select("*");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

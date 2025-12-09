@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { orderFormSchema } from "@/lib/validation/trading";
+import type { Database } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 const orderStatuses = ["open", "closed", "cancelled"] as const;
@@ -24,6 +26,21 @@ const getUserAndClient = async () => {
   }
 
   return { supabase, user };
+};
+
+const loadBalanceAccount = async (supabase: SupabaseClient<Database>, balanceAccountId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from("balance_accounts")
+    .select("id,user_id,account_type")
+    .eq("id", balanceAccountId)
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data) return { error: "Balance account not found" };
+  if (data.user_id !== userId || data.account_type !== "TRADING") {
+    return { error: "Balance account invalid or not owned by user" };
+  }
+  return { ok: true };
 };
 
 export async function GET(req: Request) {
@@ -82,6 +99,11 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     const message = parsed.error.issues[0]?.message ?? "Invalid payload";
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  const { error: balanceError } = await loadBalanceAccount(supabase, parsed.data.balance_account_id, user.id);
+  if (balanceError) {
+    return NextResponse.json({ error: balanceError }, { status: 400 });
   }
 
   const payload = {
@@ -161,6 +183,11 @@ export async function PUT(req: Request) {
   if (!parsed.success) {
     const message = parsed.error.issues[0]?.message ?? "Invalid payload";
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+
+  const { error: balanceError } = await loadBalanceAccount(supabase, parsed.data.balance_account_id, user.id);
+  if (balanceError) {
+    return NextResponse.json({ error: balanceError }, { status: 400 });
   }
 
   const payload = {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,9 +24,19 @@ import { Textarea } from "@/components/ui/textarea";
 import type { OrderRow } from "./page";
 import { orderFormSchema, type OrderFormValues } from "@/lib/validation/trading";
 import { Percent, TrendingDown, TrendingUp } from "lucide-react";
+import { useNotificationsStore } from "@/store/notifications";
 
 interface OrdersPageClientProps {
   initialOrders: OrderRow[];
+  tradingAccounts: {
+    balance_account_id: string;
+    name: string;
+    currency: string;
+    broker: string | null;
+    platform: string | null;
+    account_number: string | null;
+    is_demo: boolean | null;
+  }[];
 }
 
 type StatusFilter = "all" | "open" | "closed" | "cancelled";
@@ -397,8 +408,10 @@ const parseCsv = (text: string): CsvRow[] => {
   });
 };
 
-const csvRowToOrderPayload = (row: CsvRow): OrderFormValues | null => {
-  if (!row.symbol || !row.opening_price || !row.lots || !row.type || !row.opening_time_utc) return null;
+const csvRowToOrderPayload = (row: CsvRow, balanceAccountId: string | null): OrderFormValues | null => {
+  if (!row.symbol || !row.opening_price || !row.lots || !row.type || !row.opening_time_utc || !balanceAccountId) {
+    return null;
+  }
   const side = row.type.toLowerCase() === "sell" ? "sell" : "buy";
   const openTime = new Date(row.opening_time_utc);
   const closeTime = row.closing_time_utc ? new Date(row.closing_time_utc) : null;
@@ -430,10 +443,11 @@ const csvRowToOrderPayload = (row: CsvRow): OrderFormValues | null => {
     pnl_amount: row.profit_usd ? Number(row.profit_usd) : undefined,
     pnl_percent: undefined,
     note: undefined,
+    balance_account_id: balanceAccountId,
   };
 };
 
-const defaultOrderValues = (): OrderFormValues => ({
+const defaultOrderValues = (balanceAccountId?: string): OrderFormValues => ({
   ticket: "",
   symbol: "",
   side: "buy",
@@ -455,32 +469,38 @@ const defaultOrderValues = (): OrderFormValues => ({
   pnl_amount: undefined,
   pnl_percent: undefined,
   note: undefined,
+  balance_account_id: balanceAccountId ?? "",
 });
 
-export default function OrdersPageClient({ initialOrders }: OrdersPageClientProps) {
+export default function OrdersPageClient({ initialOrders, tradingAccounts }: OrdersPageClientProps) {
   const router = useRouter();
+  const notify = useNotificationsStore((state) => state.notify);
+  const [activeBalanceAccountId, setActiveBalanceAccountId] = useState(tradingAccounts[0]?.balance_account_id ?? "");
   const [mounted, setMounted] = useState(false);
   const [filtersDraft, setFiltersDraft] = useState<{ symbol: string; status: StatusFilter }>({ symbol: "", status: "all" });
   const [filters, setFilters] = useState<{ symbol: string; status: StatusFilter }>({ symbol: "", status: "all" });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<OrderRow | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OrderRow | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "month">("day");
   const [winRatePeriod, setWinRatePeriod] = useState<"week" | "month">("week");
+  const [syncingLedger, setSyncingLedger] = useState(false);
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
-    defaultValues: defaultOrderValues(),
+    defaultValues: defaultOrderValues(activeBalanceAccountId),
   });
+
+  const tradingAccountMap = useMemo(() => {
+    const map = new Map<string, OrdersPageClientProps["tradingAccounts"][number]>();
+    tradingAccounts.forEach((acc) => map.set(acc.balance_account_id, acc));
+    return map;
+  }, [tradingAccounts]);
 
   const filteredOrders = useMemo(() => {
     return initialOrders.filter((order) => {
@@ -499,6 +519,20 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!activeBalanceAccountId && tradingAccounts[0]) {
+      setActiveBalanceAccountId(tradingAccounts[0].balance_account_id);
+      form.setValue("balance_account_id", tradingAccounts[0].balance_account_id);
+    }
+  }, [activeBalanceAccountId, tradingAccounts, form]);
+
+  useEffect(() => {
+    if (editingOrder) return;
+    if (activeBalanceAccountId) {
+      form.setValue("balance_account_id", activeBalanceAccountId);
+    }
+  }, [activeBalanceAccountId, editingOrder, form]);
 
   useEffect(() => {
     setPage(1);
@@ -550,15 +584,54 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
     console.log("Lots series (7 days)", metrics.lotsSeries);
   }, [metrics.pnlSeries, metrics.lotsSeries]);
 
+  const hasTradingAccounts = tradingAccounts.length > 0;
+  const activeAccount = activeBalanceAccountId ? tradingAccountMap.get(activeBalanceAccountId) ?? null : null;
+  const getAccountLabel = (order: OrderRow) => {
+    const acc = order.balance_account_id ? tradingAccountMap.get(order.balance_account_id) : null;
+    if (!acc) return "Unlinked";
+    return `${acc.name} (${acc.currency})`;
+  };
+
+  const handleLedgerSync = async () => {
+    setSyncingLedger(true);
+    const res = await fetch("/api/trading/orders/sync-ledger", { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      notify({
+        type: "error",
+        title: "Sync ledger thất bại",
+        description: json.error ?? "Sync failed",
+      });
+    } else {
+      notify({
+        type: "success",
+        title: "Đã sync ledger",
+        description: `Đã sync ${json.synced ?? 0} orders (skipped: ${json.skipped ?? 0}).`,
+      });
+      router.refresh();
+    }
+    setSyncingLedger(false);
+  };
+
   if (!mounted) {
     return <div className="text-sm text-muted-foreground">Loading orders…</div>;
   }
 
   const openNewDialog = () => {
+    if (!activeBalanceAccountId) {
+      notify({
+        type: "error",
+        title: "Chưa chọn balance account",
+        description: "Chọn Trading balance account trước khi tạo order.",
+      });
+      return;
+    }
     setEditingOrder(null);
-    form.reset(defaultOrderValues());
+    form.reset({
+      ...defaultOrderValues(activeBalanceAccountId),
+      balance_account_id: activeBalanceAccountId ?? "",
+    });
     setDialogOpen(true);
-    setSubmitError(null);
   };
 
   const openEditDialog = (order: OrderRow) => {
@@ -585,15 +658,24 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
       pnl_amount: order.pnl_amount ?? undefined,
       pnl_percent: order.pnl_percent ?? undefined,
       note: order.note ?? undefined,
+      balance_account_id: order.balance_account_id ?? activeBalanceAccountId ?? "",
     });
     setDialogOpen(true);
-    setSubmitError(null);
   };
 
   const handleSubmit = async (values: OrderFormValues) => {
-    setSubmitError(null);
+    if (!values.balance_account_id) {
+      notify({
+        type: "error",
+        title: "Chưa chọn balance account",
+        description: "Chọn balance account trước khi lưu order.",
+      });
+      return;
+    }
+    const selectedAccount = tradingAccountMap.get(values.balance_account_id);
     const payload = {
       ...values,
+      balance_account_id: values.balance_account_id ?? selectedAccount?.balance_account_id ?? undefined,
       ticket: values.ticket?.trim() || null,
       sl_price: values.sl_price ?? null,
       tp_price: values.tp_price ?? null,
@@ -620,11 +702,23 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
-      setSubmitError(error.error ?? "Failed to save order");
+      notify({
+        type: "error",
+        title: "Lưu order thất bại",
+        description: error.error ?? "Failed to save order",
+      });
       return;
     }
 
-    form.reset(defaultOrderValues());
+    notify({
+      type: "success",
+      title: editingOrder ? "Đã cập nhật order" : "Đã tạo order",
+      description: editingOrder ? "Order đã được cập nhật." : "Order mới đã được thêm.",
+    });
+    form.reset({
+      ...defaultOrderValues(activeBalanceAccountId),
+      balance_account_id: activeBalanceAccountId ?? "",
+    });
     setDialogOpen(false);
     setEditingOrder(null);
     router.refresh();
@@ -632,7 +726,6 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setDeleteError(null);
     setDeleting(true);
     const res = await fetch("/api/trading/orders", {
       method: "DELETE",
@@ -641,29 +734,48 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
-      setDeleteError(error.error ?? "Failed to delete order");
+      notify({
+        type: "error",
+        title: "Không xóa được order",
+        description: error.error ?? "Failed to delete order",
+      });
       setDeleting(false);
       return;
     }
+    notify({
+      type: "success",
+      title: "Đã xóa order",
+      description: "Order đã được gỡ khỏi danh sách.",
+    });
     setDeleting(false);
     setDeleteTarget(null);
     router.refresh();
   };
 
   const handleImport = async () => {
+    if (!activeBalanceAccountId) {
+      notify({
+        type: "error",
+        title: "Chưa chọn balance account",
+        description: "Chọn balance account để import orders.",
+      });
+      return;
+    }
     if (!importFile) return;
-    setImportError(null);
-    setImportSuccess(null);
     setImporting(true);
 
     try {
       const text = await importFile.text();
       const rows = parseCsv(text)
-        .map((row) => csvRowToOrderPayload(row))
+        .map((row) => csvRowToOrderPayload(row, activeBalanceAccountId))
         .filter((r): r is OrderFormValues => Boolean(r));
 
       if (rows.length === 0) {
-        setImportError("Không tìm thấy dữ liệu hợp lệ trong file CSV");
+        notify({
+          type: "error",
+          title: "Import thất bại",
+          description: "Không tìm thấy dữ liệu hợp lệ trong file CSV.",
+        });
         setImporting(false);
         return;
       }
@@ -676,17 +788,29 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
 
       if (!res.ok) {
         const error = await res.json().catch(() => ({}));
-        setImportError(error.error ?? "Import thất bại");
+        notify({
+          type: "error",
+          title: "Import thất bại",
+          description: error.error ?? "Import thất bại",
+        });
         setImporting(false);
         return;
       }
 
-      setImportSuccess(`Đã import ${rows.length} orders`);
+      notify({
+        type: "success",
+        title: "Đã import orders",
+        description: `Đã import ${rows.length} orders.`,
+      });
       setImportFile(null);
       setImportDialogOpen(false);
       router.refresh();
     } catch (err: any) {
-      setImportError(err?.message ?? "Import thất bại");
+      notify({
+        type: "error",
+        title: "Import thất bại",
+        description: err?.message ?? "Import thất bại",
+      });
     } finally {
       setImporting(false);
     }
@@ -699,10 +823,81 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
           <h1 className="text-2xl font-semibold">Orders</h1>
           <p className="text-sm text-muted-foreground">Create, update, and review your trading orders.</p>
         </div>
-        <Button size="lg" onClick={openNewDialog}>
-          New order
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={handleLedgerSync} disabled={syncingLedger}>
+            {syncingLedger ? "Syncing..." : "Sync ledger from closed orders"}
+          </Button>
+          <Button size="lg" onClick={openNewDialog} disabled={!hasTradingAccounts}>
+            New order
+          </Button>
+        </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Trading account context</CardTitle>
+          <CardDescription>
+            Mọi order phải gắn vào một Trading balance account. Chọn account để tạo mới hoặc import.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!hasTradingAccounts ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed bg-slate-50 p-4 text-sm">
+              <div>
+                <p className="font-semibold text-foreground">Chưa có Trading account.</p>
+                <p className="text-muted-foreground">Tạo balance account (TRADING) trước khi thêm order.</p>
+              </div>
+              <Button asChild>
+                <Link href="/trading/accounts">Tạo Trading account</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-[1.05fr,0.95fr]">
+              <div className="space-y-2">
+                <FormLabel>Chọn Trading account</FormLabel>
+                <Select
+                  value={activeBalanceAccountId}
+                  onValueChange={(val) => {
+                    setActiveBalanceAccountId(val);
+                    form.setValue("balance_account_id", val);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tradingAccounts.map((acc) => (
+                      <SelectItem key={acc.balance_account_id} value={acc.balance_account_id}>
+                        {acc.name} · {acc.currency}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {activeAccount ? (
+                <div className="grid gap-2 rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Broker</p>
+                    <p className="font-medium text-foreground">{activeAccount.broker || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Platform</p>
+                    <p className="font-medium text-foreground">{activeAccount.platform || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Account #</p>
+                    <p className="font-medium text-foreground">{activeAccount.account_number || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Mode</p>
+                    <p className="font-medium text-foreground">{activeAccount.is_demo ? "Demo" : "Live"}</p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
@@ -1081,14 +1276,12 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                   Giá trị dùng: symbol, type (buy/sell), opening_time_utc, closing_time_utc, lots, opening_price, closing_price,
                   stop_loss, take_profit, profit_usd, close_reason. Các cột khác được lưu kèm (commission/swap/equity/margin).
                 </p>
-                {importError ? <p className="text-sm text-red-500">{importError}</p> : null}
-                {importSuccess ? <p className="text-sm text-emerald-600">{importSuccess}</p> : null}
               </div>
               <DialogFooter>
                 <Button variant="ghost" type="button" onClick={() => setImportDialogOpen(false)}>
                   Hủy
                 </Button>
-                <Button onClick={handleImport} disabled={!importFile || importing}>
+                <Button onClick={handleImport} disabled={!importFile || importing || !activeBalanceAccountId}>
                   {importing ? "Đang import..." : "Import"}
                 </Button>
               </DialogFooter>
@@ -1139,6 +1332,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                       <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Symbol</p>
                       <p className="text-base font-semibold text-foreground">{order.symbol}</p>
                       <p className="text-xs text-muted-foreground">{formatDateTime(order.open_time)}</p>
+                      <p className="text-xs text-muted-foreground">Account: {getAccountLabel(order)}</p>
                     </div>
                     <span
                         className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
@@ -1226,6 +1420,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                     <TableRow>
                       <TableHead>Ticket</TableHead>
                       <TableHead>Symbol</TableHead>
+                      <TableHead>Account</TableHead>
                       <TableHead>Side</TableHead>
                       <TableHead>Entry</TableHead>
                       <TableHead>SL</TableHead>
@@ -1243,6 +1438,7 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                       <TableRow key={order.id}>
                         <TableCell className="font-semibold">{order.ticket ?? "—"}</TableCell>
                         <TableCell className="font-semibold">{order.symbol}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{getAccountLabel(order)}</TableCell>
                         <TableCell>
                           <span
                             className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
@@ -1315,12 +1511,42 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
             <DialogTitle>{editingOrder ? "Edit order" : "New order"}</DialogTitle>
             <DialogDescription>Capture order details and risk metadata.</DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
-              <FormField
-                control={form.control}
-                name="ticket"
-                render={({ field }) => (
+              <Form {...form}>
+                <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
+                  <FormField
+                    control={form.control}
+                    name="balance_account_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Balance account</FormLabel>
+                        <Select
+                          value={field.value ?? ""}
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            setActiveBalanceAccountId(val);
+                          }}
+                          disabled={!hasTradingAccounts}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn Balance account" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tradingAccounts.map((acc) => (
+                              <SelectItem key={acc.balance_account_id} value={acc.balance_account_id}>
+                                {acc.name} · {acc.currency}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage>{form.formState.errors.balance_account_id?.message}</FormMessage>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="ticket"
+                    render={({ field }) => (
                   <FormItem>
                     <FormLabel>Ticket</FormLabel>
                     <FormControl>
@@ -1722,8 +1948,6 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
                 )}
               />
 
-              {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-
               <DialogFooter>
                 <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>
                   Cancel
@@ -1745,7 +1969,6 @@ export default function OrdersPageClient({ initialOrders }: OrdersPageClientProp
               This action cannot be undone. The order "{deleteTarget?.symbol}" will be removed.
             </DialogDescription>
           </DialogHeader>
-          {deleteError ? <p className="text-sm text-red-500">{deleteError}</p> : null}
           <DialogFooter>
             <Button variant="ghost" type="button" onClick={() => setDeleteTarget(null)}>
               Cancel

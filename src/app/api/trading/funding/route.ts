@@ -23,6 +23,20 @@ const getUserAndClient = async () => {
   return { supabase, user };
 };
 
+const loadFundingAccount = async (supabase: Awaited<ReturnType<typeof createClient>>, id: string, userId: string) => {
+  const { data, error } = await supabase
+    .from("balance_accounts")
+    .select("id,user_id,account_type")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!data) return { error: "Balance account not found" };
+  if (data.user_id !== userId || data.account_type !== "FUNDING") {
+    return { error: "Balance account invalid or not owned by user" };
+  }
+  return { ok: true };
+};
+
 export async function GET() {
   const { supabase, user } = await getUserAndClient();
   if (!user) {
@@ -66,6 +80,11 @@ export async function POST(req: Request) {
     note: parsed.data.note?.trim() ? parsed.data.note.trim() : null,
   };
 
+  const { error: accountError } = await loadFundingAccount(supabase, parsed.data.balance_account_id, user.id);
+  if (accountError) {
+    return NextResponse.json({ error: accountError }, { status: 400 });
+  }
+
   const { error } = await supabase.from("trading_funding").insert(payload);
 
   if (error) {
@@ -101,6 +120,13 @@ export async function PUT(req: Request) {
     transaction_time: new Date(parsed.data.transaction_time).toISOString(),
     note: parsed.data.note?.trim() ? parsed.data.note.trim() : null,
   };
+
+  if (parsed.data.balance_account_id) {
+    const { error: accountError } = await loadFundingAccount(supabase, parsed.data.balance_account_id, user.id);
+    if (accountError) {
+      return NextResponse.json({ error: accountError }, { status: 400 });
+    }
+  }
 
   const { error } = await supabase
     .from("trading_funding")

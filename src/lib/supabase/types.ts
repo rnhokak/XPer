@@ -41,6 +41,55 @@ export interface Database {
           }
         ];
       };
+      balance_accounts: {
+        Row: {
+          id: string;
+          user_id: string;
+          account_type: "TRADING" | "FUNDING";
+          name: string;
+          currency: string;
+          is_active: boolean;
+          created_at: string | null;
+          broker: string | null;
+          platform: string | null;
+          account_number: string | null;
+          is_demo: boolean;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          account_type: "TRADING" | "FUNDING";
+          name: string;
+          currency: string;
+          is_active?: boolean;
+          created_at?: string | null;
+          broker?: string | null;
+          platform?: string | null;
+          account_number?: string | null;
+          is_demo?: boolean;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          account_type?: "TRADING" | "FUNDING";
+          name?: string;
+          currency?: string;
+          is_active?: boolean;
+          created_at?: string | null;
+          broker?: string | null;
+          platform?: string | null;
+          account_number?: string | null;
+          is_demo?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "balance_accounts_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       categories: {
         Row: {
           id: string;
@@ -405,9 +454,172 @@ export interface Database {
           }
         ];
       };
+      funding_accounts: {
+        Row: {
+          id: string;
+          balance_account_id: string;
+          provider: string | null;
+          note: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          balance_account_id: string;
+          provider?: string | null;
+          note?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          balance_account_id?: string;
+          provider?: string | null;
+          note?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "funding_accounts_balance_account_id_fkey";
+            columns: ["balance_account_id"];
+            referencedRelation: "balance_accounts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      trading_balance_ledger: {
+        Row: {
+          id: string;
+          balance_account_id: string;
+          source_type:
+            | "DEPOSIT"
+            | "WITHDRAW"
+            | "TRANSFER_IN"
+            | "TRANSFER_OUT"
+            | "TRADE_PNL"
+            | "COMMISSION"
+            | "SWAP"
+            | "BONUS"
+            | "BONUS_REMOVAL"
+            | "ADJUSTMENT";
+          source_ref_id: string | null;
+          amount: number;
+          balance_after: number;
+          occurred_at: string;
+          currency: string;
+          meta: Json | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          balance_account_id: string;
+          source_type:
+            | "DEPOSIT"
+            | "WITHDRAW"
+            | "TRANSFER_IN"
+            | "TRANSFER_OUT"
+            | "TRADE_PNL"
+            | "COMMISSION"
+            | "SWAP"
+            | "BONUS"
+            | "BONUS_REMOVAL"
+            | "ADJUSTMENT";
+          source_ref_id?: string | null;
+          amount: number;
+          balance_after: number;
+          occurred_at: string;
+          currency: string;
+          meta?: Json | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          balance_account_id?: string;
+          source_type?:
+            | "DEPOSIT"
+            | "WITHDRAW"
+            | "TRANSFER_IN"
+            | "TRANSFER_OUT"
+            | "TRADE_PNL"
+            | "COMMISSION"
+            | "SWAP"
+            | "BONUS"
+            | "BONUS_REMOVAL"
+            | "ADJUSTMENT";
+          source_ref_id?: string | null;
+          amount?: number;
+          balance_after?: number;
+          occurred_at?: string;
+          currency?: string;
+          meta?: Json | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "trading_balance_ledger_balance_account_id_fkey";
+            columns: ["balance_account_id"];
+            referencedRelation: "balance_accounts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      trading_daily_balance_snapshots: {
+        Row: {
+          id: string;
+          balance_account_id: string;
+          date: string;
+          opening_balance: number;
+          closing_balance: number;
+          net_change: number;
+          deposit_amount: number;
+          withdraw_amount: number;
+          transfer_in_amount: number;
+          transfer_out_amount: number;
+          trading_net_result: number;
+          adjustment_amount: number;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          balance_account_id: string;
+          date: string;
+          opening_balance?: number;
+          closing_balance?: number;
+          net_change?: number;
+          deposit_amount?: number;
+          withdraw_amount?: number;
+          transfer_in_amount?: number;
+          transfer_out_amount?: number;
+          trading_net_result?: number;
+          adjustment_amount?: number;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          balance_account_id?: string;
+          date?: string;
+          opening_balance?: number;
+          closing_balance?: number;
+          net_change?: number;
+          deposit_amount?: number;
+          withdraw_amount?: number;
+          transfer_in_amount?: number;
+          transfer_out_amount?: number;
+          trading_net_result?: number;
+          adjustment_amount?: number;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "trading_daily_balance_snapshots_balance_account_id_fkey";
+            columns: ["balance_account_id"];
+            referencedRelation: "balance_accounts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       trading_funding: {
         Row: {
           amount: number;
+          balance_account_id: string | null;
           created_at: string | null;
           currency: string;
           id: string;
@@ -419,6 +631,7 @@ export interface Database {
         };
         Insert: {
           amount: number;
+          balance_account_id?: string | null;
           created_at?: string | null;
           currency: string;
           id?: string;
@@ -430,6 +643,7 @@ export interface Database {
         };
         Update: {
           amount?: number;
+          balance_account_id?: string | null;
           created_at?: string | null;
           currency?: string;
           id?: string;
@@ -444,6 +658,12 @@ export interface Database {
             foreignKeyName: "trading_funding_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "trading_funding_balance_account_id_fkey";
+            columns: ["balance_account_id"];
+            referencedRelation: "balance_accounts";
             referencedColumns: ["id"];
           }
         ];
@@ -461,6 +681,7 @@ export interface Database {
           id: string;
           leverage: number | null;
           margin_level: number | null;
+          balance_account_id: string | null;
           note: string | null;
           original_position_size: number | null;
           open_time: string;
@@ -487,6 +708,7 @@ export interface Database {
           id?: string;
           leverage?: number | null;
           margin_level?: number | null;
+          balance_account_id?: string | null;
           note?: string | null;
           original_position_size?: number | null;
           open_time: string;
@@ -513,6 +735,7 @@ export interface Database {
           id?: string;
           leverage?: number | null;
           margin_level?: number | null;
+          balance_account_id?: string | null;
           note?: string | null;
           original_position_size?: number | null;
           open_time?: string;
@@ -534,11 +757,31 @@ export interface Database {
             columns: ["user_id"];
             referencedRelation: "users";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "trading_orders_balance_account_id_fkey";
+            columns: ["balance_account_id"];
+            referencedRelation: "balance_accounts";
+            referencedColumns: ["id"];
           }
         ];
       };
     };
     Views: {
+      balance_account_latest_balances: {
+        Row: {
+          balance_account_id: string | null;
+          user_id: string | null;
+          account_type: "TRADING" | "FUNDING" | null;
+          name: string | null;
+          currency: string | null;
+          is_active: boolean | null;
+          created_at: string | null;
+          current_balance: number | null;
+          balance_at: string | null;
+        };
+        Relationships: [];
+      };
       partner_balances: {
         Row: {
           partner_id: string | null;

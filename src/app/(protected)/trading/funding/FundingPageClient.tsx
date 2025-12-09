@@ -22,9 +22,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type { FundingRow } from "./page";
 import { fundingFormSchema, type FundingFormValues } from "@/lib/validation/trading";
+import { useNotificationsStore } from "@/store/notifications";
 
 interface FundingPageClientProps {
   initialData: FundingRow[];
+  fundingAccounts: { balance_account_id: string; name: string; currency: string }[];
   serverNow?: string;
 }
 
@@ -96,17 +98,22 @@ const buildMonthlyBuckets = (rows: FundingRow[], months = 6, anchorIso?: string)
 
 const methodOptions = ["Bank transfer", "Wallet", "Broker transfer", "Refund"];
 
-export default function FundingPageClient({ initialData, serverNow }: FundingPageClientProps) {
+export default function FundingPageClient({ initialData, serverNow, fundingAccounts }: FundingPageClientProps) {
   const router = useRouter();
+  const notify = useNotificationsStore((state) => state.notify);
   const anchorDate = useMemo(() => (serverNow ? new Date(serverNow) : new Date()), [serverNow]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [editingRow, setEditingRow] = useState<FundingRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FundingRow | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [activeBalanceAccountId, setActiveBalanceAccountId] = useState(fundingAccounts[0]?.balance_account_id ?? "");
+  const accountMap = useMemo(() => {
+    const map = new Map<string, { name: string; currency: string }>();
+    fundingAccounts.forEach((acc) => map.set(acc.balance_account_id, { name: acc.name, currency: acc.currency }));
+    return map;
+  }, [fundingAccounts]);
 
   const totals = useMemo(() => {
     const deposited = initialData
@@ -134,6 +141,7 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
       method: methodOptions[0],
       note: undefined,
       transaction_time: initialTransactionTime,
+      balance_account_id: fundingAccounts[0]?.balance_account_id ?? "",
     },
   });
   const selectedType = form.watch("type");
@@ -149,10 +157,10 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
       method: methodOptions[0],
       note: undefined,
       transaction_time: initialTransactionTime,
+      balance_account_id: activeBalanceAccountId || fundingAccounts[0]?.balance_account_id || "",
     });
     setAmountInput("");
     setEditingRow(null);
-    setSubmitError(null);
     setDialogOpen(true);
   };
 
@@ -165,9 +173,9 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
       method: row.method,
       note: row.note ?? undefined,
       transaction_time: toInputDateTime(row.transaction_time, anchorDate),
+      balance_account_id: row.balance_account_id ?? fundingAccounts[0]?.balance_account_id ?? "",
     });
     setAmountInput(row.amount !== null && row.amount !== undefined ? String(row.amount) : "");
-    setSubmitError(null);
     setDialogOpen(true);
   };
 
@@ -175,7 +183,6 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
     setDialogOpen(open);
     if (!open) {
       setEditingRow(null);
-      setSubmitError(null);
       setAmountInput("");
     }
   };
@@ -193,10 +200,13 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
 
   const handleSubmit = async (values: FundingFormInput) => {
     if (typeof values.amount !== "number") {
-      setSubmitError("Amount is required");
+      notify({ type: "error", title: "Thiếu số tiền", description: "Nhập số tiền hợp lệ trước khi lưu giao dịch." });
       return;
     }
-    setSubmitError(null);
+    if (!values.balance_account_id) {
+      notify({ type: "error", title: "Chưa chọn balance account", description: "Chọn balance account trước khi lưu." });
+      return;
+    }
     const payload = {
       ...values,
       amount: Number(values.amount),
@@ -212,10 +222,19 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
-      setSubmitError(error.error ?? "Failed to save transaction");
+      notify({
+        type: "error",
+        title: "Lưu giao dịch thất bại",
+        description: error.error ?? "Failed to save transaction",
+      });
       return;
     }
 
+    notify({
+      type: "success",
+      title: editingRow ? "Đã cập nhật giao dịch" : "Đã tạo giao dịch",
+      description: editingRow ? "Giao dịch đã được cập nhật." : "Giao dịch mới đã được thêm.",
+    });
     form.reset({
       type: "deposit",
       amount: undefined,
@@ -223,6 +242,7 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
       method: methodOptions[0],
       note: undefined,
       transaction_time: defaultDateTimeValue(anchorDate),
+      balance_account_id: activeBalanceAccountId || fundingAccounts[0]?.balance_account_id || "",
     });
     setAmountInput("");
     setDialogOpen(false);
@@ -241,7 +261,6 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setDeleteError(null);
     setDeleting(true);
     const res = await fetch("/api/trading/funding", {
       method: "DELETE",
@@ -251,18 +270,26 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
-      setDeleteError(error.error ?? "Failed to delete transaction");
+      notify({
+        type: "error",
+        title: "Không xóa được giao dịch",
+        description: error.error ?? "Failed to delete transaction",
+      });
       setDeleting(false);
       return;
     }
 
+    notify({
+      type: "success",
+      title: "Đã xóa giao dịch",
+      description: "Giao dịch funding đã được gỡ khỏi lịch sử.",
+    });
     setDeleting(false);
     setDeleteTarget(null);
     router.refresh();
   };
 
   const requestDelete = (row: FundingRow) => {
-    setDeleteError(null);
     setDeleteTarget(row);
   };
 
@@ -273,10 +300,17 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
           <h1 className="text-2xl font-semibold">Funding history</h1>
           <p className="text-sm text-muted-foreground">Track deposits and withdrawals tied to your trading balance.</p>
         </div>
+        <div className="text-xs text-muted-foreground">
+          {activeBalanceAccountId
+            ? `Balance account: ${
+                fundingAccounts.find((a) => a.balance_account_id === activeBalanceAccountId)?.name ?? activeBalanceAccountId
+              }`
+            : "Chưa chọn balance account"}
+        </div>
 
         <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
-            <Button size="lg" onClick={openNewDialog}>
+            <Button size="lg" onClick={openNewDialog} disabled={fundingAccounts.length === 0}>
               New transaction
             </Button>
           </DialogTrigger>
@@ -305,11 +339,11 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
                   </span>
                 </div>
                 <form className="space-y-4 pb-2 sm:pb-0" onSubmit={form.handleSubmit(handleSubmit)}>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="type"
-                      render={({ field }) => (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm font-semibold">Type</FormLabel>
                           <div className="flex items-center gap-2 rounded-xl bg-muted/60 p-1">
@@ -353,6 +387,39 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="balance_account_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold">Balance account (FUNDING)</FormLabel>
+                        <Select
+                          value={field.value ?? ""}
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            setActiveBalanceAccountId(val);
+                            const acc = accountMap.get(val);
+                            if (acc?.currency) {
+                              form.setValue("currency", acc.currency);
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn balance account" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {fundingAccounts.map((acc) => (
+                              <SelectItem key={acc.balance_account_id} value={acc.balance_account_id}>
+                                {acc.name} · {acc.currency}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage>{form.formState.errors.balance_account_id?.message}</FormMessage>
+                      </FormItem>
+                    )}
+                  />
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <FormField
@@ -459,9 +526,6 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
                       </FormItem>
                     )}
                   />
-
-                  {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-
                   <DialogFooter className="sticky bottom-0 -mx-4 -mb-4 mt-2 flex flex-col gap-2 border-t bg-white/90 px-4 py-3 backdrop-blur sm:static sm:m-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
                     <Button className="w-full sm:w-auto" type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
                       Cancel
@@ -560,11 +624,11 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
             <p className="text-sm text-muted-foreground">No transactions yet. Add your first deposit or withdrawal.</p>
           ) : (
             <div className="space-y-4">
-              <div className="space-y-2 md:hidden">
-                {initialData.map((row) => (
-                  <div key={row.id} className="rounded-lg border bg-white p-3 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm text-muted-foreground">{formatDateTime(row.transaction_time)}</div>
+            <div className="space-y-2 md:hidden">
+              {initialData.map((row) => (
+                <div key={row.id} className="rounded-lg border bg-white p-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">{formatDateTime(row.transaction_time)}</div>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${
                           row.type === "deposit" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
@@ -581,6 +645,12 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
                       <div>
                         <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Method</p>
                         <p className="font-medium text-foreground">{row.method}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Balance account</p>
+                        <p className="font-medium text-foreground">
+                          {row.balance_account_id ? accountMap.get(row.balance_account_id)?.name ?? "—" : "—"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Note</p>
@@ -612,6 +682,7 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
                       <TableHead>Type</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Method</TableHead>
+                      <TableHead>Balance account</TableHead>
                       <TableHead>Note</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -629,15 +700,18 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
                             {row.type === "deposit" ? "Deposit" : "Withdraw"}
                           </span>
                         </TableCell>
-                        <TableCell className="font-medium">
-                          {currencyFormatter(row.amount, row.currency)}{" "}
-                          <span className="text-xs text-muted-foreground">({row.currency})</span>
-                        </TableCell>
-                        <TableCell className="text-sm">{row.method}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{row.note ?? "—"}</TableCell>
-                        <TableCell className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(row)}>
-                            Edit
+                      <TableCell className="font-medium">
+                        {currencyFormatter(row.amount, row.currency)}{" "}
+                        <span className="text-xs text-muted-foreground">({row.currency})</span>
+                      </TableCell>
+                      <TableCell className="text-sm">{row.method}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.balance_account_id ? accountMap.get(row.balance_account_id)?.name ?? "—" : "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{row.note ?? "—"}</TableCell>
+                      <TableCell className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(row)}>
+                          Edit
                           </Button>
                           <Button
                             variant="ghost"
@@ -663,7 +737,6 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
         onOpenChange={(open) => {
           if (!open) {
             setDeleteTarget(null);
-            setDeleteError(null);
             setDeleting(false);
           }
         }}
@@ -675,7 +748,6 @@ export default function FundingPageClient({ initialData, serverNow }: FundingPag
               This action cannot be undone. The transaction will be permanently removed.
             </DialogDescription>
           </DialogHeader>
-          {deleteError ? <p className="text-sm text-red-500">{deleteError}</p> : null}
           <DialogFooter>
             <Button variant="ghost" type="button" onClick={() => setDeleteTarget(null)}>
               Cancel

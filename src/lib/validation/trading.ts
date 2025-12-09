@@ -17,6 +17,7 @@ export const fundingFormSchema = z.object({
   method: z.string().min(1, "Method is required"),
   transaction_time: z.string().min(1, "Transaction time is required"),
   note: z.string().optional().nullable(),
+  balance_account_id: z.string().uuid("Balance account is required"),
 });
 
 export type FundingFormValues = z.infer<typeof fundingFormSchema>;
@@ -36,6 +37,7 @@ export const orderFormSchema = z.object({
   equity_usd: z.number().optional().nullable(),
   margin_level: z.number().optional().nullable(),
   close_reason: z.string().optional().nullable(),
+  balance_account_id: z.string().uuid("Balance account is required"),
   status: z.enum(["open", "closed", "cancelled"]).default("open"),
   open_time: z.string().min(1, "Open time is required"),
   close_time: z.string().optional(),
