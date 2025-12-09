@@ -1,7 +1,8 @@
-import { CashflowQuickAddForm } from "./_components/CashflowQuickAddForm";
+import Link from "next/link";
 import { CashflowRangeFilter } from "./_components/CashflowRangeFilter";
 import { CashflowTransactionList } from "./_components/CashflowTransactionList";
 import { CashflowReport } from "./_components/CashflowReport";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -62,16 +63,11 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Cashflow</h1>
-          <p className="text-sm text-muted-foreground">Theo dõi giao dịch và thêm nhanh qua modal.</p>
+          <p className="text-sm text-muted-foreground">Theo dõi giao dịch và thêm mới.</p>
         </div>
-        <CashflowQuickAddForm
-          categories={categories}
-          accounts={accounts}
-          defaultAccountId={defaultAccount?.id}
-          defaultCurrency={defaultCurrency}
-          useDialog
-          range={range}
-        />
+        <Button asChild>
+          <Link href="/cashflow/new">Add Transaction</Link>
+        </Button>
       </div>
 
       <Card>

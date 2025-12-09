@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
     icon: Wallet,
     children: [
       { href: "/cashflow", label: "Transactions" },
+      { href: "/cashflow/new", label: "Add Transaction" },
       { href: "/cashflow/accounts", label: "Accounts" },
       { href: "/cashflow/categories", label: "Categories" },
     ],
