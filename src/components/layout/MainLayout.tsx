@@ -116,7 +116,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-72 transform border-r border-slate-200 bg-white/90 px-3 py-4 shadow-lg backdrop-blur transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-30 w-72 transform overflow-y-auto border-r border-slate-200 bg-white/90 px-3 py-4 shadow-lg backdrop-blur transition-transform duration-200",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full",
           "md:translate-x-0"
         )}
