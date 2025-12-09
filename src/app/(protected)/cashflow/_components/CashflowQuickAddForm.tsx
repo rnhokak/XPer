@@ -14,6 +14,7 @@ import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/valid
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
+import { useNotificationsStore } from "@/store/notifications";
 
 type Category = { id: string; name: string; type: "income" | "expense" };
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
@@ -168,6 +169,8 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     }
   }, [amount, accountId, transactionTime, selectedType, categories, accounts, form, userTouchedCategory, selectedCategoryId]);
 
+  const notify = useNotificationsStore((state) => state.notify);
+
   const onSubmit = async (values: CashflowQuickAddValues) => {
     setSubmitError(null);
     const payload = {
@@ -188,6 +191,11 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     if (!res.ok || !responseBody || Array.isArray(responseBody) || !("id" in responseBody)) {
       const message = (responseBody as { error?: string } | null)?.error ?? "Failed to add transaction";
       setSubmitError(message);
+      notify({
+        title: "Error",
+        description: message,
+        type: "error",
+      });
       return;
     }
     const response = responseBody as CashflowTransaction;
@@ -225,6 +233,12 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       setDialogOpen(false);
     }
     persistRecentAmount(values.amount ?? 0, payload.currency ?? defaultCurrency);
+    
+    notify({
+      title: "Success",
+      description: "Transaction added successfully!",
+      type: "success",
+    });
   };
 
   const normalizeAmount = (raw: string) => {
