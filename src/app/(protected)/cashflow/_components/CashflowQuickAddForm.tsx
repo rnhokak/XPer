@@ -55,6 +55,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const [amountInput, setAmountInput] = useState("");
   const [autoThousand, setAutoThousand] = useState(defaultCurrency === "VND");
   const [recentAmounts, setRecentAmounts] = useState<Array<{ amount: number; ts: number }>>([]);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const form = useForm<CashflowQuickAddValues>({
@@ -73,6 +74,26 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!useDialog) return;
+    if (typeof window === "undefined") return;
+
+    const updateViewportHeight = () => {
+      const nextHeight = window.visualViewport?.height ?? window.innerHeight;
+      setViewportHeight(nextHeight);
+    };
+
+    updateViewportHeight();
+    window.addEventListener("resize", updateViewportHeight);
+    const viewport = window.visualViewport;
+    viewport?.addEventListener("resize", updateViewportHeight);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportHeight);
+      viewport?.removeEventListener("resize", updateViewportHeight);
+    };
+  }, [useDialog]);
 
   useEffect(() => {
     form.setValue("account_id", defaultAccountId ?? null);
@@ -273,6 +294,8 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     loadRecentAmounts(currency);
     setAutoThousand(currency === "VND");
   }, [currency]);
+
+  const dialogMaxHeight = useDialog && viewportHeight ? Math.max(360, viewportHeight - 32) : null;
 
   const formContent = !mounted ? (
     <div className="space-y-3">
@@ -657,7 +680,10 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
         <DialogTrigger asChild>
           <Button size="lg">Quick add</Button>
         </DialogTrigger>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto sm:max-w-xl"
+          style={dialogMaxHeight ? { maxHeight: `${dialogMaxHeight}px` } : undefined}
+        >
           <DialogHeader>
             <DialogTitle>Thêm giao dịch nhanh</DialogTitle>
             <DialogDescription>Nhập số tiền và các trường tuỳ chọn.</DialogDescription>
