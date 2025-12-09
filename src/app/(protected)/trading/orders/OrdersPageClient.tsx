@@ -51,7 +51,8 @@ const formatNumber = (value?: number | null, fractionDigits = 2) =>
     ? "—"
     : Number(value).toLocaleString(undefined, { maximumFractionDigits: fractionDigits, minimumFractionDigits: fractionDigits });
 
-const getOrderNetPnl = (order: OrderRow) => Number(order.pnl_amount ?? 0) + Number(order.commission_usd ?? 0);
+const getOrderCommission = (order: OrderRow) => Number(order.commission_usd ?? 0) + Number(order.swap_usd ?? 0);
+const getOrderNetPnl = (order: OrderRow) => Number(order.pnl_amount ?? 0) + getOrderCommission(order);
 
 type ChartPoint = { label: string; value: number };
 type PnlPoint = { label: string; win: number; loss: number };
@@ -93,22 +94,14 @@ const startOfMonth = (d: Date) => {
   return date;
 };
 
-// Build daily series for the last N days based on the latest date in data (fallback: today).
+// Build daily series for the last N days anchored to today (local time).
 const buildLastNDaysSeries = (
   orders: OrderRow[],
   dateKeys: Array<"open_time" | "close_time">,
   valueSelector: (o: OrderRow) => number,
   days = 7
 ) => {
-  const dates: Date[] = [];
-  orders.forEach((order) => {
-    const rawDate = dateKeys.map((key) => order[key]).find(Boolean);
-    if (!rawDate) return;
-    const d = new Date(rawDate);
-    if (!Number.isNaN(d.getTime())) dates.push(d);
-  });
-
-  const anchor = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+  const anchor = new Date(); // always use today as anchor
 
   const labels: string[] = [];
   for (let i = days - 1; i >= 0; i -= 1) {
@@ -137,14 +130,7 @@ const buildLastNDaysPnlSeries = (
   dateKeys: Array<"open_time" | "close_time">,
   days = 7
 ): PnlPoint[] => {
-  const dates: Date[] = [];
-  orders.forEach((order) => {
-    const rawDate = dateKeys.map((key) => order[key]).find(Boolean);
-    if (!rawDate) return;
-    const d = new Date(rawDate);
-    if (!Number.isNaN(d.getTime())) dates.push(d);
-  });
-  const anchor = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+  const anchor = new Date(); // always anchor to today
   const labels: string[] = [];
   for (let i = days - 1; i >= 0; i -= 1) {
     const d = new Date(anchor);
@@ -185,10 +171,7 @@ const getDateFromOrder = (order: OrderRow, keys: Array<"open_time" | "close_time
 };
 
 const getPeriodSummaries = (orders: OrderRow[], keys: Array<"open_time" | "close_time">): Record<"day" | "week" | "month", PeriodSummary> => {
-  const dates = orders
-    .map((o) => getDateFromOrder(o, keys))
-    .filter((d): d is Date => Boolean(d));
-  const anchor = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+  const anchor = new Date();
 
   const sameDay = (d: Date) =>
     d.getFullYear() === anchor.getFullYear() && d.getMonth() === anchor.getMonth() && d.getDate() === anchor.getDate();
@@ -215,7 +198,7 @@ const getPeriodSummaries = (orders: OrderRow[], keys: Array<"open_time" | "close
       const d = getDateFromOrder(order, keys);
       if (!d || !predicate(d)) return;
       const val = getOrderNetPnl(order);
-      commission += Number(order.commission_usd ?? 0);
+      commission += getOrderCommission(order);
       pnl += val;
       if (val > 0) wins += 1;
       if (val < 0) losses += 1;
@@ -246,7 +229,7 @@ const summarizeRange = (orders: OrderRow[], keys: Array<"open_time" | "close_tim
     const d = getDateFromOrder(order, keys);
     if (!d || d < start || d >= end) return;
     const val = getOrderNetPnl(order);
-    commission += Number(order.commission_usd ?? 0);
+    commission += getOrderCommission(order);
     pnl += val;
     if (val > 0) {
       wins += 1;
@@ -275,10 +258,7 @@ const getPeriodComparisons = (
   orders: OrderRow[],
   keys: Array<"open_time" | "close_time">
 ): Record<"day" | "week" | "month", PeriodComparison> => {
-  const dates = orders
-    .map((o) => getDateFromOrder(o, keys))
-    .filter((d): d is Date => Boolean(d));
-  const anchor = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+  const anchor = new Date();
 
   // Day
   const dayStart = new Date(anchor);
@@ -322,10 +302,7 @@ const getPeriodComparisons = (
 };
 
 const getWinRateComparison = (orders: OrderRow[], keys: Array<"open_time" | "close_time">, period: "week" | "month"): WinRateComparison => {
-  const dates = orders
-    .map((o) => getDateFromOrder(o, keys))
-    .filter((d): d is Date => Boolean(d));
-  const anchor = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+  const anchor = new Date();
 
   const currentStart = period === "week" ? startOfWeekMonday(anchor) : startOfMonth(anchor);
   const currentEnd = new Date(currentStart);
@@ -488,6 +465,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [reportPeriod, setReportPeriod] = useState<"day" | "week" | "month">("day");
+  const [periodView, setPeriodView] = useState<"current" | "previous">("current");
   const [winRatePeriod, setWinRatePeriod] = useState<"week" | "month">("week");
   const [syncingLedger, setSyncingLedger] = useState(false);
 
@@ -549,6 +527,8 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
     const closedCount = closedOrders.length;
     const winRate = closedCount === 0 ? 0 : Math.round((winCount / closedCount) * 100);
     const totalPnl = closedOrders.reduce((acc, o) => acc + getOrderNetPnl(o), 0);
+    const totalCommission = closedOrders.reduce((acc, o) => acc + getOrderCommission(o), 0);
+    const grossPnl = closedOrders.reduce((acc, o) => acc + Number(o.pnl_amount ?? 0), 0);
 
     const lotsSeries = buildLastNDaysSeries(filteredOrders, ["open_time", "close_time"], (o) => Number(o.volume ?? 0), 7);
     const pnlSeries = buildLastNDaysPnlSeries(closedOrders, ["close_time", "open_time"], 7);
@@ -556,18 +536,29 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
     const winRateComparison = getWinRateComparison(closedOrders, ["close_time", "open_time"], winRatePeriod);
     const periodComparisons = getPeriodComparisons(closedOrders, ["close_time", "open_time"]);
 
-    return { winRate, closedCount, totalPnl, lotsSeries, pnlSeries, periodSummaries, winRateComparison, periodComparisons };
+    return {
+      winRate,
+      closedCount,
+      totalPnl,
+      totalCommission,
+      grossPnl,
+      lotsSeries,
+      pnlSeries,
+      periodSummaries,
+      winRateComparison,
+      periodComparisons,
+    };
   }, [filteredOrders, winRatePeriod]);
 
   const periodMeta: Record<"day" | "week" | "month", { label: string; description: string; accent: string }> = {
-    day: { label: "Ngày", description: "Hiệu suất phiên gần nhất", accent: "from-emerald-500/10" },
-    week: { label: "Tuần", description: "Nhịp độ tuần hiện tại", accent: "from-blue-500/10" },
-    month: { label: "Tháng", description: "Bức tranh tháng", accent: "from-amber-500/10" },
+    day: { label: "Ngày", description: "Hôm nay (local time)", accent: "from-emerald-500/10" },
+    week: { label: "Tuần", description: "Tuần này (bắt đầu thứ 2)", accent: "from-blue-500/10" },
+    month: { label: "Tháng", description: "Tháng này", accent: "from-amber-500/10" },
   };
 
   const activeComparison = metrics.periodComparisons[reportPeriod];
-  const activeSummary = activeComparison.current;
-  const activePrevious = activeComparison.previous;
+  const activeSummary = periodView === "current" ? activeComparison.current : activeComparison.previous;
+  const activePrevious = periodView === "current" ? activeComparison.previous : activeComparison.current;
   const pnlDelta = activeSummary.pnl - activePrevious.pnl;
   const winRateDelta = activeSummary.winRate - activePrevious.winRate;
   const commissionDelta = activeSummary.commission - activePrevious.commission;
@@ -971,7 +962,32 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                 ))}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">{periodMeta[reportPeriod].description}</p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full bg-muted px-2 py-1 font-semibold text-foreground">
+                {periodView === "current" ? "Kỳ hiện tại" : "Kỳ trước"}
+              </span>
+              <div className="flex overflow-hidden rounded-full border">
+                <Button
+                  type="button"
+                  variant={periodView === "current" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none px-3 text-xs"
+                  onClick={() => setPeriodView("current")}
+                >
+                  Hiện tại
+                </Button>
+                <Button
+                  type="button"
+                  variant={periodView === "previous" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none px-3 text-xs"
+                  onClick={() => setPeriodView("previous")}
+                >
+                  Kỳ trước
+                </Button>
+              </div>
+              <span>{periodMeta[reportPeriod].description}</span>
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[2fr,1.1fr]">
@@ -1096,9 +1112,12 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
               <div className="rounded-xl border bg-white/80 p-4 shadow-sm">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Tổng PnL (closed)</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Tổng PnL (closed, đã trừ phí)</p>
                     <p className={`text-xl font-semibold ${metrics.totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                       {formatNumber(metrics.totalPnl)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Gross: {formatNumber(metrics.grossPnl)} · Commission+Swap: {formatNumber(metrics.totalCommission)}
                     </p>
                   </div>
                   <div>
