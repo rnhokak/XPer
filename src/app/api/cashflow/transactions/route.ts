@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cashflowQuickAddSchema } from "@/lib/validation/cashflow";
+import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -18,29 +19,6 @@ const getUserAndClient = async () => {
   return { supabase, user };
 };
 
-const rangeStart = (range: string | null) => {
-  const now = new Date();
-  if (range === "today") {
-    const d = new Date(now);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-  if (range === "week") {
-    const d = new Date(now);
-    const day = d.getDay();
-    const diff = (day === 0 ? -6 : 1) - day;
-    d.setDate(d.getDate() + diff);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-  if (range === "month") {
-    const d = new Date(now.getFullYear(), now.getMonth(), 1);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-  return null;
-};
-
 export async function GET(req: Request) {
   const { supabase, user } = await getUserAndClient();
   if (!user) {
@@ -48,8 +26,8 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const range = searchParams.get("range");
-  const start = rangeStart(range);
+  const range = normalizeCashflowRange(searchParams.get("range"));
+  const start = rangeStart(range === "all" ? null : range);
 
   let query = supabase
     .from("transactions")
@@ -111,13 +89,17 @@ export async function POST(req: Request) {
     transaction_time: data.transaction_time ? new Date(data.transaction_time).toISOString() : new Date().toISOString(),
   };
 
-  const { error } = await supabase.from("transactions").insert(payload);
+  const { data: inserted, error } = await supabase
+    .from("transactions")
+    .insert(payload)
+    .select("id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)")
+    .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json(inserted);
 }
 
 export async function PUT(req: Request) {

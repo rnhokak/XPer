@@ -3,7 +3,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,17 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/validation/cashflow";
+import { useQueryClient } from "@tanstack/react-query";
+import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 
-type Transaction = {
-  id: string;
-  type: "income" | "expense";
-  amount: number;
-  currency: string;
-  note: string | null;
-  transaction_time: string;
-  category?: { id?: string | null; name?: string | null } | null;
-  account?: { id?: string | null; name?: string | null; currency?: string | null } | null;
-};
+type Transaction = CashflowTransaction;
 type Category = { id: string; name: string; type: "income" | "expense" };
 type Account = { id: string; name: string; currency: string };
 
@@ -44,15 +36,19 @@ const formatDateTime = (value: string) => {
 const NONE_VALUE = "__none__";
 
 export function CashflowTransactionList({
-  transactions,
+  transactions: initialTransactions,
   categories,
   accounts,
+  range,
 }: {
   transactions: Transaction[];
   categories: Category[];
   accounts: Account[];
+  range: string;
 }) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: transactions = initialTransactions, isFetching } = useCashflowTransactions(range, initialTransactions);
+  const queryKey = cashflowTransactionsQueryKey(range);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -97,6 +93,7 @@ export function CashflowTransactionList({
 
   const handleSave = async (values: CashflowQuickAddValues) => {
     if (!selected) return;
+    const current = selected;
     setSubmitError(null);
     const payload = {
       ...values,
@@ -108,25 +105,41 @@ export function CashflowTransactionList({
     const res = await fetch("/api/cashflow/transactions", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: selected.id, ...payload }),
+      body: JSON.stringify({ id: current.id, ...payload }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       setSubmitError(err.error ?? "Cập nhật thất bại");
       return;
     }
+
+    const category = values.category_id ? categories.find((c) => c.id === values.category_id) : null;
+    const account = values.account_id ? accounts.find((a) => a.id === values.account_id) : null;
+    const normalizedTime = payload.transaction_time ?? current.transaction_time ?? new Date().toISOString();
+    const updatedTx: Transaction = {
+      ...current,
+      type: payload.type ?? "expense",
+      amount: payload.amount,
+      currency: payload.currency ?? current.currency,
+      note: payload.note ?? null,
+      transaction_time: normalizedTime,
+      category: category ? { id: category.id, name: category.name, type: category.type } : null,
+      account: account ? { id: account.id, name: account.name, currency: account.currency } : null,
+    };
     setSelected(null);
-    router.refresh();
+    queryClient.setQueryData<Transaction[]>(queryKey, (prev) => (prev ? prev.map((tx) => (tx.id === current.id ? updatedTx : tx)) : prev));
+    queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
   };
 
   const handleDelete = async () => {
     if (!selected) return;
+    const current = selected;
     setDeleteError(null);
     setDeleting(true);
     const res = await fetch("/api/cashflow/transactions", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: selected.id }),
+      body: JSON.stringify({ id: current.id }),
     });
     setDeleting(false);
     if (!res.ok) {
@@ -135,7 +148,8 @@ export function CashflowTransactionList({
       return;
     }
     setSelected(null);
-    router.refresh();
+    queryClient.setQueryData<Transaction[]>(queryKey, (prev) => prev?.filter((tx) => tx.id !== current.id));
+    queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
   };
 
   if (sorted.length === 0) {
@@ -144,6 +158,7 @@ export function CashflowTransactionList({
 
   return (
     <div className="space-y-3">
+      {isFetching ? <p className="text-xs text-muted-foreground">Đang đồng bộ dữ liệu...</p> : null}
       <div className="md:hidden space-y-2">
         {sorted.map((tx) => (
           <button

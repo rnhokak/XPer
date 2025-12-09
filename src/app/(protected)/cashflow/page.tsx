@@ -5,6 +5,7 @@ import { CashflowReport } from "./_components/CashflowReport";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -23,36 +24,12 @@ type Transaction = {
   account: { id?: string | null; name?: string | null; currency?: string | null } | null;
 };
 
-const rangeStart = (range: string | undefined) => {
-  const now = new Date();
-  if (range === "today") {
-    const d = new Date(now);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-  if (range === "week") {
-    const d = new Date(now);
-    const day = d.getDay();
-    const diff = (day === 0 ? -6 : 1) - day;
-    d.setDate(d.getDate() + diff);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-  if (range === "month") {
-    const d = new Date(now.getFullYear(), now.getMonth(), 1);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-  return null;
-};
-
 export default async function CashflowPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const allowedRanges = new Set(["today", "week", "month", "all"]);
-  const range = allowedRanges.has(searchParams?.range ?? "") ? (searchParams?.range as string) : "month";
-  const start = rangeStart(range);
+  const range = normalizeCashflowRange(searchParams?.range);
+  const start = rangeStart(range === "all" ? null : range);
 
   const [accountsRes, categoriesRes, transactionsRes] = await Promise.all([
     supabase.from("accounts").select("id,name,type,currency,is_default").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }),
@@ -93,6 +70,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
           defaultAccountId={defaultAccount?.id}
           defaultCurrency={defaultCurrency}
           useDialog
+          range={range}
         />
       </div>
 
@@ -112,7 +90,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
           <CardTitle>Báo cáo nhanh</CardTitle>
         </CardHeader>
         <CardContent>
-          <CashflowReport transactions={transactions} />
+          <CashflowReport transactions={transactions} range={range} />
         </CardContent>
       </Card>
 
@@ -125,7 +103,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
           <CashflowRangeFilter value={range} />
         </CardHeader>
         <CardContent>
-          <CashflowTransactionList transactions={transactions} categories={categories} accounts={accounts} />
+          <CashflowTransactionList transactions={transactions} categories={categories} accounts={accounts} range={range} />
         </CardContent>
       </Card>
     </div>

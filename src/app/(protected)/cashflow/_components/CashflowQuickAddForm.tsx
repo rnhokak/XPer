@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -12,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/validation/cashflow";
+import { useQueryClient } from "@tanstack/react-query";
+import { cashflowTransactionsQueryKey, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
+import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
 
 type Category = { id: string; name: string; type: "income" | "expense" };
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
@@ -22,6 +24,7 @@ type Props = {
   defaultAccountId?: string | null;
   defaultCurrency: string;
   useDialog?: boolean;
+  range: string;
 };
 
 const AUTO_VALUE = "__auto__";
@@ -41,8 +44,7 @@ const timePresets = [
   { label: "-1w", minutes: -10080 },
 ];
 
-export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, defaultCurrency, useDialog = false }: Props) {
-  const router = useRouter();
+export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, defaultCurrency, useDialog = false, range }: Props) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [customCurrency, setCustomCurrency] = useState("");
@@ -53,6 +55,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const [amountInput, setAmountInput] = useState("");
   const [autoThousand, setAutoThousand] = useState(defaultCurrency === "VND");
   const [recentAmounts, setRecentAmounts] = useState<Array<{ amount: number; ts: number }>>([]);
+  const queryClient = useQueryClient();
 
   const form = useForm<CashflowQuickAddValues>({
     resolver: zodResolver(cashflowQuickAddSchema),
@@ -160,11 +163,25 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      setSubmitError(error.error ?? "Failed to add transaction");
+    const responseBody = (await res.json().catch(() => null)) as CashflowTransaction | { error?: string } | null;
+    if (!res.ok || !responseBody || Array.isArray(responseBody) || !("id" in responseBody)) {
+      const message = (responseBody as { error?: string } | null)?.error ?? "Failed to add transaction";
+      setSubmitError(message);
       return;
     }
+    const response = responseBody as CashflowTransaction;
+
+    const normalizedRange = normalizeCashflowRange(range);
+    const startFilter = rangeStart(normalizedRange === "all" ? null : normalizedRange);
+    const transactionDate = new Date(response.transaction_time);
+    if (!Number.isNaN(transactionDate.getTime()) && (!startFilter || transactionDate >= startFilter)) {
+      queryClient.setQueryData<CashflowTransaction[]>(cashflowTransactionsQueryKey(range), (prev) => {
+        const existing = (prev ?? []).filter((tx) => tx.id !== response.id);
+        const next = [response, ...existing];
+        return next.slice(0, 50);
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
 
     form.reset({
       type: values.type,
@@ -187,7 +204,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       setDialogOpen(false);
     }
     persistRecentAmount(values.amount ?? 0, payload.currency ?? defaultCurrency);
-    router.refresh();
   };
 
   const normalizeAmount = (raw: string) => {

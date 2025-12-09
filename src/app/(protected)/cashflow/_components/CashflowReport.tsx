@@ -1,15 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useCashflowTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 
-type Transaction = {
-  id: string;
-  type: "income" | "expense";
-  amount: number;
-  currency: string;
-  transaction_time: string;
-  category?: { id?: string | null; name?: string | null } | null;
-};
+type Transaction = CashflowTransaction;
 
 const formatNumber = (value: number) => `${Number(value / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}k`;
 
@@ -120,9 +114,11 @@ const buildDailySeries = (transactions: Transaction[], days = 7) => {
   });
 };
 
-export function CashflowReport({ transactions }: { transactions: Transaction[] }) {
-  const summaries = summarizePeriods(transactions);
-  const categoryTotals = buildCategoryTotals(transactions).sort((a, b) => b.net - a.net);
+export function CashflowReport({ transactions, range }: { transactions: Transaction[]; range: string }) {
+  const { data: queryTransactions = transactions } = useCashflowTransactions(range, transactions);
+  const resolvedTransactions = queryTransactions ?? [];
+  const summaries = summarizePeriods(resolvedTransactions);
+  const categoryTotals = buildCategoryTotals(resolvedTransactions).sort((a, b) => b.net - a.net);
 
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [dayCount, setDayCount] = useState(7);
@@ -152,7 +148,7 @@ export function CashflowReport({ transactions }: { transactions: Transaction[] }
     return () => observer.disconnect();
   }, []);
 
-  const dailySeries = useMemo(() => buildDailySeries(transactions, dayCount), [transactions, dayCount]);
+  const dailySeries = useMemo(() => buildDailySeries(resolvedTransactions, dayCount), [resolvedTransactions, dayCount]);
   const maxDailyValue = useMemo(() => {
     const all = dailySeries.flatMap((d) => [d.income, d.expense]);
     return Math.max(...all, 1);
