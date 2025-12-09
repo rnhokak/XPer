@@ -1,7 +1,7 @@
 "use client";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,22 @@ export function CashflowTransactionList({
     });
     return data;
   }, [transactions]);
+
+  const groupedByDay = useMemo(() => {
+    const groups: Record<string, Transaction[]> = {};
+    const formatter = new Intl.DateTimeFormat("vi-VN", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    sorted.forEach((tx) => {
+      const key = formatter.format(new Date(tx.transaction_time));
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(tx);
+    });
+    return groups;
+  }, [sorted]);
 
   const form = useForm<CashflowQuickAddValues>({
     resolver: zodResolver(cashflowQuickAddSchema),
@@ -159,32 +175,37 @@ export function CashflowTransactionList({
   return (
     <div className="space-y-3">
       {isFetching ? <p className="text-xs text-muted-foreground">Đang đồng bộ dữ liệu...</p> : null}
-      <div className="md:hidden space-y-2">
-        {sorted.map((tx) => (
-          <button
-            key={tx.id}
-            type="button"
-            onClick={() => openDetail(tx)}
-            className="w-full text-left rounded-lg border bg-white p-3 shadow-sm transition hover:shadow"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
-                <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
-                {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
-              </div>
-              <div className={`text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
-                {tx.type === "income" ? "+" : "-"}
-                {formatNumber(tx.amount)} {tx.currency}
-              </div>
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <span className={`rounded-full px-2 py-1 ${tx.type === "income" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                {tx.type}
-              </span>
-              {tx.account?.name ? <span>{tx.account.name}</span> : null}
-            </div>
-          </button>
+      <div className="md:hidden space-y-4">
+        {Object.entries(groupedByDay).map(([dayLabel, dayTransactions]) => (
+          <div key={dayLabel} className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{dayLabel}</p>
+            {dayTransactions.map((tx) => (
+              <button
+                key={tx.id}
+                type="button"
+                onClick={() => openDetail(tx)}
+                className="w-full text-left rounded-lg border bg-white p-3 shadow-sm transition hover:shadow"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
+                    <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
+                    {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
+                  </div>
+                  <div className={`text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                    {tx.type === "income" ? "+" : "-"}
+                    {formatNumber(tx.amount)} {tx.currency}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className={`rounded-full px-2 py-1 ${tx.type === "income" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                    {tx.type}
+                  </span>
+                  {tx.account?.name ? <span>{tx.account.name}</span> : null}
+                </div>
+              </button>
+            ))}
+          </div>
         ))}
       </div>
 
@@ -201,26 +222,35 @@ export function CashflowTransactionList({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((tx) => (
-              <TableRow key={tx.id} className="cursor-pointer" onClick={() => openDetail(tx)}>
-                <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.transaction_time)}</TableCell>
-                <TableCell>
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      tx.type === "income" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
-                    }`}
-                  >
-                    {tx.type}
-                  </span>
-                </TableCell>
-                <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
-                <TableCell className={`text-right font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
-                  {tx.type === "income" ? "+" : "-"}
-                  {formatNumber(tx.amount)} {tx.currency}
-                </TableCell>
-              </TableRow>
+            {Object.entries(groupedByDay).map(([dayLabel, dayTransactions]) => (
+              <Fragment key={dayLabel}>
+                <TableRow>
+                  <TableCell colSpan={6} className="bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {dayLabel}
+                  </TableCell>
+                </TableRow>
+                {dayTransactions.map((tx) => (
+                  <TableRow key={tx.id} className="cursor-pointer" onClick={() => openDetail(tx)}>
+                    <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.transaction_time)}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                          tx.type === "income" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {tx.type}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
+                    <TableCell className={`text-right font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                      {tx.type === "income" ? "+" : "-"}
+                      {formatNumber(tx.amount)} {tx.currency}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </Fragment>
             ))}
           </TableBody>
         </Table>
