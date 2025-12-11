@@ -1101,42 +1101,47 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                 </div>
               </div>
               <div className="rounded-xl border bg-white/80 p-4 shadow-sm">
-                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Tổng PnL (closed, đã trừ phí)</p>
-                    <p className={`text-xl font-semibold ${metrics.totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                      {formatNumber(metrics.totalPnl)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Gross: {formatNumber(metrics.grossPnl)} · Commission+Swap: {formatNumber(metrics.totalCommission)}
-                    </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="border-r sm:border-r-0 sm:pr-4">
+                    <div className="flex flex-col">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">Tổng PnL (closed, đã trừ phí)</p>
+                      <p className={`text-2xl font-bold ${metrics.totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        {formatNumber(metrics.totalPnl)}
+                      </p>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                      <p>Gross: {formatNumber(metrics.grossPnl)}</p>
+                      <p>Commission+Swap: {formatNumber(metrics.totalCommission)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Avg lot mỗi ngày</p>
-                    <p className="text-xl font-semibold">
-                      {metrics.lotsSeries.length
-                        ? formatNumber(
-                            metrics.lotsSeries.reduce((acc, p) => acc + p.value, 0) / metrics.lotsSeries.length,
-                            3
-                          )
-                        : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Closed trades</p>
-                    <p className="text-xl font-semibold">{metrics.closedCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Win rate toàn bộ</p>
-                    <p className="text-xl font-semibold">{metrics.winRate}%</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">Avg lot mỗi ngày</p>
+                      <p className="text-lg font-semibold">
+                        {metrics.lotsSeries.length
+                          ? formatNumber(
+                              metrics.lotsSeries.reduce((acc, p) => acc + p.value, 0) / metrics.lotsSeries.length,
+                              3
+                            )
+                          : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">Closed trades</p>
+                      <p className="text-lg font-semibold">{metrics.closedCount}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">Win rate toàn bộ</p>
+                      <p className="text-xl font-bold">{metrics.winRate}%</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            {(["day", "week", "month"] as const).map((key) => {
+          <div className="grid gap-3 grid-cols-2">
+            {(["week", "month"] as const).map((key) => {
               const summary = metrics.periodSummaries[key];
               const comparison = metrics.periodComparisons[key];
               const delta = comparison.current.pnl - comparison.previous.pnl;
@@ -1146,7 +1151,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                   className={`rounded-xl border p-3 shadow-sm ${reportPeriod === key ? "border-foreground/30 bg-foreground/[0.03]" : "bg-white/80"}`}
                 >
                   <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/70">
-                    <span>{key === "day" ? "Hôm nay" : key === "week" ? "Tuần" : "Tháng"}</span>
+                    <span>{key === "week" ? "Tuần" : "Tháng"}</span>
                     <span className="text-[11px] text-muted-foreground">{summary.label}</span>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
