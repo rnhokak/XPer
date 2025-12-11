@@ -193,7 +193,7 @@ export default async function DashboardPage() {
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Net</p>
-                <p className={`text-2xl font-semibold ${cashflowNet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                <p className={`money-blur text-2xl font-semibold ${cashflowNet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                   {cashflowNet >= 0 ? "+" : ""}
                   {formatNumber(cashflowNet, 0)} <span className="text-base font-normal text-muted-foreground">{defaultCurrency}</span>
                 </p>
@@ -201,14 +201,14 @@ export default async function DashboardPage() {
               </div>
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-emerald-700">Thu</p>
-                <p className="text-2xl font-semibold text-emerald-700">
+                <p className="money-blur text-2xl font-semibold text-emerald-700">
                   +{formatNumber(totalIncome, 0)} <span className="text-base font-normal text-emerald-700/80">{defaultCurrency}</span>
                 </p>
                 <p className="text-xs text-emerald-700/80">Giao dịch thu tháng này</p>
               </div>
               <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-red-700">Chi</p>
-                <p className="text-2xl font-semibold text-red-700">
+                <p className="money-blur text-2xl font-semibold text-red-700">
                   -{formatNumber(totalExpense, 0)} <span className="text-base font-normal text-red-700/80">{defaultCurrency}</span>
                 </p>
                 <p className="text-xs text-red-700/80">Giao dịch chi tháng này</p>
@@ -235,7 +235,7 @@ export default async function DashboardPage() {
                           {new Date(tx.transaction_time).toLocaleString("vi-VN")}
                         </p>
                       </div>
-                      <p className={`text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                      <p className={`money-blur text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
                         {tx.type === "income" ? "+" : "-"}
                         {formatNumber(tx.amount, 0)} {tx.currency ?? defaultCurrency}
                       </p>
@@ -269,7 +269,7 @@ export default async function DashboardPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Đang cho vay</p>
-                <p className="mt-1 text-xl font-semibold">
+                <p className="money-blur mt-1 text-xl font-semibold">
                   {formatNumber(lendOutstanding, 0)} <span className="text-sm font-normal text-muted-foreground">{defaultCurrency}</span>
                 </p>
                 <Badge className="mt-2" variant="outline">
@@ -278,7 +278,7 @@ export default async function DashboardPage() {
               </div>
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Đang đi vay</p>
-                <p className="mt-1 text-xl font-semibold">
+                <p className="money-blur mt-1 text-xl font-semibold">
                   {formatNumber(borrowOutstanding, 0)} <span className="text-sm font-normal text-muted-foreground">{defaultCurrency}</span>
                 </p>
                 <Badge className="mt-2" variant="outline">
@@ -303,7 +303,7 @@ export default async function DashboardPage() {
                             Đến hạn {new Date(debt.due_date ?? "").toLocaleDateString("vi-VN")} · {debt.direction === "lend" ? "Cho vay" : "Đi vay"}
                           </p>
                         </div>
-                        <p className="text-right text-sm font-semibold text-foreground">
+                        <p className="money-blur text-right text-sm font-semibold text-foreground">
                           {formatNumber(debt.outstanding ?? debt.principal_amount, 0)} {debt.currency ?? defaultCurrency}
                         </p>
                       </div>
@@ -342,7 +342,7 @@ export default async function DashboardPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">PnL tháng này</p>
-              <p className={`mt-1 text-2xl font-semibold ${pnlThisMonth >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              <p className={`money-blur mt-1 text-2xl font-semibold ${pnlThisMonth >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {pnlThisMonth >= 0 ? "+" : ""}
                 {formatNumber(pnlThisMonth, 2)} <span className="text-base font-normal text-muted-foreground">USD</span>
               </p>
@@ -355,7 +355,7 @@ export default async function DashboardPage() {
             </div>
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Funding net</p>
-              <p className={`mt-1 text-2xl font-semibold ${fundingNet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              <p className={`money-blur mt-1 text-2xl font-semibold ${fundingNet >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {fundingNet >= 0 ? "+" : ""}
                 {formatNumber(fundingNet, 0)} <span className="text-base font-normal text-muted-foreground">USD</span>
               </p>
@@ -385,7 +385,7 @@ export default async function DashboardPage() {
                         Mở {new Date(order.open_time).toLocaleString("vi-VN")} · {order.status}
                       </p>
                     </div>
-                    <p className={`text-sm font-semibold ${Number(order.pnl_amount ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    <p className={`money-blur text-sm font-semibold ${Number(order.pnl_amount ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                       {Number(order.pnl_amount ?? 0) >= 0 ? "+" : ""}
                       {formatNumber(order.pnl_amount ?? 0, 2)} USD
                     </p>

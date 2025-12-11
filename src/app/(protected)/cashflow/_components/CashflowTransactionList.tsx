@@ -209,7 +209,7 @@ export function CashflowTransactionList({
                     <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
                     {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
                   </div>
-                  <div className={`text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                  <div className={`money-blur text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
                     {tx.type === "income" ? "+" : "-"}
                     {formatNumber(tx.amount)} {tx.currency}
                   </div>
@@ -261,7 +261,7 @@ export function CashflowTransactionList({
                     <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
-                    <TableCell className={`text-right font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                    <TableCell className={`money-blur text-right font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
                       {tx.type === "income" ? "+" : "-"}
                       {formatNumber(tx.amount)} {tx.currency}
                     </TableCell>

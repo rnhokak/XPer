@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet } from "lucide-react";
+import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useUIStore } from "@/store/ui";
+import { useMoneyVisibilityStore } from "@/store/money-visibility";
 
 type NavItem = {
   href: string;
@@ -81,6 +82,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
   const pathname = usePathname();
   const router = useRouter();
   const { isSidebarOpen, toggleSidebar, closeSidebar } = useUIStore();
+  const { hideAmounts, toggleHideAmounts } = useMoneyVisibilityStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const preferredName = userDisplayName || userEmail || "User";
@@ -289,6 +291,17 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                     <p className="font-semibold">{preferredName}</p>
                     <p className="text-xs text-muted-foreground">{userEmail ?? "Signed in"}</p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-sm hover:bg-slate-100"
+                    onClick={() => {
+                      toggleHideAmounts();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {hideAmounts ? "Hiện số tiền" : "Ẩn số tiền"}
+                  </Button>
                   <Button
                     variant="ghost"
                     className="w-full justify-start gap-2 text-sm hover:bg-emerald-50"

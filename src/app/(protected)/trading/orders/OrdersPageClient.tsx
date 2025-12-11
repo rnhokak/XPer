@@ -992,7 +992,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                     {periodMeta[reportPeriod].label} · {activeSummary.label}
                   </span>
                   <div className="flex flex-wrap items-baseline gap-2">
-                    <span className={`text-5xl font-semibold ${activeSummary.pnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    <span className={`money-blur text-5xl font-semibold ${activeSummary.pnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                       {formatNumber(activeSummary.pnl)}
                     </span>
                     <span className="text-sm text-muted-foreground">PnL ròng</span>
@@ -1000,8 +1000,10 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                   <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 font-semibold text-foreground shadow-sm">
                       {pnlDelta >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-red-600" />}
-                      {pnlDelta >= 0 ? "+" : ""}
-                      {formatNumber(pnlDelta)} 
+                      <span className="money-blur">
+                        {pnlDelta >= 0 ? "+" : ""}
+                        {formatNumber(pnlDelta)} 
+                      </span>
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 font-semibold text-foreground shadow-sm">
                       <Percent className="h-4 w-4" />
@@ -1033,7 +1035,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Trung bình/trade</span>
-                    <span className="font-semibold text-foreground">{formatNumber(avgPnlPerTrade)}</span>
+                    <span className="money-blur font-semibold text-foreground">{formatNumber(avgPnlPerTrade)}</span>
                   </div>
                 </div>
               </div>
@@ -1048,14 +1050,14 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                 </div>
                 <div className="rounded-lg bg-white/80 p-3 shadow-sm">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Win / Loss gross</p>
-                  <p className="text-lg font-semibold text-foreground">
+                  <p className="money-blur text-lg font-semibold text-foreground">
                     {formatNumber(activeSummary.winAmount)} / {formatNumber(activeSummary.loseAmount)}
                   </p>
                   <p className="text-xs text-muted-foreground">Win chiếm {winShare}% tổng biến động</p>
                 </div>
                 <div className="rounded-lg bg-white/80 p-3 shadow-sm">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Commission</p>
-                  <p className="text-lg font-semibold text-foreground">{formatNumber(activeSummary.commission)}</p>
+                  <p className="money-blur text-lg font-semibold text-foreground">{formatNumber(activeSummary.commission)}</p>
                   <p className={`text-xs ${commissionDelta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                     {commissionDelta >= 0 ? "+" : ""}
                     {formatNumber(commissionDelta)} vs kỳ trước
@@ -1063,7 +1065,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                 </div>
                 <div className="rounded-lg bg-white/80 p-3 shadow-sm">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Nhịp kỳ trước</p>
-                  <p className="text-lg font-semibold text-foreground">{formatNumber(activePrevious.pnl)}</p>
+                  <p className="money-blur text-lg font-semibold text-foreground">{formatNumber(activePrevious.pnl)}</p>
                   <p className="text-xs text-muted-foreground">{activePrevious.label}</p>
                 </div>
               </div>
@@ -1105,13 +1107,13 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                   <div className="border-r sm:border-r-0 sm:pr-4">
                     <div className="flex flex-col">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">Tổng PnL (closed, đã trừ phí)</p>
-                      <p className={`text-2xl font-bold ${metrics.totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      <p className={`money-blur text-2xl font-bold ${metrics.totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                         {formatNumber(metrics.totalPnl)}
                       </p>
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground space-y-1">
-                      <p>Gross: {formatNumber(metrics.grossPnl)}</p>
-                      <p>Commission+Swap: {formatNumber(metrics.totalCommission)}</p>
+                      <p className="money-blur">Gross: {formatNumber(metrics.grossPnl)}</p>
+                      <p className="money-blur">Commission+Swap: {formatNumber(metrics.totalCommission)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -1161,16 +1163,18 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                       }`}
                     >
                       {summary.pnl >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                      {formatNumber(summary.pnl)}
+                      <span className="money-blur">
+                        {formatNumber(summary.pnl)}
+                      </span>
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {summary.winRate}% win · {summary.wins}/{summary.losses}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="money-blur mt-1 text-xs text-muted-foreground">
                     Commission: {formatNumber(summary.commission)}
                   </p>
-                  <p className={`mt-1 text-xs ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  <p className={`money-blur mt-1 text-xs ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                     {delta >= 0 ? "+" : ""}
                     {formatNumber(delta)} vs kỳ trước
                   </p>
@@ -1214,8 +1218,8 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                             />
                           </div>
                           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                            <span className="text-emerald-600">{point.win > 0 ? formatNumber(point.win) : "0"}</span>
-                            <span className="text-red-600">-{point.loss > 0 ? formatNumber(point.loss) : "0"}</span>
+                            <span className="money-blur text-emerald-600">{point.win > 0 ? formatNumber(point.win) : "0"}</span>
+                            <span className="money-blur text-red-600">-{point.loss > 0 ? formatNumber(point.loss) : "0"}</span>
                           </div>
                           <span className="text-[11px] text-muted-foreground">{point.label.slice(5)}</span>
                         </div>
@@ -1398,7 +1402,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                         <p className="text-xs uppercase tracking-wide text-muted-foreground/70">PnL (net)</p>
                         {order.pnl_amount !== null && order.pnl_amount !== undefined ? (
                           <div className="text-foreground">
-                            <span className={getOrderNetPnl(order) >= 0 ? "text-emerald-600" : "text-red-600"}>
+                            <span className={`money-blur ${getOrderNetPnl(order) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                               {formatNumber(getOrderNetPnl(order))}
                             </span>
                             {order.pnl_percent !== null && order.pnl_percent !== undefined ? (
@@ -1485,7 +1489,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                         <TableCell>
                         {order.pnl_amount !== null && order.pnl_amount !== undefined ? (
                           <div className="space-y-0.5">
-                              <div className={getOrderNetPnl(order) >= 0 ? "text-emerald-600" : "text-red-600"}>
+                              <div className={`money-blur ${getOrderNetPnl(order) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                                 {formatNumber(getOrderNetPnl(order))}
                               </div>
                               {order.pnl_percent !== null && order.pnl_percent !== undefined ? (

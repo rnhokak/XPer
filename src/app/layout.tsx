@@ -2,6 +2,7 @@
 import { Inter } from "next/font/google";
 import "../styles/globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { MoneyVisibilityProvider } from "@/components/providers/money-visibility";
 import { Notifications } from "@/components/ui/notifications";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -25,8 +26,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta name="application-name" content="XPer Finance" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
-      <body className={`${inter.className} min-h-screen bg-slate-50 text-slate-900 antialiased`}>
+      <body className={`${inter.className} min-h-screen bg-slate-50 text-slate-900 antialiased`} data-money-hidden="true">
         <QueryProvider>
+          <MoneyVisibilityProvider />
           <Notifications />
           {children}
         </QueryProvider>
