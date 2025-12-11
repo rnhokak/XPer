@@ -1001,12 +1001,12 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                     <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 font-semibold text-foreground shadow-sm">
                       {pnlDelta >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-red-600" />}
                       {pnlDelta >= 0 ? "+" : ""}
-                      {formatNumber(pnlDelta)} so với kỳ trước
+                      {formatNumber(pnlDelta)} 
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 font-semibold text-foreground shadow-sm">
                       <Percent className="h-4 w-4" />
                       {winRateDelta >= 0 ? "+" : ""}
-                      {winRateDelta}% winrate vs kỳ trước
+                      {winRateDelta}% wr
                     </span>
                   </div>
                 </div>
