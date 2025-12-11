@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -149,7 +149,7 @@ export default function FundingPageClient({ initialData, serverNow, fundingAccou
     setMounted(true);
   }, []);
 
-  const openNewDialog = () => {
+  const openNewDialog = useCallback(() => {
     form.reset({
       type: "deposit",
       amount: undefined,
@@ -162,7 +162,18 @@ export default function FundingPageClient({ initialData, serverNow, fundingAccou
     setAmountInput("");
     setEditingRow(null);
     setDialogOpen(true);
-  };
+  }, [activeBalanceAccountId, form, fundingAccounts, initialTransactionTime]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail === "trading:funding:new") {
+        openNewDialog();
+      }
+    };
+    window.addEventListener("xper:add", handler as EventListener);
+    return () => window.removeEventListener("xper:add", handler as EventListener);
+  }, [openNewDialog]);
 
   const openEditDialog = (row: FundingRow) => {
     setEditingRow(row);

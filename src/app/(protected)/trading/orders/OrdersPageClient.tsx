@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -604,11 +604,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
     setSyncingLedger(false);
   };
 
-  if (!mounted) {
-    return <div className="text-sm text-muted-foreground">Loading orders…</div>;
-  }
-
-  const openNewDialog = () => {
+  const openNewDialog = useCallback(() => {
     if (!activeBalanceAccountId) {
       notify({
         type: "error",
@@ -623,7 +619,22 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
       balance_account_id: activeBalanceAccountId ?? "",
     });
     setDialogOpen(true);
-  };
+  }, [activeBalanceAccountId, form, notify, tradingAccounts]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail === "trading:orders:new") {
+        openNewDialog();
+      }
+    };
+    window.addEventListener("xper:add", handler as EventListener);
+    return () => window.removeEventListener("xper:add", handler as EventListener);
+  }, [openNewDialog]);
+
+  if (!mounted) {
+    return <div className="text-sm text-muted-foreground">Loading orders…</div>;
+  }
 
   const openEditDialog = (order: OrderRow) => {
     setEditingOrder(order);
