@@ -45,8 +45,6 @@ const toIsoStringWithOffset = (value?: string | null) => {
 const defaultDateTimeValue = () => toLocalInput(new Date());
 const timePresets = [
   { label: "Now", minutes: 0 },
-  { label: "-1h", minutes: -60 },
-  { label: "-1d", minutes: -1440 },
   { label: "-1w", minutes: -10080 },
 ];
 

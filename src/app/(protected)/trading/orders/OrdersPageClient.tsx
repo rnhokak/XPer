@@ -865,26 +865,6 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                   </SelectContent>
                 </Select>
               </div>
-              {activeAccount ? (
-                <div className="grid gap-2 rounded-lg border bg-slate-50 p-3 text-sm text-muted-foreground sm:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Broker</p>
-                    <p className="font-medium text-foreground">{activeAccount.broker || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Platform</p>
-                    <p className="font-medium text-foreground">{activeAccount.platform || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Account #</p>
-                    <p className="font-medium text-foreground">{activeAccount.account_number || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Mode</p>
-                    <p className="font-medium text-foreground">{activeAccount.is_demo ? "Demo" : "Live"}</p>
-                  </div>
-                </div>
-              ) : null}
             </div>
           )}
         </CardContent>
