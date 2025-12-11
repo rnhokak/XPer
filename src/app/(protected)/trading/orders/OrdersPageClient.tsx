@@ -986,13 +986,13 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
               className={`relative overflow-hidden rounded-2xl border bg-gradient-to-r ${periodMeta[reportPeriod].accent} via-white to-white p-5 shadow-sm`}
             >
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_45%)]" />
-              <div className="relative flex flex-wrap items-start justify-between gap-4">
+              <div className="relative flex flex-col sm:flex-row sm:flex-wrap items-start justify-between gap-4">
                 <div className="space-y-2">
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-foreground shadow-sm">
                     {periodMeta[reportPeriod].label} · {activeSummary.label}
                   </span>
                   <div className="flex flex-wrap items-baseline gap-2">
-                    <span className={`text-3xl font-semibold ${activeSummary.pnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    <span className={`text-5xl font-semibold ${activeSummary.pnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                       {formatNumber(activeSummary.pnl)}
                     </span>
                     <span className="text-sm text-muted-foreground">PnL ròng</span>
@@ -1010,7 +1010,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                     </span>
                   </div>
                 </div>
-                <div className="min-w-[220px] space-y-3 rounded-xl border bg-white/80 p-3 shadow-sm">
+                <div className="w-full sm:w-[220px] space-y-3 rounded-xl border bg-white/80 p-3 shadow-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wide text-muted-foreground/70">Win rate</span>
                     <span className="text-sm font-semibold">{activeSummary.winRate}%</span>
@@ -1037,7 +1037,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                   </div>
                 </div>
               </div>
-              <div className="relative mt-4 grid gap-3 sm:grid-cols-4">
+              <div className="relative mt-4 grid gap-3 grid-cols-2 sm:grid-cols-4">
                 <div className="rounded-lg bg-white/80 p-3 shadow-sm">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Giao dịch đóng</p>
                   <p className="text-lg font-semibold text-foreground">{totalTrades}</p>
@@ -1070,21 +1070,21 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
             </div>
             <div className="space-y-3">
               <div className="rounded-xl border bg-white/80 p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Win rate theo chu kỳ</p>
-                    <p className="text-sm font-semibold text-foreground">
+                    <p className="text-sm font-semibold text-foreground truncate">
                       {winRatePeriod === "week" ? "Tuần" : "Tháng"}: {metrics.winRateComparison.current}%{" "}
                       <span className={metrics.winRateComparison.current >= metrics.winRateComparison.previous ? "text-emerald-600" : "text-red-600"}>
                         {metrics.winRateComparison.previous === 0 ? "" : `(${metrics.winRateComparison.current - metrics.winRateComparison.previous}%)`}
                       </span>
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       Hiện tại: {metrics.winRateComparison.label} · Trước đó: {metrics.winRateComparison.prevLabel}
                     </p>
                   </div>
                   <Select value={winRatePeriod} onValueChange={(v: "week" | "month") => setWinRatePeriod(v)}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32 flex-shrink-0">
                       <SelectValue placeholder="Kỳ" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1101,7 +1101,7 @@ export default function OrdersPageClient({ initialOrders, tradingAccounts }: Ord
                 </div>
               </div>
               <div className="rounded-xl border bg-white/80 p-4 shadow-sm">
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Tổng PnL (closed, đã trừ phí)</p>
                     <p className={`text-xl font-semibold ${metrics.totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
