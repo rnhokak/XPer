@@ -37,6 +37,11 @@ const toLocalInput = (input: string | Date) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
 };
+const toIsoStringWithOffset = (value?: string | null) => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
 const defaultDateTimeValue = () => toLocalInput(new Date());
 const timePresets = [
   { label: "Now", minutes: 0 },
@@ -173,11 +178,12 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
   const onSubmit = async (values: CashflowQuickAddValues) => {
     setSubmitError(null);
+    const transactionTimeIso = toIsoStringWithOffset(values.transaction_time);
     const payload = {
       ...values,
       category_id: values.category_id || null,
       account_id: values.account_id || defaultAccountId || null,
-      transaction_time: values.transaction_time || undefined,
+      transaction_time: transactionTimeIso ?? undefined,
       currency: values.currency || defaultCurrency,
     };
 

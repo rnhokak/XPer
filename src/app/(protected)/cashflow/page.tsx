@@ -72,17 +72,6 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
 
       <Card>
         <CardHeader>
-          <CardTitle>Cashflow tips</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>Nhập số tiền và bấm Add là đủ. Category, account, thời gian đều tuỳ chọn.</p>
-          <p>Mặc định sẽ dùng account đánh dấu default nếu có. Currency lấy từ account hoặc fallback {defaultCurrency}.</p>
-          <p>Giao dịch mới sẽ hiện ngay dưới danh sách, bạn có thể lọc Today/Week/Month.</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Báo cáo nhanh</CardTitle>
         </CardHeader>
         <CardContent>

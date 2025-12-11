@@ -30,7 +30,23 @@ const formatNumber = (value: number) =>
 
 const formatDateTime = (value: string) => {
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const toLocalInputValue = (value: string | Date | null | undefined) => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+
+const toIsoStringWithOffset = (value?: string | null) => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 
 const NONE_VALUE = "__none__";
@@ -101,7 +117,7 @@ export function CashflowTransactionList({
       account_id: tx.account?.id ?? null,
       category_id: tx.category?.id ?? null,
       note: tx.note ?? "",
-      transaction_time: new Date(tx.transaction_time).toISOString().slice(0, 16),
+      transaction_time: toLocalInputValue(tx.transaction_time),
       currency: tx.currency,
     });
     setSelected(tx);
@@ -111,11 +127,12 @@ export function CashflowTransactionList({
     if (!selected) return;
     const current = selected;
     setSubmitError(null);
+    const normalizedTime = toIsoStringWithOffset(values.transaction_time);
     const payload = {
       ...values,
       category_id: values.category_id || null,
       account_id: values.account_id || null,
-      transaction_time: values.transaction_time ? new Date(values.transaction_time).toISOString() : null,
+      transaction_time: normalizedTime ?? null,
     };
 
     const res = await fetch("/api/cashflow/transactions", {
@@ -131,14 +148,14 @@ export function CashflowTransactionList({
 
     const category = values.category_id ? categories.find((c) => c.id === values.category_id) : null;
     const account = values.account_id ? accounts.find((a) => a.id === values.account_id) : null;
-    const normalizedTime = payload.transaction_time ?? current.transaction_time ?? new Date().toISOString();
+    const normalizedTimeForState = normalizedTime ?? current.transaction_time ?? new Date().toISOString();
     const updatedTx: Transaction = {
       ...current,
       type: payload.type ?? "expense",
       amount: payload.amount,
       currency: payload.currency ?? current.currency,
       note: payload.note ?? null,
-      transaction_time: normalizedTime,
+      transaction_time: normalizedTimeForState,
       category: category ? { id: category.id, name: category.name, type: category.type } : null,
       account: account ? { id: account.id, name: account.name, currency: account.currency } : null,
     };

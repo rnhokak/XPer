@@ -35,16 +35,13 @@ export default async function CashflowNewPage() {
   const defaultCurrency = defaultAccount?.currency ?? "VND";
 
   return (
-    <div className="mx-auto w-full max-w-4xl overflow-x-hidden">
+    <div className="mx-auto w-full max-w-4xl overflow-x-hidden px-[2px] sm:px-4 pb-[300px] md:pb-0">
       <div className="mb-5">
         <h1 className="text-2xl font-semibold">Add Transaction</h1>
         <p className="text-sm text-muted-foreground">Enter transaction details below.</p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>New Transaction</CardTitle>
-        </CardHeader>
         <CardContent>
           <CashflowQuickAddForm 
             categories={categories} 
