@@ -141,8 +141,8 @@ export function CashflowReport({ transactions, range}: { transactions: Transacti
 
   const periodMeta: Record<PeriodKey, { label: string; icon: JSX.Element }> = {
     day: { label: "Hôm nay", icon: getPeriodIcon("day") },
-    week: { label: "Tuần này", icon: getPeriodIcon("week") },
-    month: { label: "Tháng này", icon: getPeriodIcon("month") },
+    week: { label: "Tuần", icon: getPeriodIcon("week") },
+    month: { label: "Tháng", icon: getPeriodIcon("month") },
   };
 
   return (

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
+import { CashflowExpenseChart } from "./_components/CashflowExpenseChart";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +93,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
           <CashflowReport transactions={transactions} range={range} />
         </CardContent>
       </Card>
-
+      
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
