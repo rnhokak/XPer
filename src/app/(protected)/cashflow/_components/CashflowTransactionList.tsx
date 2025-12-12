@@ -99,12 +99,19 @@ export function CashflowTransactionList({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Initialize viewport units to handle keyboard appearance
   useViewportUnit();
 
   // Mobile detection
   const isMobileView = useIsMobile();
+
+  useEffect(() => {
+    if (!selected) {
+      setConfirmDeleteOpen(false);
+    }
+  }, [selected]);
 
   const sorted = useMemo(() => {
     const data = [...transactions].sort((a, b) => {
@@ -221,6 +228,11 @@ export function CashflowTransactionList({
     queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
   };
 
+  const handleConfirmDelete = async () => {
+    setConfirmDeleteOpen(false);
+    await handleDelete();
+  };
+
   if (sorted.length === 0) {
     return <p className="text-sm text-muted-foreground">Chưa có giao dịch.</p>;
   }
@@ -309,20 +321,33 @@ export function CashflowTransactionList({
 
       {/* Mobile and desktop friendly transaction detail dialog */}
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent 
-          className={`max-h-[90vh] overflow-y-auto ${
-            isMobileView 
-              ? "w-full max-w-[95vw] scale-100" // Mobile centered dialog
-              : "max-w-lg" // Desktop dialog
-          }`}
-          style={{
-            maxHeight: 'calc(var(--full-vh, 100vh) - 2rem)',  // Account for viewport changes due to keyboard
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Chi tiết giao dịch</DialogTitle>
-            <DialogDescription>Xem, sửa hoặc xoá giao dịch.</DialogDescription>
-          </DialogHeader>
+      <DialogContent 
+        className={`max-h-[90vh] overflow-y-auto ${
+          isMobileView 
+            ? "w-full max-w-[95vw] scale-100" 
+            : "max-w-lg"
+        }`}
+        style={{
+          maxHeight: 'calc(var(--full-vh, 100vh) - 2rem)',
+        }}
+      >
+        <DialogHeader className="space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle>Chi tiết giao dịch</DialogTitle>
+              <DialogDescription>Xem, sửa hoặc xoá giao dịch.</DialogDescription>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="mr-5"
+              onClick={() => setConfirmDeleteOpen(true)}
+              disabled={deleting}
+            >
+              Xoá
+            </Button>
+          </div>
+        </DialogHeader>
 
           {selected ? (
             <Form {...form}>
@@ -482,28 +507,34 @@ export function CashflowTransactionList({
                 {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
                 {deleteError ? <p className="text-sm text-red-500">{deleteError}</p> : null}
 
-                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="sm:order-1"
-                    onClick={handleDelete}
-                    disabled={deleting}
-                  >
-                    {deleting ? "Đang xoá..." : "Xoá"}
+                <DialogFooter className="flex flex-row-reverse gap-2">
+                  <Button type="submit" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
                   </Button>
-                  <div className="flex w-full justify-end gap-2">
-                    <Button type="button" variant="ghost" onClick={() => setSelected(null)}>
-                      Đóng
-                    </Button>
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
-                      {form.formState.isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}
-                    </Button>
-                  </div>
+                  <Button type="button" variant="ghost" onClick={() => setSelected(null)}>
+                    Đóng
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Xác nhận xoá</DialogTitle>
+            <DialogDescription>Bạn có chắc muốn xoá giao dịch này? Hành động không thể hoàn tác.</DialogDescription>
+          </DialogHeader>
+          {deleteError ? <p className="mt-2 text-sm text-red-500">{deleteError}</p> : null}
+          <DialogFooter className="flex flex-row-reverse gap-2">
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleting}>
+              {deleting ? "Đang xoá..." : "Xoá giao dịch"}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
+              Huỷ
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
