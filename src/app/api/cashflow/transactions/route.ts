@@ -31,7 +31,9 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from("transactions")
-    .select("id,type,amount,currency,note,transaction_time,category:categories(name,type),account:accounts(name,currency)")
+    .select(
+      "id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)"
+    )
     .eq("user_id", user.id)
     .order("transaction_time", { ascending: false })
     .limit(50);

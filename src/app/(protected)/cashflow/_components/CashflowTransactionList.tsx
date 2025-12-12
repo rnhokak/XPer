@@ -1,7 +1,7 @@
 "use client";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/validation/cashflow";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
+import { useViewportUnit } from "@/hooks/useViewportUnit";
 
 type Transaction = CashflowTransaction;
 type Category = { id: string; name: string; type: "income" | "expense" };
 type Account = { id: string; name: string; currency: string };
 
-const formatNumber = (value: number) =>
-  Number(value).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+const formatNumber = (value: number, currency?: string) => {
+  const isVnd = currency?.toUpperCase() === "VND";
+  return Number(value).toLocaleString(undefined, {
+    maximumFractionDigits: isVnd ? 0 : 2,
+    minimumFractionDigits: isVnd ? 0 : 2,
+  });
+};
 
 const formatDateTime = (value: string) => {
   const d = new Date(value);
@@ -51,6 +57,30 @@ const toIsoStringWithOffset = (value?: string | null) => {
 
 const NONE_VALUE = "__none__";
 
+// Detect if the device is mobile
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Check if it's a client-side render and determine if mobile
+    const checkIsMobile = () => {
+      if (typeof window !== 'undefined') {
+        // More precise mobile detection
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // Also check screen size as a fallback
+        const isSmallScreen = window.innerWidth < 768;
+        setIsMobile(isMobileDevice || isSmallScreen);
+      }
+    };
+
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
+  return isMobile;
+}
+
 export function CashflowTransactionList({
   transactions: initialTransactions,
   categories,
@@ -69,6 +99,12 @@ export function CashflowTransactionList({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Initialize viewport units to handle keyboard appearance
+  useViewportUnit();
+
+  // Mobile detection
+  const isMobileView = useIsMobile();
 
   const sorted = useMemo(() => {
     const data = [...transactions].sort((a, b) => {
@@ -210,8 +246,7 @@ export function CashflowTransactionList({
                     {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
                   </div>
                   <div className={`money-blur text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
-                    {tx.type === "income" ? "+" : "-"}
-                    {formatNumber(tx.amount)} {tx.currency}
+                    {formatNumber(tx.amount, tx.currency)} {tx.currency}
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -262,8 +297,7 @@ export function CashflowTransactionList({
                     <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
                     <TableCell className={`money-blur text-right font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
-                      {tx.type === "income" ? "+" : "-"}
-                      {formatNumber(tx.amount)} {tx.currency}
+                      {formatNumber(tx.amount, tx.currency)} {tx.currency}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -273,8 +307,18 @@ export function CashflowTransactionList({
         </Table>
       </div>
 
+      {/* Mobile and desktop friendly transaction detail dialog */}
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent>
+        <DialogContent 
+          className={`max-h-[90vh] overflow-y-auto ${
+            isMobileView 
+              ? "w-full max-w-[95vw] scale-100" // Mobile centered dialog
+              : "max-w-lg" // Desktop dialog
+          }`}
+          style={{
+            maxHeight: 'calc(var(--full-vh, 100vh) - 2rem)',  // Account for viewport changes due to keyboard
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Chi tiết giao dịch</DialogTitle>
             <DialogDescription>Xem, sửa hoặc xoá giao dịch.</DialogDescription>

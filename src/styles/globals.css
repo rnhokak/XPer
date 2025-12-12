@@ -18,6 +18,10 @@
   --accent: 221 83% 53%;
   --accent-foreground: 210 40% 98%;
   --radius: 0.75rem;
+  
+  /* Dynamic viewport units for mobile keyboard handling */
+  --vh: 1vh;
+  --full-vh: 100vh;
 }
 
 body {

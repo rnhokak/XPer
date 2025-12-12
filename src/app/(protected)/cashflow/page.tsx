@@ -29,8 +29,22 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
   const user = await requireUser();
   const supabase = await createClient();
 
-  const range = normalizeCashflowRange(searchParams?.range);
+  const range = normalizeCashflowRange((await searchParams)?.range);
   const start = rangeStart(range === "all" ? null : range);
+
+  // Fetch profile with privacy setting (handle both cases: with and without the column)
+  let hideMoneyAmounts = false;
+  try {
+    const profileRes = await supabase.from("profiles").select("hide_money_amounts").eq("id", user.id).single();
+    if (profileRes && profileRes.data) {
+      // Access data property safely
+      const data = profileRes.data as any;
+      hideMoneyAmounts = data?.hide_money_amounts ?? false;
+    }
+  } catch (error) {
+    // If column doesn't exist, use default false
+    hideMoneyAmounts = false;
+  }
 
   const [accountsRes, categoriesRes, transactionsRes] = await Promise.all([
     supabase.from("accounts").select("id,name,type,currency,is_default").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }),
@@ -48,7 +62,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
           .select("id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)")
           .eq("user_id", user.id)
           .order("transaction_time", { ascending: false })
-          .limit(50)),
+          .limit(50))
   ]);
 
   const accounts: Account[] = accountsRes.data ?? [];
