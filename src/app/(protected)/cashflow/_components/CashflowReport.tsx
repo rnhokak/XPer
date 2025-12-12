@@ -178,7 +178,7 @@ export function CashflowReport({ transactions, range}: { transactions: Transacti
                 </div>
                 
                 {item.previousExpense > 0 && (
-                  <div className={`flex  text-xs ${trend === 'increase' ? 'text-red-600' : trend === 'decrease' ? 'text-green-600' : 'text-gray-500'} mt-1 justify-end justify-between flex-col items-end`}>
+                  <div className={`money-blur flex  text-xs ${trend === 'increase' ? 'text-red-600' : trend === 'decrease' ? 'text-green-600' : 'text-gray-500'} mt-1 justify-end justify-between flex-col items-end`}>
                     <div className="flex ">
                       {trend === 'increase' ? <TrendingUp className="h-3 w-3 mr-1" /> : 
                        trend === 'decrease' ? <TrendingDown className="h-3 w-3 mr-1" /> : 
