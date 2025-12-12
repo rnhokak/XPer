@@ -431,13 +431,14 @@ export function CashflowTransactionList({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Thời gian</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="datetime-local"
-                            value={field.value ?? ""}
-                            onChange={(e) => field.onChange(e.target.value)}
-                          />
-                        </FormControl>
+                          <FormControl>
+                            <Input
+                              type="datetime-local"
+                              className="w-full"
+                              value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                            />
+                          </FormControl>
                         <FormMessage>{form.formState.errors.transaction_time?.message}</FormMessage>
                       </FormItem>
                     )}
