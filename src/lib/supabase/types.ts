@@ -95,7 +95,9 @@ export interface Database {
           id: string;
           user_id: string;
           name: string;
-          type: "income" | "expense";
+          type: "income" | "expense" | "transfer";
+          category_group: "sinh_hoat" | "an_uong" | "ca_nhan_giai_tri" | "tai_chinh" | "khac" | null;
+          category_focus: "co_ban" | "phat_trien_ban_than" | "dau_tu" | "con_cai" | "khac_focus" | null;
           is_default: boolean;
           parent_id: string | null;
           level: number;
@@ -105,7 +107,9 @@ export interface Database {
           id?: string;
           user_id: string;
           name: string;
-          type: "income" | "expense";
+          type: "income" | "expense" | "transfer";
+          category_group?: "sinh_hoat" | "an_uong" | "ca_nhan_giai_tri" | "tai_chinh" | "khac" | null;
+          category_focus?: "co_ban" | "phat_trien_ban_than" | "dau_tu" | "con_cai" | "khac_focus" | null;
           is_default?: boolean;
           parent_id?: string | null;
           level?: number;
@@ -115,7 +119,9 @@ export interface Database {
           id?: string;
           user_id?: string;
           name?: string;
-          type?: "income" | "expense";
+          type?: "income" | "expense" | "transfer";
+          category_group?: "sinh_hoat" | "an_uong" | "ca_nhan_giai_tri" | "tai_chinh" | "khac";
+          category_focus?: "co_ban" | "phat_trien_ban_than" | "dau_tu" | "con_cai" | "khac_focus";
           is_default?: boolean;
           parent_id?: string | null;
           level?: number;

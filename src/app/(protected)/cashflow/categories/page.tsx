@@ -10,7 +10,7 @@ export default async function CashflowCategoriesPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("categories")
-    .select("id,name,type,parent_id,level,is_default,created_at")
+    .select("id,name,type,parent_id,level,is_default,category_group,category_focus,created_at")
     .eq("user_id", user.id)
     .order("level", { ascending: true })
     .order("created_at", { ascending: false });

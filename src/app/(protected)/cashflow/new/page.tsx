@@ -3,11 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { type CategoryGroup, type CategoryFocus } from "@/lib/validation/categories";
 
 export const dynamic = "force-dynamic";
 
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense"; parent_id: string | null; is_default?: boolean | null };
+type Category = {
+  id: string;
+  name: string;
+  type: "income" | "expense" | "transfer";
+  parent_id: string | null;
+  is_default?: boolean | null;
+  category_group: CategoryGroup | null;
+  category_focus: CategoryFocus | null;
+};
 
 export default async function CashflowNewPage() {
   const user = await requireUser();
@@ -17,7 +26,7 @@ export default async function CashflowNewPage() {
     supabase.from("accounts").select("id,name,type,currency,is_default").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }),
     supabase
       .from("categories")
-      .select("id,name,type,parent_id,is_default")
+      .select("id,name,type,parent_id,is_default,category_group,category_focus")
       .eq("user_id", user.id)
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false }),

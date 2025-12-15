@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const cashflowTransactionTypes = ["expense", "income", "transfer"] as const;
+export type CashflowTransactionType = (typeof cashflowTransactionTypes)[number];
+export const cashflowTransactionTypeLabels: Record<CashflowTransactionType, string> = {
+  expense: "Expense",
+  income: "Income",
+  transfer: "Transfer",
+};
+
 const numberFromInput = (val: unknown) => {
   if (val === null || val === undefined || val === "") return undefined;
   const parsed = Number(val);
@@ -7,7 +15,7 @@ const numberFromInput = (val: unknown) => {
 };
 
 export const cashflowQuickAddSchema = z.object({
-  type: z.enum(["income", "expense"]).default("expense"),
+  type: z.enum(cashflowTransactionTypes).default("expense"),
   amount: z.preprocess(numberFromInput, z.number({ required_error: "Amount is required" }).positive("Amount must be greater than 0")),
   category_id: z.string().uuid().nullable().optional(),
   account_id: z.string().uuid().nullable().optional(),

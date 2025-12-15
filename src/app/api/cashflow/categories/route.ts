@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { categorySchema } from "@/lib/validation/categories";
+import { categorySchema, type CategoryInput } from "@/lib/validation/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,10 @@ const getUserAndClient = async () => {
   return { supabase, user };
 };
 
-const validateHierarchy = (level: number, parentLevel: number | null) => {
+const validateHierarchy = (type: CategoryInput["type"], level: number, parentLevel: number | null) => {
+  if (type === "transfer") {
+    return level === 0 && parentLevel === null;
+  }
   if (level === 0) return parentLevel === null;
   if (level === 1) return parentLevel === 0;
   if (level === 2) return parentLevel === 1;
@@ -27,7 +30,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("categories")
-    .select("id,name,type,parent_id,level,is_default,created_at")
+    .select("id,name,type,parent_id,level,is_default,category_group,category_focus,created_at")
     .eq("user_id", user.id)
     .order("level", { ascending: true })
     .order("created_at", { ascending: false });
@@ -46,7 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
   }
 
-  const { name, type, parent_id, level } = parsed.data;
+  const { name, type, parent_id, level, category_group, category_focus } = parsed.data;
 
   let parentLevel: number | null = null;
   let parentType: string | null = null;
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
     parentType = parent?.type ?? null;
   }
 
-  if (!validateHierarchy(level, parentLevel)) {
+  if (!validateHierarchy(type, level, parentLevel)) {
     return NextResponse.json({ error: "Invalid parent/level combination" }, { status: 400 });
   }
   if (parentType && parentType !== type) {
@@ -75,6 +78,8 @@ export async function POST(req: Request) {
     type,
     parent_id: parent_id ?? null,
     level,
+    category_group: category_group ?? null,
+    category_focus: category_focus ?? null,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -91,7 +96,7 @@ export async function PUT(req: Request) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
 
-  const { name, type, parent_id, level } = parsed.data;
+  const { name, type, parent_id, level, category_group, category_focus } = parsed.data;
 
   let parentLevel: number | null = null;
   let parentType: string | null = null;
@@ -107,7 +112,7 @@ export async function PUT(req: Request) {
     parentType = parent?.type ?? null;
   }
 
-  if (!validateHierarchy(level, parentLevel)) {
+  if (!validateHierarchy(type, level, parentLevel)) {
     return NextResponse.json({ error: "Invalid parent/level combination" }, { status: 400 });
   }
   if (parentType && parentType !== type) {
@@ -121,6 +126,8 @@ export async function PUT(req: Request) {
       type,
       parent_id: parent_id ?? null,
       level,
+      category_group: category_group ?? null,
+      category_focus: category_focus ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);

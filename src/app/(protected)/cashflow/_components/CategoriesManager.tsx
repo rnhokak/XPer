@@ -8,25 +8,73 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { categorySchema, type CategoryInput } from "@/lib/validation/categories";
+import {
+  categorySchema,
+  categoryTypes,
+  categoryGroups,
+  categoryGroupLabels,
+  categoryFocuses,
+  categoryFocusLabels,
+  type CategoryInput,
+  type CategoryGroup,
+  type CategoryFocus,
+} from "@/lib/validation/categories";
 
-type Category = { id: string; name: string; type: "income" | "expense"; parent_id: string | null; level: 0 | 1 | 2 };
+type Category = {
+  id: string;
+  name: string;
+  type: "income" | "expense" | "transfer";
+  parent_id: string | null;
+  level: 0 | 1 | 2;
+  category_group: CategoryGroup | null;
+  category_focus: CategoryFocus | null;
+};
+
+const EMPTY_GROUP = "__none__";
+const EMPTY_FOCUS = "__none_focus__";
+
+type CategoryMeta = {
+  type: CategoryInput["type"];
+  category_group: CategoryGroup | null;
+  category_focus: CategoryFocus | null;
+};
+
+const categoryTypeLabels: Record<CategoryInput["type"], string> = {
+  expense: "Expense",
+  income: "Income",
+  transfer: "Transfer",
+};
+
+const initialCategoryMeta: CategoryMeta = {
+  type: "expense",
+  category_group: "sinh_hoat",
+  category_focus: "co_ban",
+};
 
 export function CategoriesManager({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Category | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [preferredCategoryMeta, setPreferredCategoryMeta] = useState<CategoryMeta>(initialCategoryMeta);
 
   const form = useForm<CategoryInput>({
     resolver: zodResolver(categorySchema),
-    defaultValues: { name: "", type: "expense", parent_id: null, level: 0 },
+    defaultValues: {
+      name: "",
+      type: initialCategoryMeta.type,
+      parent_id: null,
+      level: 0,
+      category_group: initialCategoryMeta.category_group,
+      category_focus: initialCategoryMeta.category_focus,
+    },
   });
 
+  const selectedType = form.watch("type") ?? "expense";
   const parentChoices = useMemo(() => {
-    const type = form.watch("type") ?? "expense";
-    return categories.filter((c) => c.type === type && c.level <= 1);
-  }, [categories, form]);
+    if (selectedType === "transfer") return [];
+    return categories.filter((c) => c.type === selectedType && c.level <= 1);
+  }, [categories, selectedType]);
 
   const categoryLookup = useMemo(() => {
     const map = new Map<string, Category>();
@@ -78,7 +126,9 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
             {category.name}
           </p>
           <p className="text-xs text-muted-foreground">
-            {category.type} · level {category.level}
+            {categoryTypeLabels[category.type]} ·{" "}
+            {category.category_group ? categoryGroupLabels[category.category_group] : "Không phân loại"} ·{" "}
+            {category.category_focus ? categoryFocusLabels[category.category_focus] : "Không phân loại"} · level {category.level}
             {parentName ? ` · parent: ${parentName}` : ""}
           </p>
         </div>
@@ -105,8 +155,27 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     setMounted(true);
   }, []);
 
-  const resetForm = () => {
-    form.reset({ name: "", type: "expense", parent_id: null, level: 0 });
+  useEffect(() => {
+    if (selectedType === "transfer") {
+      if (form.getValues("parent_id") !== null) {
+        form.setValue("parent_id", null);
+      }
+      if (form.getValues("level") !== 0) {
+        form.setValue("level", 0);
+      }
+    }
+  }, [selectedType, form]);
+
+  const resetForm = (meta?: CategoryMeta) => {
+    const target = meta ?? preferredCategoryMeta;
+    form.reset({
+      name: "",
+      type: target.type,
+      parent_id: null,
+      level: 0,
+      category_group: target.category_group,
+      category_focus: target.category_focus,
+    });
     setEditing(null);
     setSubmitError(null);
   };
@@ -132,7 +201,13 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       setSubmitError(err.error ?? "Failed to save category");
       return;
     }
-    resetForm();
+    const nextMeta: CategoryMeta = {
+      type: values.type,
+      category_group: values.category_group ?? null,
+      category_focus: values.category_focus ?? null,
+    };
+    setPreferredCategoryMeta(nextMeta);
+    resetForm(nextMeta);
     router.refresh();
   };
 
@@ -159,12 +234,21 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       type: cat.type,
       parent_id: cat.parent_id,
       level: cat.level,
+      category_group: cat.category_group,
+      category_focus: cat.category_focus,
     });
   };
 
   // When parent changes, auto-adjust level to parent level + 1 (or reset when cleared)
   const parentId = form.watch("parent_id");
   useEffect(() => {
+    if (selectedType === "transfer") {
+      if (form.getValues("level") !== 0) {
+        form.setValue("level", 0);
+      }
+      return;
+    }
+
     if (!parentId) {
       if (form.getValues("level") !== 0) {
         form.setValue("level", 0);
@@ -182,7 +266,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
         form.setValue("type", parent.type);
       }
     }
-  }, [parentId, categories, form]);
+  }, [parentId, categories, form, selectedType]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
@@ -207,7 +291,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
         </div>
         <Form {...form}>
           <form className="space-y-4" onSubmit={form.handleSubmit(upsert)}>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <FormField
                 control={form.control}
                 name="type"
@@ -219,21 +303,76 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="expense">Expense</SelectItem>
-                        <SelectItem value="income">Income</SelectItem>
+                        {categoryTypes.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {categoryTypeLabels[value]}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage>{form.formState.errors.type?.message}</FormMessage>
                   </FormItem>
                 )}
               />
-              <FormItem>
-                <FormLabel>Computed level</FormLabel>
-                <div className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
-                  Level {form.watch("level")} (auto from parent)
-                </div>
-              </FormItem>
+              <FormField
+                control={form.control}
+                name="category_group"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Group</FormLabel>
+                    <Select
+                      value={field.value ?? EMPTY_GROUP}
+                      onValueChange={(v) => field.onChange(v === EMPTY_GROUP ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={EMPTY_GROUP}>Không phân loại</SelectItem>
+                        {categoryGroups.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {categoryGroupLabels[value]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage>{form.formState.errors.category_group?.message}</FormMessage>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="category_focus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Định hướng</FormLabel>
+                    <Select
+                      value={field.value ?? EMPTY_FOCUS}
+                      onValueChange={(v) => field.onChange(v === EMPTY_FOCUS ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={EMPTY_FOCUS}>Không phân loại</SelectItem>
+                        {categoryFocuses.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {categoryFocusLabels[value]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage>{form.formState.errors.category_focus?.message}</FormMessage>
+                  </FormItem>
+                )}
+              />
             </div>
+            <FormItem>
+              <FormLabel>Computed level</FormLabel>
+              <div className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                Level {form.watch("level")} (auto from parent)
+              </div>
+            </FormItem>
 
             <FormField
               control={form.control}
@@ -252,25 +391,34 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
             <FormField
               control={form.control}
               name="parent_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Parent</FormLabel>
-                  <Select value={field.value ?? "__root__"} onValueChange={(v) => field.onChange(v === "__root__" ? null : v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select parent (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__root__">No parent (root)</SelectItem>
-                      {parentChoices.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name} (level {p.level})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage>{form.formState.errors.parent_id?.message}</FormMessage>
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const isTransfer = selectedType === "transfer";
+                return (
+                  <FormItem>
+                    <FormLabel>Parent</FormLabel>
+                    {isTransfer ? (
+                      <div className="rounded-md border border-dashed border-primary/60 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+                        Transfer categories must stay at level 0 and cannot have parents.
+                      </div>
+                    ) : (
+                      <Select value={field.value ?? "__root__"} onValueChange={(v) => field.onChange(v === "__root__" ? null : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select parent (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__root__">No parent (root)</SelectItem>
+                          {parentChoices.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} (level {p.level})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <FormMessage>{form.formState.errors.parent_id?.message}</FormMessage>
+                  </FormItem>
+                );
+              }}
             />
 
             {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}

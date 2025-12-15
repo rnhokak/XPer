@@ -2,10 +2,11 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { normalizeCashflowRange } from "@/lib/cashflow/utils";
+import { type CashflowTransactionType } from "@/lib/validation/cashflow";
 
 export type CashflowTransaction = {
   id: string;
-  type: "income" | "expense";
+  type: CashflowTransactionType;
   amount: number;
   currency: string;
   note: string | null;

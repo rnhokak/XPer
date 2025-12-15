@@ -18,14 +18,27 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/validation/cashflow";
+import {
+  cashflowQuickAddSchema,
+  cashflowTransactionTypeLabels,
+  type CashflowQuickAddValues,
+  type CashflowTransactionType,
+} from "@/lib/validation/cashflow";
+import { type CategoryFocus, type CategoryGroup } from "@/lib/validation/categories";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { useViewportUnit } from "@/hooks/useViewportUnit";
 import { CategoryTreeModal } from "./CategoryTreeModal";
 
 type Transaction = CashflowTransaction;
-type Category = { id: string; name: string; type: "income" | "expense"; parent_id: string | null };
+type Category = {
+  id: string;
+  name: string;
+  type: "income" | "expense" | "transfer";
+  parent_id: string | null;
+  category_group: CategoryGroup | null;
+  category_focus: CategoryFocus | null;
+};
 type Account = { id: string; name: string; currency: string };
 
 const formatNumber = (value: number, currency?: string) => {
@@ -58,7 +71,18 @@ const toIsoStringWithOffset = (value?: string | null) => {
 };
 
 const NONE_VALUE = "__none__";
-const lastCategoryKey = (type: "income" | "expense") => `cashflow:lastCategory:${type}`;
+const lastCategoryKey = (type: CashflowTransactionType) => `cashflow:lastCategory:${type}`;
+const typeBadgeBaseClasses = "rounded-full px-2 py-1 text-xs font-semibold";
+const getTypeBadgeClasses = (type: CashflowTransactionType) => {
+  if (type === "income") return "bg-emerald-50 text-emerald-700";
+  if (type === "transfer") return "bg-slate-100 text-slate-700";
+  return "bg-red-50 text-red-700";
+};
+const getAmountTextClass = (type: CashflowTransactionType) => {
+  if (type === "income") return "text-emerald-600";
+  if (type === "transfer") return "text-slate-600";
+  return "text-red-600";
+};
 
 // Detect if the device is mobile
 function useIsMobile() {
@@ -210,7 +234,7 @@ export function CashflowTransactionList({
         { condition: amountValue !== null && amountValue <= 150000 && hour >= 10 && hour <= 14, keywords: ["lunch", "meal"], reason: "Giữa trưa" },
         { condition: amountValue !== null && amountValue <= 80000 && acctType.includes("wallet"), keywords: ["ride", "grab", "taxi"], reason: "Di chuyển ví" }
       );
-    } else {
+    } else if (selectedType === "income") {
       heuristics.push(
         { condition: amountValue !== null && amountValue >= 10000000, keywords: ["salary"], reason: "Lương lớn" },
         { condition: amountValue !== null && amountValue >= 1000000, keywords: ["bonus"], reason: "Bonus" },
@@ -359,14 +383,14 @@ export function CashflowTransactionList({
                     <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
                     {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
                   </div>
-                  <div className={`money-blur text-base font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                  <div className={`money-blur text-base font-semibold ${getAmountTextClass(tx.type)}`}>
                     {formatNumber(tx.amount, tx.currency)} {tx.currency}
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className={`rounded-full px-2 py-1 ${tx.type === "income" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                    {tx.type}
-                  </span>
+                    <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
+                      {cashflowTransactionTypeLabels[tx.type]}
+                    </span>
                   {tx.account?.name ? <span>{tx.account.name}</span> : null}
                 </div>
               </button>
@@ -399,18 +423,14 @@ export function CashflowTransactionList({
                   <TableRow key={tx.id} className="cursor-pointer" onClick={() => openDetail(tx)}>
                     <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.transaction_time)}</TableCell>
                     <TableCell>
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                          tx.type === "income" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
-                        }`}
-                      >
-                        {tx.type}
+                      <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
+                        {cashflowTransactionTypeLabels[tx.type]}
                       </span>
                     </TableCell>
                     <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
-                    <TableCell className={`money-blur text-right font-semibold ${tx.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                    <TableCell className={`money-blur text-right font-semibold ${getAmountTextClass(tx.type)}`}>
                       {formatNumber(tx.amount, tx.currency)} {tx.currency}
                     </TableCell>
                   </TableRow>
@@ -468,6 +488,7 @@ export function CashflowTransactionList({
                           <SelectContent>
                             <SelectItem value="expense">Expense</SelectItem>
                             <SelectItem value="income">Income</SelectItem>
+                            <SelectItem value="transfer">Transfer</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage>{form.formState.errors.type?.message}</FormMessage>

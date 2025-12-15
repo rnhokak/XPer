@@ -10,14 +10,29 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/validation/cashflow";
+import {
+  cashflowQuickAddSchema,
+  cashflowTransactionTypeLabels,
+  cashflowTransactionTypes,
+  type CashflowQuickAddValues,
+  type CashflowTransactionType,
+} from "@/lib/validation/cashflow";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
+import { type CategoryFocus, type CategoryGroup } from "@/lib/validation/categories";
 import { useNotificationsStore } from "@/store/notifications";
 import { CategoryTreeModal } from "./CategoryTreeModal";
+import Link from "next/link";
 
-type Category = { id: string; name: string; type: "income" | "expense"; parent_id: string | null };
+type Category = {
+  id: string;
+  name: string;
+  type: "income" | "expense" | "transfer";
+  parent_id: string | null;
+  category_group: CategoryGroup | null;
+  category_focus: CategoryFocus | null;
+};
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
 
 type Props = {
@@ -32,7 +47,7 @@ type Props = {
 const AUTO_VALUE = "__auto__";
 const CUSTOM_CURRENCY = "__custom__";
 const CURRENCIES = ["VND", "USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "CNY"];
-const lastCategoryKey = (type: "income" | "expense") => `cashflow:lastCategory:${type}`;
+const lastCategoryKey = (type: CashflowTransactionType) => `cashflow:lastCategory:${type}`;
 const toLocalInput = (input: string | Date) => {
   const date = input instanceof Date ? input : new Date(input);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -121,6 +136,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   }, [currency]);
 
   const categoriesByType = useMemo(() => categories.filter((c) => c.type === selectedType), [categories, selectedType]);
+  const CATEGORY_MANAGER_PATH = "/cashflow/categories";
 
   useEffect(() => {
     const suggestions: Array<{ category: Category; reason?: string }> = [];
@@ -167,7 +183,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
         { condition: amountValue !== null && amountValue <= 150000 && hour >= 10 && hour <= 14, keywords: ["lunch", "meal"], reason: "Giữa trưa" },
         { condition: amountValue !== null && amountValue <= 80000 && acctType.includes("wallet"), keywords: ["ride", "grab", "taxi"], reason: "Di chuyển ví" }
       );
-    } else {
+    } else if (selectedType === "income") {
       heuristics.push(
         { condition: amountValue !== null && amountValue >= 10000000, keywords: ["salary"], reason: "Lương lớn" },
         { condition: amountValue !== null && amountValue >= 1000000, keywords: ["bonus"], reason: "Bonus" },
@@ -190,7 +206,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
     setSmartSuggestions(suggestions.slice(0, 5));
 
-    if (userTouchedCategory || selectedCategoryId) {
+    if (userTouchedCategory) {
       return;
     }
 
@@ -257,8 +273,10 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       currency: defaultCurrency,
     });
     setAmountInput("");
+    setUserTouchedCategory(false);
+    setSuggestedCategoryId(null);
     try {
-      if (payload.category_id) {
+      if (payload.category_id && payload.type !== "transfer") {
         localStorage.setItem(lastCategoryKey(payload.type ?? "expense"), payload.category_id);
       }
     } catch {
@@ -361,14 +379,14 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
           <p className="text-sm text-muted-foreground">Nhập tiền nhanh, tối ưu cho điện thoại.</p>
         </div>
         <div className="inline-flex rounded-full bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-100">
-          {selectedType === "income" ? "Income" : "Expense"}
+          {cashflowTransactionTypeLabels[selectedType]}
         </div>
       </div>
 
       <Form {...form}>
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <div className="flex gap-2">
-            {(["expense", "income"] as const).map((type) => (
+            {cashflowTransactionTypes.map((type) => (
               <Button
                 key={type}
                 type="button"
@@ -376,7 +394,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                 className="flex-1"
                 onClick={() => form.setValue("type", type)}
               >
-                {type === "expense" ? "Expense" : "Income"}
+                {cashflowTransactionTypeLabels[type]}
               </Button>
             ))}
           </div>
@@ -556,26 +574,34 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Category (optional)</Label>
-            <button
-              type="button"
-              onClick={() => setCategoryModalOpen(true)}
-              className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60"
-            >
-              <span className="truncate">
-                {selectedCategoryId
-                  ? categories.find((cat) => cat.id === selectedCategoryId)?.name
-                  : "Select category"}
-              </span>
-              <span className="text-xs text-muted-foreground">Choose</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setCategoryModalOpen(true)}
+                className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60"
+              >
+                <span className="truncate">
+                  {selectedCategoryId
+                    ? categories.find((cat) => cat.id === selectedCategoryId)?.name
+                    : "Select category"}
+                </span>
+                <span className="text-xs text-muted-foreground">Choose</span>
+              </button>
+            {categoriesByType.length === 0 ? (
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <p>No {cashflowTransactionTypeLabels[selectedType]} categories yet.</p>
+                <Link href={CATEGORY_MANAGER_PATH} className="text-[11px] font-semibold text-primary">
+                  Create category
+                </Link>
+              </div>
+            ) : null}
             {suggestedCategoryId && selectedCategoryId !== suggestedCategoryId ? (
               <p className="text-[10px] text-primary">
                 Suggested: {categories.find((cat) => cat.id === suggestedCategoryId)?.name}
               </p>
             ) : null}
-            <CategoryTreeModal
-              open={categoryModalOpen}
-              onClose={() => setCategoryModalOpen(false)}
+          <CategoryTreeModal
+            open={categoryModalOpen}
+            onClose={() => setCategoryModalOpen(false)}
               categories={categoriesByType}
               selected={selectedCategoryId}
               onSelect={(next) => {
@@ -748,6 +774,9 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                   transaction_time: defaultDateTimeValue(),
                   currency: defaultCurrency,
                 });
+                setUserTouchedCategory(false);
+                setSuggestedCategoryId(null);
+                setAmountInput("");
               }}
             >
               Clear
