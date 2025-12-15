@@ -98,57 +98,6 @@ export default function ReportsPanel({
   defaultCurrency,
 }: Props) {
 
-  console.log("Rendering ReportsPanel with reportRuns:", reportRuns);
-  console.log("cashflowSummary:", cashflowSummary);
-  console.log("tradingSummary:", tradingSummary);
-  console.log("fundingSummary:", fundingSummary);
-  const router = useRouter();
-  const notify = useNotificationsStore((state) => state.notify);
-  const todayValue = new Date().toISOString().slice(0, 10);
-  const [formState, setFormState] = useState<{ type: ReportType; reportDate: string }>({
-    type: reportTypes[0],
-    reportDate: todayValue,
-  });
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubmitting(true);
-
-    try {
-      const response = await fetch("/api/report-runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: formState.type,
-          report_date: formState.reportDate,
-        }),
-      });
-
-      const json = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error((json as { error?: string })?.error ?? "Không thể lưu báo cáo");
-      }
-
-      notify({
-        type: "success",
-        title: "Đã ghi nhận ngày báo cáo",
-        description: `Bắt đầu từ ${formatDate(formState.reportDate)}`,
-      });
-      setFormState((prev) => ({ ...prev, reportDate: todayValue }));
-      router.refresh();
-    } catch (error: any) {
-      notify({
-        type: "error",
-        title: "Thất bại",
-        description: error?.message ?? "Không thể lưu báo cáo",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const winRate = tradingSummary.trade_count ? Math.round((tradingSummary.win_trades / tradingSummary.trade_count) * 100) : 0;
 
   return (
