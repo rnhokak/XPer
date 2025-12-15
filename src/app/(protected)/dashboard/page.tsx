@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/types";
+import ReportsPanel from "./_components/ReportsPanel";
 
 type Transaction = {
   id: string;
@@ -42,6 +44,8 @@ type TradingOrder = {
 
 type TradingFunding = { amount: number; type: "deposit" | "withdraw"; currency: string; transaction_time: string };
 type Account = { id: string; name: string; currency: string; is_default: boolean };
+type ReportRun = Database["public"]["Tables"]["report_runs"]["Row"];
+type FundingSummaryRow = Database["public"]["Functions"]["report_funding_summary"]["Returns"];
 
 const startOfMonth = (d: Date) => {
   const date = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -79,9 +83,10 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const supabase = await createClient();
   const now = new Date();
-  const monthStart = startOfMonth(now).toISOString();
+  const monthStartDate = startOfMonth(now);
+  const monthStart = monthStartDate.toISOString();
 
-  const [accountsRes, transactionsRes, debtsRes, paymentsRes, ordersRes, fundingRes] = await Promise.all([
+  const [accountsRes, transactionsRes, debtsRes, paymentsRes, ordersRes, fundingRes, reportRunsRes] = await Promise.all([
     supabase.from("accounts").select("id,name,currency,is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
     supabase
       .from("transactions")
@@ -111,6 +116,12 @@ export default async function DashboardPage() {
       .gte("transaction_time", monthStart)
       .order("transaction_time", { ascending: false })
       .limit(20),
+    supabase
+      .from("report_runs")
+      .select("id,user_id,type,report_date,note,created_at")
+      .eq("user_id", user.id)
+      .order("report_date", { ascending: false })
+      .limit(50),
   ]);
 
   const accounts: Account[] = accountsRes.data ?? [];
@@ -119,6 +130,7 @@ export default async function DashboardPage() {
   const payments: DebtPayment[] = paymentsRes.data ?? [];
   const orders: TradingOrder[] = ordersRes.data ?? [];
   const funding: TradingFunding[] = fundingRes.data ?? [];
+  const reportRuns: ReportRun[] = reportRunsRes.data ?? [];
 
   const defaultCurrency = accounts.find((a) => a.is_default)?.currency ?? accounts[0]?.currency ?? transactions[0]?.currency ?? "VND";
 
@@ -158,6 +170,76 @@ export default async function DashboardPage() {
 
   const latestOrders = orders.slice(0, 5);
 
+  const latestReportByType: Record<ReportRun["type"], ReportRun | undefined> = {
+    cashflow: undefined,
+    trading: undefined,
+    funding: undefined,
+  };
+  reportRuns.forEach((run) => {
+    if (!latestReportByType[run.type]) {
+      latestReportByType[run.type] = run;
+    }
+  });
+
+  const cashflowStartDate = latestReportByType.cashflow
+    ? new Date(latestReportByType.cashflow.report_date)
+    : monthStartDate;
+  const tradingStartDate = latestReportByType.trading
+    ? new Date(latestReportByType.trading.report_date)
+    : monthStartDate;
+  const fundingStartDate = latestReportByType.funding
+    ? new Date(latestReportByType.funding.report_date)
+    : monthStartDate;
+  const cashflowStartIso = cashflowStartDate.toISOString();
+  const tradingStartIso = tradingStartDate.toISOString();
+  const fundingStartIso = fundingStartDate.toISOString();
+
+  const toNumber = (value: unknown) => (value === null || value === undefined ? 0 : Number(value));
+
+  const [cashflowSummaryRes, tradingSummaryRes, fundingSummaryRes] = await Promise.all([
+    supabase.rpc("report_cashflow_summary", {
+      p_user_id: user.id,
+      p_start_time: cashflowStartIso,
+    }),
+    supabase.rpc("report_trading_summary", {
+      p_user_id: user.id,
+      p_start_time: tradingStartIso,
+    }),
+    supabase.rpc("report_funding_summary", {
+      p_user_id: user.id,
+      p_start_time: fundingStartIso,
+    }),
+  ]);
+
+  const cashflowSummaryRow =
+    (cashflowSummaryRes.data ?? null) as Database["public"]["Functions"]["report_cashflow_summary"]["Returns"] | null;
+  const tradingSummaryRow =
+    (tradingSummaryRes.data ?? null) as Database["public"]["Functions"]["report_trading_summary"]["Returns"] | null;
+
+  const cashflowSummary = {
+    total_income: toNumber(cashflowSummaryRow?.total_income),
+    total_expense: toNumber(cashflowSummaryRow?.total_expense),
+    net_amount: toNumber(cashflowSummaryRow?.net_amount),
+    transaction_count: toNumber(cashflowSummaryRow?.transaction_count),
+  };
+
+  const tradingSummary = {
+    pnl_total: toNumber(tradingSummaryRow?.pnl_total),
+    win_trades: toNumber(tradingSummaryRow?.win_trades),
+    loss_trades: toNumber(tradingSummaryRow?.loss_trades),
+    neutral_trades: toNumber(tradingSummaryRow?.neutral_trades),
+    trade_count: toNumber(tradingSummaryRow?.trade_count),
+    average_pnl: toNumber(tradingSummaryRow?.average_pnl),
+  };
+
+  const fundingSummaryRow = (fundingSummaryRes.data ?? null) as FundingSummaryRow | null;
+  const fundingSummary = {
+    deposit_total: toNumber(fundingSummaryRow?.deposit_total),
+    withdraw_total: toNumber(fundingSummaryRow?.withdraw_total),
+    net_amount: toNumber(fundingSummaryRow?.net_amount),
+    transaction_count: toNumber(fundingSummaryRow?.transaction_count),
+  };
+
   return (
     <div className="space-y-5">
       <div className="space-y-3">
@@ -172,6 +254,17 @@ export default async function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <ReportsPanel
+        reportRuns={reportRuns}
+        cashflowSummary={cashflowSummary}
+        tradingSummary={tradingSummary}
+        cashflowStart={cashflowStartIso}
+        tradingStart={tradingStartIso}
+        fundingSummary={fundingSummary}
+        fundingStart={fundingStartIso}
+        defaultCurrency={defaultCurrency}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
         <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">

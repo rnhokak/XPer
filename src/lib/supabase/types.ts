@@ -460,6 +460,40 @@ export interface Database {
           }
         ];
       };
+      report_runs: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: "cashflow" | "trading" | "funding";
+          report_date: string;
+          note: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: "cashflow" | "trading" | "funding";
+          report_date: string;
+          note?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: "cashflow" | "trading" | "funding";
+          report_date?: string;
+          note?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "report_runs_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       funding_accounts: {
         Row: {
           id: string;
@@ -800,7 +834,46 @@ export interface Database {
         Relationships: [];
       };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      report_cashflow_summary: {
+        Args: {
+          p_user_id: string;
+          p_start_time: string;
+        };
+        Returns: {
+          total_income: number;
+          total_expense: number;
+          net_amount: number;
+          transaction_count: number;
+        };
+      };
+      report_trading_summary: {
+        Args: {
+          p_user_id: string;
+          p_start_time: string;
+        };
+        Returns: {
+          pnl_total: number;
+          win_trades: number;
+          loss_trades: number;
+          neutral_trades: number;
+          trade_count: number;
+          average_pnl: number;
+        };
+      };
+      report_funding_summary: {
+        Args: {
+          p_user_id: string;
+          p_start_time: string;
+        };
+        Returns: {
+          deposit_total: number;
+          withdraw_total: number;
+          net_amount: number;
+          transaction_count: number;
+        };
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
