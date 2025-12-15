@@ -17,13 +17,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/validation/cashflow";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { useViewportUnit } from "@/hooks/useViewportUnit";
+import { CategoryTreeModal } from "./CategoryTreeModal";
 
 type Transaction = CashflowTransaction;
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense"; parent_id: string | null };
 type Account = { id: string; name: string; currency: string };
 
 const formatNumber = (value: number, currency?: string) => {
@@ -56,6 +58,7 @@ const toIsoStringWithOffset = (value?: string | null) => {
 };
 
 const NONE_VALUE = "__none__";
+const lastCategoryKey = (type: "income" | "expense") => `cashflow:lastCategory:${type}`;
 
 // Detect if the device is mobile
 function useIsMobile() {
@@ -100,6 +103,10 @@ export function CashflowTransactionList({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [smartSuggestions, setSmartSuggestions] = useState<Array<{ category: Category; reason?: string }>>([]);
+  const [suggestedCategoryId, setSuggestedCategoryId] = useState<string | null>(null);
+  const [userTouchedCategory, setUserTouchedCategory] = useState(false);
 
   // Initialize viewport units to handle keyboard appearance
   useViewportUnit();
@@ -151,6 +158,99 @@ export function CashflowTransactionList({
     },
   });
 
+  const selectedType = form.watch("type") ?? "expense";
+  const selectedCategoryId = form.watch("category_id");
+  const amount = form.watch("amount");
+  const accountId = form.watch("account_id");
+  const transactionTimeValue = form.watch("transaction_time");
+  const categoriesByType = useMemo(() => categories.filter((c) => c.type === selectedType), [categories, selectedType]);
+
+  useEffect(() => {
+    const suggestions: Array<{ category: Category; reason?: string }> = [];
+    const seen = new Set<string>();
+
+    const addSuggestion = (category?: Category, reason?: string) => {
+      if (!category || seen.has(category.id)) return;
+      seen.add(category.id);
+      suggestions.push({ category, reason });
+    };
+
+    const findByKeywords = (names: string[]) => {
+      const lowered = names.map((name) => name.toLowerCase());
+      return categories.find(
+        (c) =>
+          c.type === selectedType &&
+          lowered.some((name) => c.name.toLowerCase().includes(name))
+      );
+    };
+
+    const storedId = (() => {
+      try {
+        return localStorage.getItem(lastCategoryKey(selectedType));
+      } catch {
+        return null;
+      }
+    })();
+
+    if (storedId) {
+      const storedCategory = categories.find((c) => c.id === storedId && c.type === selectedType);
+      if (storedCategory) {
+        addSuggestion(storedCategory, "Last used");
+      }
+    }
+
+    const hour = transactionTimeValue ? new Date(transactionTimeValue).getHours() : new Date().getHours();
+    const amountValue = typeof amount === "number" ? amount : null;
+    const acctType = accounts.find((a) => a.id === accountId)?.type?.toLowerCase() ?? "";
+
+    const heuristics: Array<{ condition: boolean; keywords: string[]; reason: string }> = [];
+    if (selectedType === "expense") {
+      heuristics.push(
+        { condition: amountValue !== null && amountValue <= 50000, keywords: ["coffee", "cafe"], reason: "Nhỏ, cà phê" },
+        { condition: amountValue !== null && amountValue <= 150000 && hour >= 10 && hour <= 14, keywords: ["lunch", "meal"], reason: "Giữa trưa" },
+        { condition: amountValue !== null && amountValue <= 80000 && acctType.includes("wallet"), keywords: ["ride", "grab", "taxi"], reason: "Di chuyển ví" }
+      );
+    } else {
+      heuristics.push(
+        { condition: amountValue !== null && amountValue >= 10000000, keywords: ["salary"], reason: "Lương lớn" },
+        { condition: amountValue !== null && amountValue >= 1000000, keywords: ["bonus"], reason: "Bonus" },
+        { condition: amountValue !== null && amountValue < 1000000, keywords: ["gift"], reason: "Tiền thưởng" }
+      );
+    }
+
+    heuristics.forEach((item) => {
+      if (!item.condition) return;
+      const matched = findByKeywords(item.keywords);
+      addSuggestion(matched, item.reason);
+    });
+
+    if (suggestions.length < 5) {
+      categoriesByType
+        .filter((category) => !seen.has(category.id))
+        .slice(0, 5 - suggestions.length)
+        .forEach((category) => addSuggestion(category));
+    }
+
+    setSmartSuggestions(suggestions.slice(0, 5));
+
+    if (userTouchedCategory) {
+      return;
+    }
+
+    if (selectedCategoryId) {
+      setSuggestedCategoryId(selectedCategoryId);
+      return;
+    }
+
+    const autoId = suggestions[0]?.category?.id ?? null;
+    if (autoId) {
+      form.setValue("category_id", autoId);
+      setSuggestedCategoryId(autoId);
+    } else {
+      setSuggestedCategoryId(null);
+    }
+  }, [amount, accounts, accountId, categories, categoriesByType, form, selectedCategoryId, selectedType, transactionTimeValue, userTouchedCategory]);
+
   const openDetail = (tx: Transaction) => {
     setSubmitError(null);
     setDeleteError(null);
@@ -164,6 +264,8 @@ export function CashflowTransactionList({
       currency: tx.currency,
     });
     setSelected(tx);
+    setUserTouchedCategory(false);
+    setSuggestedCategoryId(tx.category?.id ?? null);
   };
 
   const handleSave = async (values: CashflowQuickAddValues) => {
@@ -392,62 +494,102 @@ export function CashflowTransactionList({
                   />
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="category_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select
-                          value={field.value ?? NONE_VALUE}
-                          onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : val)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE_VALUE}>None</SelectItem>
-                            {categories
-                              .filter((c) => c.type === form.watch("type"))
-                              .map((c) => (
-                                <SelectItem key={c.id} value={c.id}>
-                                  {c.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage>{form.formState.errors.category_id?.message}</FormMessage>
-                      </FormItem>
-                    )}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Category (optional)</Label>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryModalOpen(true)}
+                    className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60"
+                  >
+                    <span className="truncate">
+                      {selectedCategoryId
+                        ? categories.find((cat) => cat.id === selectedCategoryId)?.name
+                        : "Select category"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">Choose</span>
+                  </button>
+                  {suggestedCategoryId && selectedCategoryId !== suggestedCategoryId ? (
+                    <p className="text-[10px] text-primary">
+                      Suggested: {categories.find((cat) => cat.id === suggestedCategoryId)?.name}
+                    </p>
+                  ) : null}
+                  <CategoryTreeModal
+                    open={categoryModalOpen}
+                    onClose={() => setCategoryModalOpen(false)}
+                    categories={categoriesByType}
+                    selected={selectedCategoryId}
+                    onSelect={(next) => {
+                      form.setValue("category_id", next);
+                      setUserTouchedCategory(true);
+                      setSuggestedCategoryId(next);
+                    }}
+                    suggestedId={suggestedCategoryId}
                   />
-                  <FormField
-                    control={form.control}
-                    name="account_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Account</FormLabel>
-                        <Select
-                          value={field.value ?? NONE_VALUE}
-                          onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : val)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE_VALUE}>None</SelectItem>
-                            {accounts.map((acc) => (
-                              <SelectItem key={acc.id} value={acc.id}>
-                                {acc.name} · {acc.currency}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage>{form.formState.errors.account_id?.message}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
+                  {smartSuggestions.length ? (
+                    <div className="space-y-2 rounded-2xl border border-dashed border-primary/60 bg-primary/5 p-3">
+                      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
+                        <span>Smart suggestions</span>
+                        <span>Amount & time</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                        {smartSuggestions.map(({ category, reason }) => {
+                          const active = selectedCategoryId === category.id;
+                          return (
+                            <button
+                              key={category.id}
+                              type="button"
+                              className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition duration-150 ${
+                                active
+                                  ? "bg-foreground text-white border-foreground"
+                                  : "border border-gray-200 bg-white text-foreground hover:border-primary/60"
+                              }`}
+                              onClick={() => {
+                                form.setValue("category_id", category.id);
+                                setUserTouchedCategory(true);
+                                setSuggestedCategoryId(category.id);
+                              }}
+                            >
+                              <div className="min-w-0 flex items-center gap-2 text-sm">
+                                <span className="font-semibold truncate">{category.name}</span>
+                                {reason ? (
+                                  <span className="text-[11px] text-muted-foreground whitespace-nowrap">{reason}</span>
+                                ) : null}
+                              </div>
+                              {active ? <span className="text-xs font-semibold">✓</span> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="account_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account</FormLabel>
+                      <Select
+                        value={field.value ?? NONE_VALUE}
+                        onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : val)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE_VALUE}>None</SelectItem>
+                          {accounts.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.name} · {acc.currency}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage>{form.formState.errors.account_id?.message}</FormMessage>
+                    </FormItem>
+                  )}
+                />
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <FormField

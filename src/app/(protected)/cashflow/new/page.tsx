@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense"; is_default?: boolean | null };
+type Category = { id: string; name: string; type: "income" | "expense"; parent_id: string | null; is_default?: boolean | null };
 
 export default async function CashflowNewPage() {
   const user = await requireUser();
@@ -15,7 +15,12 @@ export default async function CashflowNewPage() {
 
   const [accountsRes, categoriesRes] = await Promise.all([
     supabase.from("accounts").select("id,name,type,currency,is_default").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }),
-    supabase.from("categories").select("id,name,type,is_default").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }),
+    supabase
+      .from("categories")
+      .select("id,name,type,parent_id,is_default")
+      .eq("user_id", user.id)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
 
   if (accountsRes.error) {

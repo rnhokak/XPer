@@ -9,14 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cashflowQuickAddSchema, type CashflowQuickAddValues } from "@/lib/validation/cashflow";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
 import { useNotificationsStore } from "@/store/notifications";
+import { CategoryTreeModal } from "./CategoryTreeModal";
 
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense"; parent_id: string | null };
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
 
 type Props = {
@@ -61,6 +62,8 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const [recentAmounts, setRecentAmounts] = useState<Array<{ amount: number; ts: number }>>([]);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [smartSuggestions, setSmartSuggestions] = useState<Array<{ category: Category; reason?: string }>>([]);
 
   const form = useForm<CashflowQuickAddValues>({
     resolver: zodResolver(cashflowQuickAddSchema),
@@ -116,61 +119,89 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     loadRecentAmounts(currency);
     setAutoThousand(currency === "VND");
   }, [currency]);
-  const quickCategories = useMemo(
-    () => categories.filter((c) => c.type === selectedType).slice(0, 8),
-    [categories, selectedType]
-  );
 
-  // Suggest the last used category for the current type when the user hasn't interacted yet
-  useEffect(() => {
-    if (userTouchedCategory) return;
-    if (selectedCategoryId) return;
-    try {
-      const stored = localStorage.getItem(lastCategoryKey(selectedType));
-      if (stored && categories.some((c) => c.id === stored && c.type === selectedType)) {
-        form.setValue("category_id", stored);
-        setSuggestedCategoryId(stored);
-      }
-    } catch {
-      // ignore storage errors
-    }
-  }, [categories, form, selectedCategoryId, selectedType, userTouchedCategory]);
+  const categoriesByType = useMemo(() => categories.filter((c) => c.type === selectedType), [categories, selectedType]);
 
   useEffect(() => {
-    if (userTouchedCategory) return;
-    const acctType = accounts.find((a) => a.id === accountId)?.type?.toLowerCase() ?? "";
-    const hour = transactionTime ? new Date(transactionTime).getHours() : new Date().getHours();
-    const findCat = (names: string[]) =>
-      categories.find(
-        (c) => c.type === selectedType && names.some((name) => c.name.toLowerCase().includes(name.toLowerCase()))
+    const suggestions: Array<{ category: Category; reason?: string }> = [];
+    const seen = new Set<string>();
+
+    const addSuggestion = (category?: Category, reason?: string) => {
+      if (!category || seen.has(category.id)) return;
+      seen.add(category.id);
+      suggestions.push({ category, reason });
+    };
+
+    const findByKeywords = (names: string[]) => {
+      const lowered = names.map((name) => name.toLowerCase());
+      return categories.find(
+        (c) =>
+          c.type === selectedType &&
+          lowered.some((name) => c.name.toLowerCase().includes(name))
       );
+    };
 
-    let candidate: string | null = null;
-    if (selectedType === "expense") {
-      if (typeof amount === "number" && amount <= 50000) {
-        candidate = findCat(["coffee"])?.id ?? null;
-      } else if (typeof amount === "number" && amount <= 150000 && hour >= 10 && hour <= 14) {
-        candidate = findCat(["lunch", "meal"])?.id ?? null;
-      } else if (typeof amount === "number" && amount <= 80000 && acctType.includes("wallet")) {
-        candidate = findCat(["ride", "grab"])?.id ?? null;
+    const storedId = (() => {
+      try {
+        return localStorage.getItem(lastCategoryKey(selectedType));
+      } catch {
+        return null;
       }
-    } else {
-      if (typeof amount === "number" && amount >= 10000000) {
-        candidate = findCat(["salary"])?.id ?? null;
-      } else if (typeof amount === "number" && amount >= 1000000) {
-        candidate = findCat(["bonus"])?.id ?? null;
-      } else {
-        candidate = findCat(["gift"])?.id ?? candidate;
+    })();
+
+    if (storedId) {
+      const storedCategory = categories.find((c) => c.id === storedId && c.type === selectedType);
+      if (storedCategory) {
+        addSuggestion(storedCategory, "Last used");
       }
     }
 
-    if (candidate && candidate !== selectedCategoryId) {
-      form.setValue("category_id", candidate);
-      setSuggestedCategoryId(candidate);
-    } else if (!candidate) {
+    const hour = transactionTime ? new Date(transactionTime).getHours() : new Date().getHours();
+    const amountValue = typeof amount === "number" ? amount : null;
+    const acctType = accounts.find((a) => a.id === accountId)?.type?.toLowerCase() ?? "";
+
+    const heuristics: Array<{ condition: boolean; keywords: string[]; reason: string }> = [];
+    if (selectedType === "expense") {
+      heuristics.push(
+        { condition: amountValue !== null && amountValue <= 50000, keywords: ["coffee", "cafe"], reason: "Nhỏ, cà phê" },
+        { condition: amountValue !== null && amountValue <= 150000 && hour >= 10 && hour <= 14, keywords: ["lunch", "meal"], reason: "Giữa trưa" },
+        { condition: amountValue !== null && amountValue <= 80000 && acctType.includes("wallet"), keywords: ["ride", "grab", "taxi"], reason: "Di chuyển ví" }
+      );
+    } else {
+      heuristics.push(
+        { condition: amountValue !== null && amountValue >= 10000000, keywords: ["salary"], reason: "Lương lớn" },
+        { condition: amountValue !== null && amountValue >= 1000000, keywords: ["bonus"], reason: "Bonus" },
+        { condition: amountValue !== null && amountValue < 1000000, keywords: ["gift"], reason: "Tiền thưởng" }
+      );
+    }
+
+    heuristics.forEach((item) => {
+      if (!item.condition) return;
+      const matched = findByKeywords(item.keywords);
+      addSuggestion(matched, item.reason);
+    });
+
+    if (suggestions.length < 5) {
+      categoriesByType
+        .filter((category) => !seen.has(category.id))
+        .slice(0, 5 - suggestions.length)
+        .forEach((category) => addSuggestion(category));
+    }
+
+    setSmartSuggestions(suggestions.slice(0, 5));
+
+    if (userTouchedCategory || selectedCategoryId) {
+      return;
+    }
+
+    const autoId = suggestions[0]?.category?.id ?? null;
+    if (autoId) {
+      form.setValue("category_id", autoId);
+      setSuggestedCategoryId(autoId);
+    } else {
       setSuggestedCategoryId(null);
     }
-  }, [amount, accountId, transactionTime, selectedType, categories, accounts, form, userTouchedCategory, selectedCategoryId]);
+  }, [amount, accounts, accountId, categories, categoriesByType, form, selectedCategoryId, selectedType, transactionTime, userTouchedCategory]);
 
   const notify = useNotificationsStore((state) => state.notify);
 
@@ -525,35 +556,70 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Category (optional)</Label>
-            {quickCategories.length ? (
-              <div className="flex flex-wrap gap-2">
-                {quickCategories.map((cat) => {
-                  const active = selectedCategoryId === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      className={`rounded-full px-3 py-1 text-sm font-semibold shadow-sm ring-1 transition ${
-                        active ? "bg-foreground text-white ring-foreground" : "bg-white text-foreground ring-black/10"
-                      }`}
-                      onClick={() => {
-                        setUserTouchedCategory(true);
-                        form.setValue("category_id", active ? null : cat.id);
-                      }}
-                    >
-                      {cat.name}
-                      {suggestedCategoryId === cat.id && !active ? (
-                        <span className="ml-2 text-[10px] uppercase tracking-wide text-primary">Suggested</span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Chưa có category. Thêm tại <a className="underline" href="/cashflow/categories">Cashflow &gt; Categories</a>.
+            <button
+              type="button"
+              onClick={() => setCategoryModalOpen(true)}
+              className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60"
+            >
+              <span className="truncate">
+                {selectedCategoryId
+                  ? categories.find((cat) => cat.id === selectedCategoryId)?.name
+                  : "Select category"}
+              </span>
+              <span className="text-xs text-muted-foreground">Choose</span>
+            </button>
+            {suggestedCategoryId && selectedCategoryId !== suggestedCategoryId ? (
+              <p className="text-[10px] text-primary">
+                Suggested: {categories.find((cat) => cat.id === suggestedCategoryId)?.name}
               </p>
-            )}
+            ) : null}
+            <CategoryTreeModal
+              open={categoryModalOpen}
+              onClose={() => setCategoryModalOpen(false)}
+              categories={categoriesByType}
+              selected={selectedCategoryId}
+              onSelect={(next) => {
+                form.setValue("category_id", next);
+                setUserTouchedCategory(true);
+              }}
+              suggestedId={suggestedCategoryId}
+            />
+            {smartSuggestions.length ? (
+              <div className="space-y-2 rounded-2xl border border-dashed border-primary/60 bg-primary/5 p-3">
+                <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <span>Smart suggestions</span>
+                  <span>Amount & time</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  {smartSuggestions.map(({ category, reason }) => {
+                    const active = selectedCategoryId === category.id;
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition duration-150 ${
+                          active
+                            ? "bg-foreground text-white border-foreground"
+                            : "border border-gray-200 bg-white text-foreground hover:border-primary/60"
+                        }`}
+                        onClick={() => {
+                          form.setValue("category_id", category.id);
+                          setUserTouchedCategory(true);
+                        }}
+                      >
+                        <div className="min-w-0 flex items-center gap-2 text-sm">
+                          <span className="font-semibold truncate">{category.name}</span>
+                          {reason ? (
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{reason}</span>
+                          ) : null}
+                        </div>
+                        {active ? <span className="text-xs font-semibold">✓</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <FormField

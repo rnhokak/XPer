@@ -28,6 +28,79 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     return categories.filter((c) => c.type === type && c.level <= 1);
   }, [categories, form]);
 
+  const categoryLookup = useMemo(() => {
+    const map = new Map<string, Category>();
+    categories.forEach((category) => map.set(category.id, category));
+    return map;
+  }, [categories]);
+
+  const groupedCategories = useMemo(() => {
+    const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+    const map = new Map<string | null, Category[]>();
+    categories.forEach((category) => {
+      const key = category.parent_id ?? null;
+      const list = map.get(key);
+      if (list) {
+        list.push(category);
+      } else {
+        map.set(key, [category]);
+      }
+    });
+    map.forEach((list) => list.sort((a, b) => collator.compare(a.name, b.name)));
+    return map;
+  }, [categories]);
+
+  const rootCategories = groupedCategories.get(null) ?? [];
+
+  const renderEntry = (category: Category, depth: number) => {
+    const prefix = depth === 0 ? "" : `${"--".repeat(depth)} `;
+    const indentClass = depth === 0 ? "" : depth === 1 ? "pl-4" : "pl-8";
+    const parentName = category.parent_id ? categoryLookup.get(category.parent_id)?.name : null;
+    const entryClasses = [
+      "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left transition",
+      depth === 0 ? "border bg-white hover:border-primary/40" : "border border-transparent bg-muted/40 text-sm hover:border-primary/40",
+      indentClass,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => startEdit(category)}
+        onKeyDown={(event) => event.key === "Enter" && startEdit(category)}
+        className={entryClasses}
+      >
+        <div className="min-w-0">
+          <p className={depth === 0 ? "text-base font-semibold" : "text-sm font-semibold"}>
+            {prefix}
+            {category.name}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {category.type} · level {category.level}
+            {parentName ? ` · parent: ${parentName}` : ""}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderChildren = (parentId: string, depth: number): JSX.Element | null => {
+    const children = groupedCategories.get(parentId) ?? [];
+    if (!children.length) return null;
+    return (
+      <div className="mt-2 space-y-1">
+        {children.map((child) => (
+          <div key={child.id} className="space-y-1">
+            {renderEntry(child, depth)}
+            {renderChildren(child.id, depth + 1)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -214,77 +287,18 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
           <p className="text-sm font-semibold">Categories (hierarchical)</p>
           <span className="text-xs text-muted-foreground">{categories.length} total</span>
         </div>
-                <div className="space-y-2">
-                  {categories.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No categories yet.</p>
-                  ) : (
-                    categories
-                      .filter((c) => c.level === 0)
-                      .map((root) => {
-                        const children = categories.filter((c) => c.parent_id === root.id && c.level === 1);
-                        return (
-                          <div
-                            key={root.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => startEdit(root)}
-                            onKeyDown={(e) => e.key === "Enter" && startEdit(root)}
-                            className="w-full rounded-lg border bg-white px-3 py-2 text-left transition hover:border-primary/40"
-                          >
-                            <div>
-                              <p className="font-semibold">{root.name}</p>
-                              <p className="text-xs text-muted-foreground">{root.type} · level 0</p>
-                            </div>
-
-                            {children.length > 0 ? (
-                              <div className="mt-2 space-y-1 border-l pl-3">
-                                {children.map((child) => {
-                                  const grand = categories.filter((c) => c.parent_id === child.id && c.level === 2);
-                                  return (
-                                    <div
-                                      key={child.id}
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={() => startEdit(child)}
-                                      onKeyDown={(e) => e.key === "Enter" && startEdit(child)}
-                                      className="w-full rounded-md bg-muted/40 px-3 py-2 text-left transition hover:border hover:border-primary/40"
-                                    >
-                                      <div>
-                                        <p className="font-semibold">{child.name}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {child.type} · level 1 · parent: {root.name}
-                                        </p>
-                                      </div>
-
-                                      {grand.length > 0 ? (
-                                        <div className="mt-2 space-y-1 border-l pl-3">
-                                          {grand.map((g) => (
-                                            <div
-                                              key={g.id}
-                                              role="button"
-                                              tabIndex={0}
-                                              onClick={() => startEdit(g)}
-                                              onKeyDown={(e) => e.key === "Enter" && startEdit(g)}
-                                              className="flex w-full items-center justify-between rounded bg-white px-3 py-2 text-left transition hover:border hover:border-primary/40"
-                                            >
-                                              <div>
-                                                <p className="font-semibold">{g.name}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                  {g.type} · level 2 · parent: {child.name}
-                                                </p>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })
+        <div className="space-y-2">
+          {categories.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No categories yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {rootCategories.map((root) => (
+                <div key={root.id} className="space-y-2">
+                  {renderEntry(root, 0)}
+                  {renderChildren(root.id, 1)}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
