@@ -294,12 +294,19 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     });
   };
 
-  const normalizeAmount = (raw: string) => {
+  const evaluateAmountExpression = (raw: string) => {
     const clean = raw.replace(/,/g, ".").replace(/\s+/g, "");
-    if (!clean || clean === "." || clean === "-") return undefined;
-    const val = Number(clean.startsWith(".") ? `0${clean}` : clean);
-    return Number.isFinite(val) ? val : undefined;
+    if (!clean || clean === "." || clean === "-" || clean === "+") return undefined;
+    if (!/^[0-9+\-*/.()]+$/.test(clean)) return undefined;
+    try {
+      const result = new Function(`"use strict"; return (${clean});`)();
+      return typeof result === "number" && Number.isFinite(result) ? result : undefined;
+    } catch {
+      return undefined;
+    }
   };
+
+  const normalizeAmount = (raw: string) => evaluateAmountExpression(raw);
 
   const applyThousandShortcuts = (raw: string) => {
     const trimmed = raw.trim();
@@ -317,10 +324,18 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   };
 
   const suggestedAmounts = useMemo(() => {
+    const seen = new Set<number>();
     const sorted: Array<{ label: string; value: number | null }> = recentAmounts
       .slice()
       .sort((a, b) => b.ts - a.ts)
-      .map((item) => ({ label: formatSuggestedLabel(item.amount), value: item.amount }))
+      .reduce<Array<{ label: string; value: number | null }>>((acc, item) => {
+        if (seen.has(item.amount)) {
+          return acc;
+        }
+        seen.add(item.amount);
+        acc.push({ label: formatSuggestedLabel(item.amount), value: item.amount });
+        return acc;
+      }, [])
       .slice(0, 4);
     if (currency === "VND") {
       sorted.push({ label: "+000", value: null }); // special: append 000 to current
