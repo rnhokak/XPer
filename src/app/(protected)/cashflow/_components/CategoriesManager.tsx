@@ -71,6 +71,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   });
 
   const selectedType = form.watch("type") ?? "expense";
+  const parentId = form.watch("parent_id");
   const parentChoices = useMemo(() => {
     if (selectedType === "transfer") return [];
     return categories.filter((c) => c.type === selectedType && c.level <= 1);
@@ -81,6 +82,22 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     categories.forEach((category) => map.set(category.id, category));
     return map;
   }, [categories]);
+
+  const rootCategory = useMemo(() => {
+    if (!parentId) return null;
+    let current = categoryLookup.get(parentId) ?? null;
+    while (current?.parent_id) {
+      const next = categoryLookup.get(current.parent_id);
+      if (!next) break;
+      current = next;
+    }
+    return current;
+  }, [parentId, categoryLookup]);
+
+  const metadataEditable = !parentId;
+  const metadataOriginLabel = parentId
+    ? rootCategory?.name ?? categoryLookup.get(parentId)?.name ?? "parent"
+    : null;
 
   const groupedCategories = useMemo(() => {
     const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
@@ -239,8 +256,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     });
   };
 
-  // When parent changes, auto-adjust level to parent level + 1 (or reset when cleared)
-  const parentId = form.watch("parent_id");
   useEffect(() => {
     if (selectedType === "transfer") {
       if (form.getValues("level") !== 0) {
@@ -253,20 +268,38 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       if (form.getValues("level") !== 0) {
         form.setValue("level", 0);
       }
+      const preferredGroup = preferredCategoryMeta.category_group ?? null;
+      const preferredFocus = preferredCategoryMeta.category_focus ?? null;
+      if (form.getValues("category_group") !== preferredGroup) {
+        form.setValue("category_group", preferredGroup);
+      }
+      if (form.getValues("category_focus") !== preferredFocus) {
+        form.setValue("category_focus", preferredFocus);
+      }
       return;
     }
-    const parent = categories.find((c) => c.id === parentId);
+
+    const parent = categoryLookup.get(parentId);
     if (parent) {
       const targetLevel = (parent.level + 1) as 0 | 1 | 2;
       if (form.getValues("level") !== targetLevel) {
         form.setValue("level", targetLevel);
       }
-      // Ensure type matches parent
       if (form.getValues("type") !== parent.type) {
         form.setValue("type", parent.type);
       }
     }
-  }, [parentId, categories, form, selectedType]);
+
+    const rootMeta = rootCategory ?? parent;
+    const inheritedGroup = rootMeta?.category_group ?? null;
+    const inheritedFocus = rootMeta?.category_focus ?? null;
+    if (form.getValues("category_group") !== inheritedGroup) {
+      form.setValue("category_group", inheritedGroup);
+    }
+    if (form.getValues("category_focus") !== inheritedFocus) {
+      form.setValue("category_focus", inheritedFocus);
+    }
+  }, [parentId, categoryLookup, form, preferredCategoryMeta, rootCategory, selectedType]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
@@ -322,7 +355,8 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                     <FormLabel>Group</FormLabel>
                     <Select
                       value={field.value ?? EMPTY_GROUP}
-                      onValueChange={(v) => field.onChange(v === EMPTY_GROUP ? null : v)}
+                      onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_GROUP ? null : v)}
+                      disabled={!metadataEditable}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -336,6 +370,11 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                         ))}
                       </SelectContent>
                     </Select>
+                    {!metadataEditable ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Inherited from {metadataOriginLabel ?? "parent"}.
+                      </p>
+                    ) : null}
                     <FormMessage>{form.formState.errors.category_group?.message}</FormMessage>
                   </FormItem>
                 )}
@@ -348,7 +387,8 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                     <FormLabel>Định hướng</FormLabel>
                     <Select
                       value={field.value ?? EMPTY_FOCUS}
-                      onValueChange={(v) => field.onChange(v === EMPTY_FOCUS ? null : v)}
+                      onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_FOCUS ? null : v)}
+                      disabled={!metadataEditable}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -362,6 +402,11 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                         ))}
                       </SelectContent>
                     </Select>
+                    {!metadataEditable ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Inherited from {metadataOriginLabel ?? "parent"}.
+                      </p>
+                    ) : null}
                     <FormMessage>{form.formState.errors.category_focus?.message}</FormMessage>
                   </FormItem>
                 )}
