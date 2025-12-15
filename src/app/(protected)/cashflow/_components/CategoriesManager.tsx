@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -55,7 +56,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Category | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [preferredCategoryMeta, setPreferredCategoryMeta] = useState<CategoryMeta>(initialCategoryMeta);
 
   const form = useForm<CategoryInput>({
@@ -169,10 +170,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   };
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (selectedType === "transfer") {
       if (form.getValues("parent_id") !== null) {
         form.setValue("parent_id", null);
@@ -195,6 +192,40 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     });
     setEditing(null);
     setSubmitError(null);
+  };
+  const closeModal = () => {
+    resetForm();
+  };
+
+  const categoriesByType = useMemo(() => {
+    const map: Record<Category["type"], Category[]> = {
+      expense: [],
+      income: [],
+      transfer: [],
+    };
+    categories.forEach((category) => {
+      map[category.type].push(category);
+    });
+    return map;
+  }, [categories]);
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setModalOpen(true);
+      return;
+    }
+    closeModal();
+    setModalOpen(false);
+  };
+
+  const openModalForType = (type: Category["type"]) => {
+    const meta: CategoryMeta = {
+      type,
+      category_group: preferredCategoryMeta.category_group,
+      category_focus: preferredCategoryMeta.category_focus,
+    };
+    resetForm(meta);
+    setModalOpen(true);
   };
 
   const upsert = async (values: CategoryInput) => {
@@ -225,6 +256,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     };
     setPreferredCategoryMeta(nextMeta);
     resetForm(nextMeta);
+    setModalOpen(false);
     router.refresh();
   };
 
@@ -254,6 +286,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       category_group: cat.category_group,
       category_focus: cat.category_focus,
     });
+    setModalOpen(true);
   };
 
   useEffect(() => {
@@ -302,199 +335,215 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   }, [parentId, categoryLookup, form, preferredCategoryMeta, rootCategory, selectedType]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.05fr,0.95fr]">
-      {!mounted ? (
-        <div className="space-y-3 rounded-xl border bg-white p-4 shadow-sm">
-          <div className="h-6 w-32 animate-pulse rounded bg-muted" />
-          <div className="h-10 w-full animate-pulse rounded bg-muted" />
-          <div className="h-10 w-full animate-pulse rounded bg-muted" />
-        </div>
-      ) : (
-      <div className="rounded-xl border bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
+    <>
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground/70">{editing ? "Edit category" : "New category"}</p>
-            <p className="text-sm text-muted-foreground">Type + level + name; parent required for level 1/2.</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Categories</p>
+            <p className="text-sm text-muted-foreground">Manage income, expense, and transfer hierarchies.</p>
           </div>
-          {editing ? (
-            <Button variant="ghost" size="sm" onClick={() => resetForm()}>
-              Cancel
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap gap-2">
+             <Button  size="sm" variant="outline" onClick={() => openModalForType('expense')}>
+                Add Category 
+              </Button>
+          </div>
         </div>
-        <Form {...form}>
-          <form className="space-y-4" onSubmit={form.handleSubmit(upsert)}>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categoryTypes.map((value) => (
-                          <SelectItem key={value} value={value}>
-                            {categoryTypeLabels[value]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage>{form.formState.errors.type?.message}</FormMessage>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="category_group"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Group</FormLabel>
-                    <Select
-                      value={field.value ?? EMPTY_GROUP}
-                      onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_GROUP ? null : v)}
-                      disabled={!metadataEditable}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={EMPTY_GROUP}>Không phân loại</SelectItem>
-                        {categoryGroups.map((value) => (
-                          <SelectItem key={value} value={value}>
-                            {categoryGroupLabels[value]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {!metadataEditable ? (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Inherited from {metadataOriginLabel ?? "parent"}.
-                      </p>
-                    ) : null}
-                    <FormMessage>{form.formState.errors.category_group?.message}</FormMessage>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="category_focus"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Định hướng</FormLabel>
-                    <Select
-                      value={field.value ?? EMPTY_FOCUS}
-                      onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_FOCUS ? null : v)}
-                      disabled={!metadataEditable}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={EMPTY_FOCUS}>Không phân loại</SelectItem>
-                        {categoryFocuses.map((value) => (
-                          <SelectItem key={value} value={value}>
-                            {categoryFocusLabels[value]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {!metadataEditable ? (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Inherited from {metadataOriginLabel ?? "parent"}.
-                      </p>
-                    ) : null}
-                    <FormMessage>{form.formState.errors.category_focus?.message}</FormMessage>
-                  </FormItem>
-                )}
-              />
-            </div>
-            <FormItem>
-              <FormLabel>Computed level</FormLabel>
-              <div className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
-                Level {form.watch("level")} (auto from parent)
-              </div>
-            </FormItem>
 
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} />
-                  </FormControl>
-                  <FormMessage>{form.formState.errors.name?.message}</FormMessage>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="parent_id"
-              render={({ field }) => {
-                const isTransfer = selectedType === "transfer";
-                return (
-                  <FormItem>
-                    <FormLabel>Parent</FormLabel>
-                    {isTransfer ? (
-                      <div className="rounded-md border border-dashed border-primary/60 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
-                        Transfer categories must stay at level 0 and cannot have parents.
+        <div className="space-y-5">
+          {categoryTypes.map((type) => {
+            const roots = rootCategories.filter((root) => root.type === type);
+            return (
+              <section key={type} className="space-y-4 rounded-xl border bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{categoryTypeLabels[type]}</p>
+                    <p className="text-xs text-muted-foreground">{categoriesByType[type].length} total</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => openModalForType(type)}>
+                    Add {categoryTypeLabels[type]} category
+                  </Button>
+                </div>
+                {roots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No {categoryTypeLabels[type]} categories yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {roots.map((root) => (
+                      <div key={root.id} className="space-y-2">
+                        {renderEntry(root, 0)}
+                        {renderChildren(root.id, 1)}
                       </div>
-                    ) : (
-                      <Select value={field.value ?? "__root__"} onValueChange={(v) => field.onChange(v === "__root__" ? null : v)}>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      </div>
+
+      <Dialog open={modalOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="w-full max-w-3xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit category" : "New category"}</DialogTitle>
+            <DialogDescription>Type, metadata, and positioning are enforced hierarchically.</DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form className="space-y-4" onSubmit={form.handleSubmit(upsert)}>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select parent (optional)" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__root__">No parent (root)</SelectItem>
-                          {parentChoices.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name} (level {p.level})
+                          {categoryTypes.map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {categoryTypeLabels[value]}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    )}
-                    <FormMessage>{form.formState.errors.parent_id?.message}</FormMessage>
-                  </FormItem>
-                );
-              }}
-            />
-
-            {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Saving..." : editing ? "Update category" : "Add category"}
-            </Button>
-          </form>
-        </Form>
-      </div>
-      )}
-
-      <div className="rounded-xl border bg-white p-4 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold">Categories (hierarchical)</p>
-          <span className="text-xs text-muted-foreground">{categories.length} total</span>
-        </div>
-        <div className="space-y-2">
-          {categories.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No categories yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {rootCategories.map((root) => (
-                <div key={root.id} className="space-y-2">
-                  {renderEntry(root, 0)}
-                  {renderChildren(root.id, 1)}
+                      <FormMessage>{form.formState.errors.type?.message}</FormMessage>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category_group"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Group</FormLabel>
+                      <Select
+                        value={field.value ?? EMPTY_GROUP}
+                        onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_GROUP ? null : v)}
+                        disabled={!metadataEditable}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={EMPTY_GROUP}>Không phân loại</SelectItem>
+                          {categoryGroups.map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {categoryGroupLabels[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!metadataEditable ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Inherited from {metadataOriginLabel ?? "parent"}.
+                        </p>
+                      ) : null}
+                      <FormMessage>{form.formState.errors.category_group?.message}</FormMessage>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category_focus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Định hướng</FormLabel>
+                      <Select
+                        value={field.value ?? EMPTY_FOCUS}
+                        onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_FOCUS ? null : v)}
+                        disabled={!metadataEditable}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={EMPTY_FOCUS}>Không phân loại</SelectItem>
+                          {categoryFocuses.map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {categoryFocusLabels[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!metadataEditable ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Inherited from {metadataOriginLabel ?? "parent"}.
+                        </p>
+                      ) : null}
+                      <FormMessage>{form.formState.errors.category_focus?.message}</FormMessage>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormItem>
+                <FormLabel>Computed level</FormLabel>
+                <div className="rounded-md border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  Level {form.watch("level")} (auto from parent)
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+              </FormItem>
+
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage>{form.formState.errors.name?.message}</FormMessage>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="parent_id"
+                render={({ field }) => {
+                  const isTransfer = selectedType === "transfer";
+                  return (
+                    <FormItem>
+                      <FormLabel>Parent</FormLabel>
+                      {isTransfer ? (
+                        <div className="rounded-md border border-dashed border-primary/60 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+                          Transfer categories must stay at level 0 and cannot have parents.
+                        </div>
+                      ) : (
+                        <Select value={field.value ?? "__root__"} onValueChange={(v) => field.onChange(v === "__root__" ? null : v)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select parent (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__root__">No parent (root)</SelectItem>
+                            {parentChoices.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name} (level {p.level})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <FormMessage>{form.formState.errors.parent_id?.message}</FormMessage>
+                    </FormItem>
+                  );
+                }}
+              />
+
+              {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
+              <div className="flex items-center justify-between gap-3">
+                <Button variant="ghost" type="button" onClick={() => { closeModal(); setModalOpen(false); }}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? "Saving..." : editing ? "Update category" : "Add category"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
