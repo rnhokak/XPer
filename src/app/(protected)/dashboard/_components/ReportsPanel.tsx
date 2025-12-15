@@ -149,7 +149,6 @@ export default function ReportsPanel({
     }
   };
 
-  const rowsToShow = reportRuns.slice(0, 12);
   const winRate = tradingSummary.trade_count ? Math.round((tradingSummary.win_trades / tradingSummary.trade_count) * 100) : 0;
 
   return (
@@ -248,82 +247,6 @@ export default function ReportsPanel({
             </p>
             <p className="text-xs text-muted-foreground">{fundingSummary.transaction_count} giao dịch</p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
-        <CardHeader>
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Bảng ngày báo cáo</CardTitle>
-              <CardDescription>Ghi lại thời điểm bắt đầu báo cáo mới theo loại.</CardDescription>
-            </div>
-            <div className="text-xs text-muted-foreground">Danh sách mới nhất</div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="w-full text-left text-sm text-muted-foreground">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Loại</th>
-                  <th className="px-4 py-3">Ngày bắt đầu</th>
-                  <th className="px-4 py-3">Ghi nhận lúc</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rowsToShow.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-5 text-center text-sm text-muted-foreground">
-                      Chưa có ngày báo cáo nào.
-                    </td>
-                  </tr>
-                ) : (
-                  rowsToShow.map((run) => (
-                    <tr key={run.id} className="border-t border-slate-100 bg-white/80">
-                      <td className="px-4 py-3 text-foreground">{typeLabels[run.type]}</td>
-                      <td className="px-4 py-3">{formatDate(run.report_date)}</td>
-                      <td className="px-4 py-3">{formatDateTime(run.created_at ?? run.report_date)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <form className="grid gap-3 md:grid-cols-[1fr,1fr,auto]" onSubmit={handleSubmit}>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Loại báo cáo</p>
-              <Select
-                value={formState.type}
-                onValueChange={(value) => setFormState((prev) => ({ ...prev, type: value as ReportType }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn loại" />
-                </SelectTrigger>
-                <SelectContent>
-                  {reportTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {typeLabels[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Ngày báo cáo</p>
-              <Input
-                type="date"
-                value={formState.reportDate}
-                onChange={(event) => setFormState((prev) => ({ ...prev, reportDate: event.target.value }))}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button className="w-full" type="submit" disabled={submitting}>
-                {submitting ? "Đang lưu..." : "Ghi nhận"}
-              </Button>
-            </div>
-          </form>
         </CardContent>
       </Card>
     </div>
