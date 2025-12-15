@@ -284,7 +284,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
             <p className="text-sm text-muted-foreground">Type + level + name; parent required for level 1/2.</p>
           </div>
           {editing ? (
-            <Button variant="ghost" size="sm" onClick={resetForm}>
+            <Button variant="ghost" size="sm" onClick={() => resetForm()}>
               Cancel
             </Button>
           ) : null}

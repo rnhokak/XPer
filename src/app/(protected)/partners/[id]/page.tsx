@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 type Partner = { id: string; name: string; type: string | null; phone: string | null; note: string | null; created_at: string | null };
 type Balance = { total_lent: number | null; total_borrowed: number | null; total_receive: number | null; total_repay: number | null; balance: number | null };
 type Account = { id: string; name: string; currency: string; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense" | "transfer" };
 type PartnerTransactionRow = {
   id: string;
   direction: "lend" | "borrow" | "repay" | "receive";
@@ -19,13 +19,13 @@ type PartnerTransactionRow = {
   note: string | null;
   transaction: {
     id: string;
-    type: "income" | "expense";
+    type: "income" | "expense" | "transfer";
     amount: number;
     currency: string;
     transaction_time: string;
     note: string | null;
     account: { id: string; name: string | null; currency: string | null } | null;
-    category: { id: string; name: string | null; type: "income" | "expense" | null } | null;
+    category: { id: string; name: string | null; type: "income" | "expense" | "transfer" | null } | null;
   } | null;
 };
 

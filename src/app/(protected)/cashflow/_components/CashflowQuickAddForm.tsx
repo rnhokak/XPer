@@ -574,36 +574,48 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Category (optional)</Label>
-              <button
-                type="button"
-                onClick={() => setCategoryModalOpen(true)}
-                className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60"
-              >
-                <span className="truncate">
-                  {selectedCategoryId
-                    ? categories.find((cat) => cat.id === selectedCategoryId)?.name
-                    : "Select category"}
-                </span>
-                <span className="text-xs text-muted-foreground">Choose</span>
-              </button>
+            <button
+              type="button"
+              onClick={() => setCategoryModalOpen(true)}
+              className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60"
+            >
+              <span className="truncate">
+                {selectedCategoryId
+                  ? categories.find((cat) => cat.id === selectedCategoryId)?.name
+                  : "Select category"}
+              </span>
+              <span className="text-xs text-muted-foreground">Choose</span>
+            </button>
             {categoriesByType.length === 0 ? (
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                 <p>No {cashflowTransactionTypeLabels[selectedType]} categories yet.</p>
-                <Link href={CATEGORY_MANAGER_PATH} className="text-[11px] font-semibold text-primary">
-                  Create category
-                </Link>
+                <Button size="sm" variant="outline" asChild>
+                  <Link href={CATEGORY_MANAGER_PATH}>Create category</Link>
+                </Button>
               </div>
+            ) : null}
+            {!selectedCategoryId && categoriesByType.length > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full justify-center text-[11px] font-semibold"
+                asChild
+              >
+                <Link href={CATEGORY_MANAGER_PATH}>
+                  Add {cashflowTransactionTypeLabels[selectedType]} category
+                </Link>
+              </Button>
             ) : null}
             {suggestedCategoryId && selectedCategoryId !== suggestedCategoryId ? (
               <p className="text-[10px] text-primary">
                 Suggested: {categories.find((cat) => cat.id === suggestedCategoryId)?.name}
               </p>
             ) : null}
-          <CategoryTreeModal
-            open={categoryModalOpen}
-            onClose={() => setCategoryModalOpen(false)}
+            <CategoryTreeModal
+              open={categoryModalOpen}
+              onClose={() => setCategoryModalOpen(false)}
               categories={categoriesByType}
-              selected={selectedCategoryId}
+              selected={selectedCategoryId ?? null}
               onSelect={(next) => {
                 form.setValue("category_id", next);
                 setUserTouchedCategory(true);

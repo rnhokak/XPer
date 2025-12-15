@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 type Partner = { id: string; name: string; type: string | null; phone?: string | null };
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense" | "transfer" };
 type DebtPayment = { debt_id: string; payment_type: string; principal_amount: number | null; amount: number | null };
 type DebtRow = {
   id: string;

@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 type Partner = { id: string; name: string; type: string | null };
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense" | "transfer" };
 
 type Props = {
   partners: Partner[];

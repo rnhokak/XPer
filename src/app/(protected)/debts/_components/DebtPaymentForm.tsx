@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense" | "transfer" };
 
 type Props = {
   debtId: string;

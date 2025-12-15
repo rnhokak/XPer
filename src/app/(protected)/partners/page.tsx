@@ -5,7 +5,7 @@ import { PartnerListPageClient } from "@/features/partners/PartnerListPageClient
 export const dynamic = "force-dynamic";
 
 type Account = { id: string; name: string; currency: string; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense" | "transfer" };
 type PartnerBalance = {
   total_lent: number | null;
   total_borrowed: number | null;

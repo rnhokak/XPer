@@ -20,18 +20,18 @@ type PaymentRow = {
   note: string | null;
   transaction: {
     id: string;
-    type: "income" | "expense";
+    type: "income" | "expense" | "transfer";
     amount: number;
     currency: string;
     transaction_time: string;
     note: string | null;
     account: { id: string; name: string | null; currency: string | null } | null;
-    category: { id: string; name: string | null; type: "income" | "expense" | null } | null;
+    category: { id: string; name: string | null; type: "income" | "expense" | "transfer" | null } | null;
   } | null;
 };
 
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
-type Category = { id: string; name: string; type: "income" | "expense" };
+type Category = { id: string; name: string; type: "income" | "expense" | "transfer" };
 
 const computeOutstanding = (
   direction: "lend" | "borrow",

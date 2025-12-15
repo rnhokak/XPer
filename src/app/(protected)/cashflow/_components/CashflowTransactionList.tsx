@@ -39,7 +39,7 @@ type Category = {
   category_group: CategoryGroup | null;
   category_focus: CategoryFocus | null;
 };
-type Account = { id: string; name: string; currency: string };
+type Account = { id: string; name: string; currency: string; type?: string | null };
 
 const formatNumber = (value: number, currency?: string) => {
   const isVnd = currency?.toUpperCase() === "VND";
@@ -538,7 +538,7 @@ export function CashflowTransactionList({
                     open={categoryModalOpen}
                     onClose={() => setCategoryModalOpen(false)}
                     categories={categoriesByType}
-                    selected={selectedCategoryId}
+                    selected={selectedCategoryId ?? null}
                     onSelect={(next) => {
                       form.setValue("category_id", next);
                       setUserTouchedCategory(true);

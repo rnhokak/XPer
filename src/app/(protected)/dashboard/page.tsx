@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 type Transaction = {
   id: string;
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   amount: number;
   currency: string;
   transaction_time: string;

@@ -22,7 +22,7 @@ import { partnerTransactionSchema, type PartnerTransactionInput } from "@/lib/va
 
 export type PartnerOption = { id: string; name: string };
 export type AccountOption = { id: string; name: string; currency: string };
-export type CategoryOption = { id: string; name: string; type: "income" | "expense" };
+export type CategoryOption = { id: string; name: string; type: "income" | "expense" | "transfer" };
 
 const toDateInputValue = (value?: string | null) => {
   if (!value) return new Date().toISOString().slice(0, 16);
