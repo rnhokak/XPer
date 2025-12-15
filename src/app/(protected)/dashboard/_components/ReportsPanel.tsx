@@ -97,6 +97,11 @@ export default function ReportsPanel({
   fundingStart,
   defaultCurrency,
 }: Props) {
+
+  console.log("Rendering ReportsPanel with reportRuns:", reportRuns);
+  console.log("cashflowSummary:", cashflowSummary);
+  console.log("tradingSummary:", tradingSummary);
+  console.log("fundingSummary:", fundingSummary);
   const router = useRouter();
   const notify = useNotificationsStore((state) => state.notify);
   const todayValue = new Date().toISOString().slice(0, 10);

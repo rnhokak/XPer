@@ -212,9 +212,11 @@ export default async function DashboardPage() {
   ]);
 
   const cashflowSummaryRow =
-    (cashflowSummaryRes.data ?? null) as Database["public"]["Functions"]["report_cashflow_summary"]["Returns"] | null;
+    (((cashflowSummaryRes.data ?? []) as Database["public"]["Functions"]["report_cashflow_summary"]["Returns"][])[0] ??
+      null) as Database["public"]["Functions"]["report_cashflow_summary"]["Returns"] | null;
   const tradingSummaryRow =
-    (tradingSummaryRes.data ?? null) as Database["public"]["Functions"]["report_trading_summary"]["Returns"] | null;
+    (((tradingSummaryRes.data ?? []) as Database["public"]["Functions"]["report_trading_summary"]["Returns"][])[0] ??
+      null) as Database["public"]["Functions"]["report_trading_summary"]["Returns"] | null;
 
   const cashflowSummary = {
     total_income: toNumber(cashflowSummaryRow?.total_income),
@@ -232,13 +234,28 @@ export default async function DashboardPage() {
     average_pnl: toNumber(tradingSummaryRow?.average_pnl),
   };
 
-  const fundingSummaryRow = (fundingSummaryRes.data ?? null) as FundingSummaryRow | null;
+  const fundingSummaryRow =
+    (((fundingSummaryRes.data ?? []) as FundingSummaryRow[])[0] ?? null) as FundingSummaryRow | null;
   const fundingSummary = {
     deposit_total: toNumber(fundingSummaryRow?.deposit_total),
     withdraw_total: toNumber(fundingSummaryRow?.withdraw_total),
     net_amount: toNumber(fundingSummaryRow?.net_amount),
     transaction_count: toNumber(fundingSummaryRow?.transaction_count),
   };
+
+  console.log("report-dates", {
+    cashflowStart: cashflowStartIso,
+    tradingStart: tradingStartIso,
+    fundingStart: fundingStartIso,
+    latestReportByType,
+    cashflowSummaryRow,
+    tradingSummaryRow,
+    fundingSummaryRow,
+  });
+
+  console.log("acashflowSummary", cashflowSummary);
+  console.log("atradingSummary", tradingSummary);
+  console.log("afundingSummary", fundingSummary);
 
   return (
     <div className="space-y-5">
