@@ -232,6 +232,8 @@ export default async function DashboardPage() {
     neutral_trades: toNumber(tradingSummaryRow?.neutral_trades),
     trade_count: toNumber(tradingSummaryRow?.trade_count),
     average_pnl: toNumber(tradingSummaryRow?.average_pnl),
+    commission_total: toNumber(tradingSummaryRow?.commission_total),
+    swap_total: toNumber(tradingSummaryRow?.swap_total),
   };
 
   const fundingSummaryRow =

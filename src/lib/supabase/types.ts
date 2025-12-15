@@ -854,6 +854,8 @@ export interface Database {
         };
         Returns: {
           pnl_total: number;
+          commission_total: number;
+          swap_total: number;
           win_trades: number;
           loss_trades: number;
           neutral_trades: number;

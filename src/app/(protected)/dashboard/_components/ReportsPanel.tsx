@@ -32,6 +32,8 @@ type TradingSummary = {
   neutral_trades: number;
   trade_count: number;
   average_pnl: number;
+  commission_total: number;
+  swap_total: number;
 };
 
 type FundingSummary = {
@@ -99,6 +101,10 @@ export default function ReportsPanel({
 }: Props) {
 
   const winRate = tradingSummary.trade_count ? Math.round((tradingSummary.win_trades / tradingSummary.trade_count) * 100) : 0;
+  const tradingFeesLabel = `Commission ${formatMoney(Math.abs(tradingSummary.commission_total))} + Swap ${formatMoney(
+    Math.abs(tradingSummary.swap_total)
+  )} USD`;
+  const fundingBalance = fundingSummary.withdraw_total - fundingSummary.deposit_total;
 
   return (
     <div className="space-y-4">
@@ -142,12 +148,13 @@ export default function ReportsPanel({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs uppercase text-muted-foreground">PnL tổng</p>
+              <p className="text-xs uppercase text-muted-foreground">PnL tổng (USD)</p>
               <p className={`text-3xl font-semibold ${tradingSummary.pnl_total >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {tradingSummary.pnl_total >= 0 ? "+" : ""}
-                {formatMoney(tradingSummary.pnl_total)} {defaultCurrency}
+                {formatMoney(tradingSummary.pnl_total)} USD
               </p>
-              <p className="text-xs text-muted-foreground">Win rate {winRate}%</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Win rate {winRate}%</p>
+              <p className="text-xs text-muted-foreground">{tradingFeesLabel}</p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs uppercase tracking-wide text-muted-foreground">
               <div className="rounded-lg border border-slate-200 bg-white/80 px-2 py-2 text-slate-900">
@@ -171,10 +178,10 @@ export default function ReportsPanel({
       </div>
       <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base">
-            <span>Funding report</span>
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">{formatDate(fundingStart)}</span>
-          </CardTitle>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>Funding report</span>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">{formatDate(fundingStart)}</span>
+        </CardTitle>
           <CardDescription>Funding history từ ngày báo cáo mới nhất</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -190,12 +197,12 @@ export default function ReportsPanel({
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs uppercase text-muted-foreground">Net</p>
-            <p className={`text-3xl font-semibold ${fundingSummary.net_amount >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-              {fundingSummary.net_amount >= 0 ? "+" : ""}
-              {formatMoney(fundingSummary.net_amount)} {defaultCurrency}
-            </p>
-            <p className="text-xs text-muted-foreground">{fundingSummary.transaction_count} giao dịch</p>
-          </div>
+            <p className={`text-3xl font-semibold ${fundingBalance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              {fundingBalance >= 0 ? "+" : ""}
+              {formatMoney(fundingBalance)} {defaultCurrency}
+              </p>
+              <p className="text-xs text-muted-foreground">{fundingSummary.transaction_count} giao dịch</p>
+            </div>
         </CardContent>
       </Card>
     </div>
