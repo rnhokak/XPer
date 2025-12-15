@@ -1,20 +1,7 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useNotificationsStore } from "@/store/notifications";
-import { reportTypes, type ReportType } from "@/lib/validation/report";
 import type { Database } from "@/lib/supabase/types";
-
-const typeLabels: Record<ReportType, string> = {
-  cashflow: "Cashflow",
-  trading: "Trading",
-  funding: "Funding",
-};
 
 type ReportRunRow = Database["public"]["Tables"]["report_runs"]["Row"];
 
@@ -99,7 +86,8 @@ export default function ReportsPanel({
   fundingStart,
   defaultCurrency,
 }: Props) {
-
+  const latestRun = reportRuns?.[0];
+  const lastRunLabel = latestRun?.created_at ? formatDateTime(latestRun.created_at) : "Chưa có dữ liệu";
   const winRate = tradingSummary.trade_count ? Math.round((tradingSummary.win_trades / tradingSummary.trade_count) * 100) : 0;
   const tradingFeesLabel = `Commission ${formatMoney(Math.abs(tradingSummary.commission_total))} + Swap ${formatMoney(
     Math.abs(tradingSummary.swap_total)
@@ -107,30 +95,61 @@ export default function ReportsPanel({
   const fundingBalance = fundingSummary.withdraw_total - fundingSummary.deposit_total;
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1.03fr,0.97fr]">
-        <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
+    <div className="space-y-6 sm:space-y-7">
+      <div className="rounded-3xl bg-gradient-to-r from-slate-100 via-white to-blue-50 p-5 text-slate-900 shadow-xl ring-1 ring-slate-200/80 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500">Báo cáo</p>
+            <p className="text-3xl font-semibold text-slate-900">Dashboard</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
+            Cập nhật: {lastRunLabel}
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Cashflow Net</p>
+            <p className="money-blur text-2xl font-semibold text-slate-900">
+              {cashflowSummary.net_amount >= 0 ? "+" : ""}
+              {formatMoney(cashflowSummary.net_amount)} {defaultCurrency}
+            </p>
+            <p className="text-xs text-slate-500">{formatDate(cashflowStart)} đến nay</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Trading PnL</p>
+            <p className="money-blur text-2xl font-semibold text-slate-900">
+              {tradingSummary.pnl_total >= 0 ? "+" : ""}
+              {formatMoney(tradingSummary.pnl_total)} USD
+            </p>
+            <p className="text-xs text-slate-500">Win rate {winRate}%</p>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="rounded-3xl border-none bg-white text-slate-900 shadow-lg shadow-slate-200/70 ring-1 ring-slate-100">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="flex items-center justify-between text-lg font-semibold">
               <span>Cashflow report</span>
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">{formatDate(cashflowStart)}</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+                {formatDate(cashflowStart)}
+              </span>
             </CardTitle>
             <CardDescription>Liên tục từ ngày báo cáo mới nhất đến hiện tại</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
               {cashflowHighlights.map((item) => (
-                <div key={item.key} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div key={item.key} className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
                   <p className="text-xs uppercase text-muted-foreground">{item.label}</p>
-                  <p className="text-2xl font-semibold">
+                  <p className="money-blur text-2xl font-semibold">
                     {formatMoney(cashflowSummary[item.key])} {defaultCurrency}
                   </p>
                 </div>
               ))}
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-2xl border border-slate-100 bg-gradient-to-br from-emerald-50 to-white p-4">
               <p className="text-xs uppercase text-muted-foreground">Net</p>
-              <p className={`text-3xl font-semibold ${cashflowSummary.net_amount >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              <p className={`money-blur text-3xl font-semibold ${cashflowSummary.net_amount >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {cashflowSummary.net_amount >= 0 ? "+" : ""}
                 {formatMoney(cashflowSummary.net_amount)} {defaultCurrency}
               </p>
@@ -138,71 +157,75 @@ export default function ReportsPanel({
             </div>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
+        <Card className="rounded-3xl border-none bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-sky-50 shadow-lg ring-1 ring-black/10">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="flex items-center justify-between text-lg text-sky-50">
               <span>Trading report</span>
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">{formatDate(tradingStart)}</span>
+              <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-sky-200">
+                {formatDate(tradingStart)}
+              </span>
             </CardTitle>
-            <CardDescription>Orders closed từ ngày báo cáo mới đến nay</CardDescription>
+            <CardDescription className="text-sky-200">Orders closed từ ngày báo cáo mới đến nay</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs uppercase text-muted-foreground">PnL tổng (USD)</p>
-              <p className={`text-3xl font-semibold ${tradingSummary.pnl_total >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-wide text-sky-200">PnL tổng (USD)</p>
+              <p className={`money-blur text-3xl font-semibold ${tradingSummary.pnl_total >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
                 {tradingSummary.pnl_total >= 0 ? "+" : ""}
                 {formatMoney(tradingSummary.pnl_total)} USD
               </p>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Win rate {winRate}%</p>
-              <p className="text-xs text-muted-foreground">{tradingFeesLabel}</p>
+              <p className="text-xs uppercase tracking-wide text-sky-200">Win rate {winRate}%</p>
+              <p className="text-xs text-sky-200">{tradingFeesLabel}</p>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs uppercase tracking-wide text-muted-foreground">
-              <div className="rounded-lg border border-slate-200 bg-white/80 px-2 py-2 text-slate-900">
+            <div className="grid grid-cols-3 gap-2 text-center text-xs uppercase tracking-wide text-sky-200">
+              <div className="rounded-2xl border border-white/15 bg-white/5 px-2 py-2">
                 <p className="text-[10px]">Wins</p>
-                <strong className="text-base text-emerald-600">{tradingSummary.win_trades}</strong>
+                <strong className="text-base text-emerald-300">{tradingSummary.win_trades}</strong>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-white/80 px-2 py-2 text-slate-900">
+              <div className="rounded-2xl border border-white/15 bg-white/5 px-2 py-2">
                 <p className="text-[10px]">Losses</p>
-                <strong className="text-base text-red-600">{tradingSummary.loss_trades}</strong>
+                <strong className="text-base text-rose-300">{tradingSummary.loss_trades}</strong>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-white/80 px-2 py-2 text-slate-900">
+              <div className="rounded-2xl border border-white/15 bg-white/5 px-2 py-2">
                 <p className="text-[10px]">Trades</p>
-                <strong className="text-base text-foreground">{tradingSummary.trade_count}</strong>
+                <strong className="text-base text-sky-50">{tradingSummary.trade_count}</strong>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-muted-foreground">
-              Trung bình mỗi trade: {formatMoney(tradingSummary.average_pnl)} {defaultCurrency}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-sky-100">
+              Trung bình mỗi trade: <span className="money-blur">{formatMoney(tradingSummary.average_pnl)} {defaultCurrency}</span>
             </div>
           </CardContent>
         </Card>
       </div>
-      <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
-        <CardHeader>
-        <CardTitle className="flex items-center justify-between text-base">
-          <span>Funding report</span>
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">{formatDate(fundingStart)}</span>
-        </CardTitle>
+      <Card className="rounded-3xl border-none bg-white text-slate-900 shadow-lg shadow-slate-200/70 ring-1 ring-slate-100">
+        <CardHeader className="space-y-1 pb-4">
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span>Funding report</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+              {formatDate(fundingStart)}
+            </span>
+          </CardTitle>
           <CardDescription>Funding history từ ngày báo cáo mới nhất</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
             {fundingHighlights.map((item) => (
-              <div key={item.key} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div key={item.key} className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
                 <p className="text-xs uppercase text-muted-foreground">{item.label}</p>
-                <p className="text-2xl font-semibold">
-                  {formatMoney(fundingSummary[item.key])} {defaultCurrency}
+                <p className="money-blur text-2xl font-semibold">
+                  {formatMoney(fundingSummary[item.key])}
                 </p>
               </div>
             ))}
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-2xl border border-slate-100 bg-gradient-to-br from-blue-50 to-white p-4">
             <p className="text-xs uppercase text-muted-foreground">Net</p>
-            <p className={`text-3xl font-semibold ${fundingBalance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            <p className={`money-blur text-3xl font-semibold ${fundingBalance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
               {fundingBalance >= 0 ? "+" : ""}
-              {formatMoney(fundingBalance)} {defaultCurrency}
-              </p>
-              <p className="text-xs text-muted-foreground">{fundingSummary.transaction_count} giao dịch</p>
-            </div>
+              {formatMoney(fundingBalance)}
+            </p>
+            <p className="text-xs text-muted-foreground">{fundingSummary.transaction_count} giao dịch</p>
+          </div>
         </CardContent>
       </Card>
     </div>
