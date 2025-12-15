@@ -511,11 +511,11 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                           Transfer categories must stay at level 0 and cannot have parents.
                         </div>
                       ) : (
-                        <Select value={field.value ?? "__root__"} onValueChange={(v) => field.onChange(v === "__root__" ? null : v)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select parent (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
+                      <Select value={field.value ?? "__root__"} onValueChange={(v) => field.onChange(v === "__root__" ? null : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select parent (optional)" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[280px] overflow-y-auto">
                             <SelectItem value="__root__">No parent (root)</SelectItem>
                             {parentChoices.map((p) => (
                               <SelectItem key={p.id} value={p.id}>
