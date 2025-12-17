@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 
 type Category = { id: string; name: string; parent_id: string | null };
 
@@ -28,6 +29,41 @@ export function CategoryTreeModal({
 }: CategoryTreeModalProps) {
   const collator = useMemo(() => new Intl.Collator(undefined, { sensitivity: "base", numeric: true }), []);
   const [searchTerm, setSearchTerm] = useState("");
+  const [dialogMaxHeight, setDialogMaxHeight] = useState<number | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const update = () => {
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const max = Math.max(360, viewportHeight - 120);
+      setDialogMaxHeight(max);
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      searchInputRef.current?.blur();
+      onClose();
+    }
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+  };
+
+  const handleSelectAndClose = (categoryId: string | null) => {
+    searchInputRef.current?.blur();
+    onSelect(categoryId);
+    onClose();
+  };
 
   const groupedByParent = useMemo(() => {
     const map = new Map<string | null, Category[]>();
@@ -87,11 +123,6 @@ export function CategoryTreeModal({
     ? implicitRoots
     : categories;
 
-  const handleSelect = (categoryId: string) => {
-    onSelect(categoryId);
-    onClose();
-  };
-
   const noMatches = Boolean(normalizedSearch && visibleIds && visibleIds.size === 0);
 
   const renderNodes = (nodes: Category[], depth = 0): JSX.Element[] => {
@@ -105,7 +136,7 @@ export function CategoryTreeModal({
         <div key={category.id} className="space-y-1">
           <button
             type="button"
-            onClick={() => handleSelect(category.id)}
+            onClick={() => handleSelectAndClose(category.id)}
             className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition duration-150 ${
               isActive
                 ? "bg-foreground text-white border-foreground hover:border-foreground"
@@ -132,40 +163,62 @@ export function CategoryTreeModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl">
-        <div className="mb-3">
-          <Input
-            placeholder={searchPlaceholder}
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
-        </div>
-        <DialogHeader>
-          <DialogTitle>Chọn category</DialogTitle>
-          <DialogDescription>Hiển thị cây category theo loại giao dịch</DialogDescription>
-        </DialogHeader>
-        <div className="max-h-[60vh] space-y-1 overflow-y-auto pt-1">
-          {noMatches ? (
-            <div className="px-3 py-2 text-sm text-muted-foreground">No categories match your search.</div>
-          ) : (
-            renderNodes(displayRoots)
-          )}
-        </div>
-        <DialogFooter className="gap-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              onSelect(null);
-              onClose();
-            }}
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent className="sm:max-w-2xl gap-0 p-0 sm:p-6">
+        <div className="flex h-full flex-col gap-3 sm:gap-4">
+          <div className="border-b px-4 py-3 sm:border-none sm:px-0 sm:py-0">
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="text-base font-semibold sm:text-lg">Chọn category</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground sm:text-sm">
+                Hiển thị cây category theo loại giao dịch
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="px-4 sm:px-0">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={searchInputRef}
+                placeholder={searchPlaceholder}
+                value={searchTerm}
+                onChange={(event) => handleSearchChange(event.target.value)}
+                className="h-10 rounded-xl border px-9 text-sm"
+                inputMode="search"
+              />
+            </div>
+          </div>
+          <div
+            className="space-y-1 overflow-y-auto px-4 pb-4 pt-1 sm:px-0"
+            style={dialogMaxHeight ? { maxHeight: dialogMaxHeight } : undefined}
           >
-            Clear selection
-          </Button>
-          <Button variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
+            {noMatches ? (
+              <div className="px-3 py-2 text-sm text-muted-foreground">No categories match your search.</div>
+            ) : (
+              renderNodes(displayRoots)
+            )}
+          </div>
+          <DialogFooter className="flex flex-row gap-3 border-t px-4 py-3 sm:border-none sm:px-0 sm:py-0">
+            <div className="flex flex-1 flex-row gap-3 sm:flex-initial">
+              <Button
+                variant="outline"
+                onClick={() => handleSelectAndClose(null)}
+                className="flex-1"
+              >
+                Clear selection
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  searchInputRef.current?.blur();
+                  onClose();
+                }}
+                className="flex-1"
+              >
+                Close
+              </Button>
+            </div>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -323,6 +323,34 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
   };
 
+  const numericInputPattern = /^-?\d*(\.\d*)?$/;
+
+  const formatNumericValue = (value: string) => {
+    if (!value || value === "-" || value === "." || value === "-." || value === "+") return value;
+    const sign = value.startsWith("-") ? "-" : "";
+    const unsigned = sign ? value.slice(1) : value;
+    const hasDecimal = unsigned.includes(".");
+    const [integerPart = "", decimalPart] = unsigned.split(".");
+    const formattedInteger = integerPart
+      ? integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+      : hasDecimal
+      ? "0"
+      : "";
+    const decimalSuffix = hasDecimal ? `.${decimalPart ?? ""}` : "";
+    return `${sign}${formattedInteger}${decimalSuffix}`;
+  };
+
+  const formatInputDisplay = (value: string, fallback?: string) => {
+    const cleaned = value.replace(/,/g, "");
+    if (!cleaned) return "";
+    if (!numericInputPattern.test(cleaned)) {
+      return fallback ?? value;
+    }
+    return formatNumericValue(cleaned);
+  };
+
+  const formatNumberForInput = (value: number) => formatNumericValue(String(value));
+
   const suggestedAmounts = useMemo(() => {
     const seen = new Set<number>();
     const sorted: Array<{ label: string; value: number | null }> = recentAmounts
@@ -513,13 +541,19 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                         value={amountInput}
                         onChange={(e) => {
                           const raw = e.target.value;
-                          setAmountInput(raw);
-                          const normalized = normalizeAmount(applyThousandShortcuts(raw));
+                          const cleaned = raw.replace(/,/g, "");
+                          const normalized = normalizeAmount(applyThousandShortcuts(cleaned));
                           field.onChange(normalized);
+                          if (!cleaned) {
+                            setAmountInput("");
+                            return;
+                          }
+                          setAmountInput(formatInputDisplay(cleaned, raw));
                         }}
                         onBlur={(e) => {
-                          const normalized = normalizeAmount(applyThousandShortcuts(e.target.value));
-                          setAmountInput(normalized !== undefined ? String(normalized) : "");
+                          const cleaned = e.target.value.replace(/,/g, "");
+                          const normalized = normalizeAmount(applyThousandShortcuts(cleaned));
+                          setAmountInput(normalized !== undefined ? formatNumberForInput(normalized) : "");
                           field.onChange(normalized);
                         }}
                         placeholder="e.g. 120000"
@@ -565,13 +599,14 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                             className="rounded-full px-3 text-xs"
                             onClick={() => {
                               if (item.value === null) {
-                                const appended = `${(amountInput || "0").replace(/\D/g, "")}000`;
-                                setAmountInput(appended);
+                                const numericInput = amountInput.replace(/,/g, "");
+                                const appended = `${(numericInput || "0").replace(/\D/g, "")}000`;
+                                setAmountInput(formatInputDisplay(appended, appended));
                                 const normalized = normalizeAmount(appended);
                                 field.onChange(normalized);
                                 return;
                               }
-                              setAmountInput(String(item.value));
+                              setAmountInput(formatNumberForInput(item.value));
                               field.onChange(item.value);
                             }}
                           >
