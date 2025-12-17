@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronDown, Search } from "lucide-react";
 import {
   categorySchema,
   categoryTypes,
@@ -58,6 +59,10 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [preferredCategoryMeta, setPreferredCategoryMeta] = useState<CategoryMeta>(initialCategoryMeta);
+  const [parentSearch, setParentSearch] = useState("");
+  const [parentPickerOpen, setParentPickerOpen] = useState(false);
+  const parentPickerTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const parentPickerPanelRef = useRef<HTMLDivElement | null>(null);
 
   const form = useForm<CategoryInput>({
     resolver: zodResolver(categorySchema),
@@ -77,6 +82,38 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     if (selectedType === "transfer") return [];
     return categories.filter((c) => c.type === selectedType && c.level <= 1);
   }, [categories, selectedType]);
+  const parentChildrenMap = useMemo(() => {
+    const map = new Map<string | null, Category[]>();
+    const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+    parentChoices.forEach((category) => {
+      const key = category.parent_id ?? null;
+      const list = map.get(key);
+      if (list) {
+        list.push(category);
+      } else {
+        map.set(key, [category]);
+      }
+    });
+    map.forEach((list) => list.sort((a, b) => collator.compare(a.name, b.name)));
+    return map;
+  }, [parentChoices]);
+  const visibleParentIds = useMemo(() => {
+    const query = parentSearch.trim().toLowerCase();
+    if (!query) return null;
+    const matches = new Set<string>();
+    const visit = (node: Category): boolean => {
+      const children = parentChildrenMap.get(node.id) ?? [];
+      const childMatch = children.some((child) => visit(child));
+      const selfMatch = node.name.toLowerCase().includes(query);
+      if (selfMatch || childMatch) {
+        matches.add(node.id);
+        return true;
+      }
+      return false;
+    };
+    (parentChildrenMap.get(null) ?? []).forEach((root) => visit(root));
+    return matches;
+  }, [parentChildrenMap, parentSearch]);
 
   const categoryLookup = useMemo(() => {
     const map = new Map<string, Category>();
@@ -177,8 +214,38 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       if (form.getValues("level") !== 0) {
         form.setValue("level", 0);
       }
+      if (parentPickerOpen) {
+        setParentPickerOpen(false);
+      }
     }
-  }, [selectedType, form]);
+  }, [selectedType, form, parentPickerOpen]);
+  useEffect(() => {
+    setParentSearch("");
+    setParentPickerOpen(false);
+  }, [selectedType, modalOpen]);
+  useEffect(() => {
+    if (!parentPickerOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setParentPickerOpen(false);
+      }
+    };
+    const handleClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (parentPickerTriggerRef.current?.contains(target)) return;
+      if (parentPickerPanelRef.current?.contains(target)) return;
+      setParentPickerOpen(false);
+    };
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("touchstart", handleClick);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("touchstart", handleClick);
+    };
+  }, [parentPickerOpen]);
 
   const resetForm = (meta?: CategoryMeta) => {
     const target = meta ?? preferredCategoryMeta;
@@ -503,6 +570,43 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                 name="parent_id"
                 render={({ field }) => {
                   const isTransfer = selectedType === "transfer";
+                  const hasParentOptions = parentChoices.length > 0;
+                  const hasSearchMatches = visibleParentIds
+                    ? parentChoices.some((choice) => visibleParentIds.has(choice.id))
+                    : hasParentOptions;
+                  const renderParentTree = (targetParentId: string | null, depth = 0): JSX.Element[] => {
+                    const children = parentChildrenMap.get(targetParentId) ?? [];
+                    return children
+                      .map((child) => {
+                        if (visibleParentIds && !visibleParentIds.has(child.id)) {
+                          return null;
+                        }
+                        const isActive = field.value === child.id;
+                        const padding = depth === 0 ? "" : depth === 1 ? "pl-4" : "pl-6";
+                        return (
+                          <div key={child.id} className={`space-y-1 ${padding}`}>
+                            <button
+                              type="button"
+                              className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition ${
+                                isActive
+                                  ? "border-foreground bg-foreground text-white"
+                                  : "border border-gray-200 bg-white text-foreground hover:border-primary/60"
+                              }`}
+                              onClick={() => {
+                                field.onChange(child.id);
+                                setParentPickerOpen(false);
+                              }}
+                            >
+                              <span className="truncate font-medium">{child.name}</span>
+                              <span className="text-xs text-muted-foreground">Level {child.level}</span>
+                            </button>
+                            {renderParentTree(child.id, depth + 1)}
+                          </div>
+                        );
+                      })
+                      .filter(Boolean);
+                  };
+                  const parentLabel = field.value ? categoryLookup.get(field.value)?.name ?? "Unknown parent" : "No parent (root)";
                   return (
                     <FormItem>
                       <FormLabel>Parent</FormLabel>
@@ -511,19 +615,72 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                           Transfer categories must stay at level 0 and cannot have parents.
                         </div>
                       ) : (
-                      <Select value={field.value ?? "__root__"} onValueChange={(v) => field.onChange(v === "__root__" ? null : v)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select parent (optional)" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-[280px] overflow-y-auto">
-                            <SelectItem value="__root__">No parent (root)</SelectItem>
-                            {parentChoices.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name} (level {p.level})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <button
+                              ref={parentPickerTriggerRef}
+                              type="button"
+                              className="flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2 text-left text-sm transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              onClick={() => setParentPickerOpen((prev) => !prev)}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                  {hasParentOptions ? "Choose parent" : "No parent options"}
+                                </p>
+                                <p className="truncate font-medium text-foreground">{parentLabel}</p>
+                              </div>
+                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition ${parentPickerOpen ? "rotate-180" : ""}`} />
+                            </button>
+                            {parentPickerOpen ? (
+                              <>
+                                <div className="fixed inset-0 z-40" aria-hidden onClick={() => setParentPickerOpen(false)} />
+                                <div
+                                  ref={parentPickerPanelRef}
+                                  className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-full rounded-2xl border bg-white p-4 text-sm shadow-2xl sm:w-[min(380px,calc(100vw-2rem))]"
+                                >
+                                  <div className="space-y-3">
+                                    <div className="relative">
+                                      <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                      <Input
+                                        value={parentSearch}
+                                        onChange={(event) => setParentSearch(event.target.value)}
+                                        placeholder="Search parent..."
+                                        className="h-9 pl-8 text-sm"
+                                        autoFocus
+                                      />
+                                    </div>
+                                    <div className="rounded-lg border">
+                                      <button
+                                        type="button"
+                                        className={`flex w-full items-center justify-between rounded-t-lg px-3 py-2 text-left text-sm font-medium transition ${
+                                          field.value === null ? "bg-foreground text-white" : "hover:bg-muted"
+                                        }`}
+                                        onClick={() => {
+                                          field.onChange(null);
+                                          setParentPickerOpen(false);
+                                        }}
+                                      >
+                                        <span>No parent (root)</span>
+                                        {field.value === null ? <span className="text-xs font-semibold">✓</span> : null}
+                                      </button>
+                                      <div className="max-h-64 space-y-1 overflow-y-auto p-2">
+                                        {!hasParentOptions ? (
+                                          <p className="px-2 py-4 text-sm text-muted-foreground">No available parents.</p>
+                                        ) : visibleParentIds && !hasSearchMatches ? (
+                                          <p className="px-2 py-4 text-sm text-muted-foreground">No matches found.</p>
+                                        ) : (
+                                          renderParentTree(null, 0)
+                                        )}
+                                      </div>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">Tap outside or press Esc to close.</p>
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">Parents limited to level 1 for nesting.</p>
+                        </div>
                       )}
                       <FormMessage>{form.formState.errors.parent_id?.message}</FormMessage>
                     </FormItem>
