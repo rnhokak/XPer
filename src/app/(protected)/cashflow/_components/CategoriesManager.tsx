@@ -604,7 +604,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                           </div>
                         );
                       })
-                      .filter(Boolean);
+                      .filter((node): node is JSX.Element => node !== null);
                   };
                   const parentLabel = field.value ? categoryLookup.get(field.value)?.name ?? "Unknown parent" : "No parent (root)";
                   return (
