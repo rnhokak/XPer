@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { debtCreateSchema } from "@/lib/validation/debts";
 import { type Database } from "@/lib/supabase/types";
+import { createCashflowTransaction } from "@/features/cashflow/server/transactions";
+import { type CashflowQuickAddValues } from "@/lib/validation/cashflow";
 
 export const dynamic = "force-dynamic";
 const debtStatuses = ["ongoing", "paid_off", "overdue", "cancelled"] as const;
@@ -146,22 +148,21 @@ export async function POST(req: Request) {
 
   const transactionType: "income" | "expense" = data.direction === "borrow" ? "income" : "expense";
 
-  const transactionPayload: Database["public"]["Tables"]["transactions"]["Insert"] = {
-    user_id: user.id,
-    account_id: data.account_id ?? null,
-    category_id: data.category_id ?? null,
+  const transactionValues: CashflowQuickAddValues = {
     type: transactionType,
     amount: data.principal_amount,
+    account_id: data.account_id ?? null,
+    category_id: data.category_id ?? null,
     currency,
-    note: data.note?.trim() || null,
+    note: data.note ?? undefined,
     transaction_time: parseDateToIso(data.transaction_time ?? data.start_date, now),
   };
 
-  const { data: insertedTx, error: txError } = await supabase
-    .from("transactions")
-    .insert(transactionPayload)
-    .select("id")
-    .single();
+  const { data: insertedTx, error: txError } = await createCashflowTransaction({
+    supabase,
+    userId: user.id,
+    values: transactionValues,
+  });
 
   if (txError || !insertedTx?.id) {
     await supabase.from("debts").delete().eq("id", insertedDebt.id).eq("user_id", user.id);
@@ -176,7 +177,7 @@ export async function POST(req: Request) {
     amount: data.principal_amount,
     principal_amount: data.principal_amount,
     interest_amount: null,
-    payment_date: transactionPayload.transaction_time,
+    payment_date: transactionValues.transaction_time ?? now.toISOString(),
     note: data.note?.trim() || null,
   };
 

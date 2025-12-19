@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cashflowQuickAddSchema } from "@/lib/validation/cashflow";
 import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
+import { createCashflowTransaction, updateCashflowTransaction } from "@/features/cashflow/server/transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -65,37 +66,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  const data = parsed.data;
-  let resolvedCurrency = data.currency?.trim() || null;
-
-  if (!resolvedCurrency && data.account_id) {
-    const { data: account } = await supabase
-      .from("accounts")
-      .select("currency")
-      .eq("user_id", user.id)
-      .eq("id", data.account_id)
-      .maybeSingle();
-    if (account?.currency) {
-      resolvedCurrency = account.currency;
-    }
-  }
-
-  const payload = {
-    user_id: user.id,
-    type: data.type ?? "expense",
-    amount: data.amount,
-    account_id: data.account_id ?? null,
-    category_id: data.category_id ?? null,
-    currency: resolvedCurrency || "USD",
-    note: data.note?.trim() || null,
-    transaction_time: data.transaction_time ? new Date(data.transaction_time).toISOString() : new Date().toISOString(),
-  };
-
-  const { data: inserted, error } = await supabase
-    .from("transactions")
-    .insert(payload)
-    .select("id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)")
-    .single();
+  const { data: inserted, error } = await createCashflowTransaction({
+    supabase,
+    userId: user.id,
+    values: parsed.data,
+  });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -122,36 +97,12 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  const data = parsed.data;
-  let resolvedCurrency = data.currency?.trim() || null;
-
-  if (!resolvedCurrency && data.account_id) {
-    const { data: account } = await supabase
-      .from("accounts")
-      .select("currency")
-      .eq("user_id", user.id)
-      .eq("id", data.account_id)
-      .maybeSingle();
-    if (account?.currency) {
-      resolvedCurrency = account.currency;
-    }
-  }
-
-  const payload = {
-    type: data.type ?? "expense",
-    amount: data.amount,
-    account_id: data.account_id ?? null,
-    category_id: data.category_id ?? null,
-    currency: resolvedCurrency || "USD",
-    note: data.note?.trim() || null,
-    transaction_time: data.transaction_time ? new Date(data.transaction_time).toISOString() : new Date().toISOString(),
-  };
-
-  const { error } = await supabase
-    .from("transactions")
-    .update(payload)
-    .eq("id", id)
-    .eq("user_id", user.id);
+  const { error } = await updateCashflowTransaction({
+    supabase,
+    userId: user.id,
+    transactionId: id,
+    values: parsed.data,
+  });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

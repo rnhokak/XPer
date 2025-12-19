@@ -31,9 +31,9 @@ export interface Database {
           currency?: string;
           is_default?: boolean;
           created_at?: string | null;
-        };
-        Relationships: [
-          {
+      };
+      Relationships: [
+        {
             foreignKeyName: "accounts_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "users";
@@ -521,6 +521,83 @@ export interface Database {
             foreignKeyName: "funding_accounts_balance_account_id_fkey";
             columns: ["balance_account_id"];
             referencedRelation: "balance_accounts";
+          referencedColumns: ["id"];
+        }
+      ];
+      };
+      telegram_link_codes: {
+        Row: {
+          id: string;
+          user_id: string;
+          code: string;
+          expires_at: string;
+          used_at: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          code: string;
+          expires_at?: string;
+          used_at?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          code?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "telegram_link_codes_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      telegram_links: {
+        Row: {
+          id: string;
+          user_id: string;
+          telegram_user_id: number;
+          telegram_chat_id: number;
+          username: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          telegram_user_id: number;
+          telegram_chat_id: number;
+          username?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          telegram_user_id?: number;
+          telegram_chat_id?: number;
+          username?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "telegram_links_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
             referencedColumns: ["id"];
           }
         ];
