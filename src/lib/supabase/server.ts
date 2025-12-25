@@ -16,7 +16,7 @@ export const createClient = async () => {
 
   return createServerClient<Database, "public">(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      get(name) {
+      get(name: string) {
         const store = cookieStore;
         // Some Next runtimes expose only getAll; normalize to string | undefined
         if (typeof (store as any).get === "function") {
@@ -29,7 +29,7 @@ export const createClient = async () => {
         }
         return undefined;
       },
-      set(name, value, options) {
+      set(name: string, value: string, options: any) {
         // Wrap in try/catch because cookies() can be immutable in some RSC contexts
         try {
           const store = cookieStore;
@@ -43,7 +43,7 @@ export const createClient = async () => {
           // noop
         }
       },
-      remove(name, options) {
+      remove(name: string, options: any) {
         try {
           const store = cookieStore;
           if (typeof (store as any).set === "function") {

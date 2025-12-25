@@ -63,6 +63,8 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   const [parentPickerOpen, setParentPickerOpen] = useState(false);
   const parentPickerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const parentPickerPanelRef = useRef<HTMLDivElement | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
 
   const form = useForm<CategoryInput>({
     resolver: zodResolver(categorySchema),
@@ -168,14 +170,14 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       .join(" ");
 
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => startEdit(category)}
-        onKeyDown={(event) => event.key === "Enter" && startEdit(category)}
-        className={entryClasses}
-      >
-        <div className="min-w-0">
+      <div className={entryClasses}>
+        <div 
+          role="button"
+          tabIndex={0}
+          onClick={() => startEdit(category)}
+          onKeyDown={(event) => event.key === "Enter" && startEdit(category)}
+          className="flex-1 min-w-0 cursor-pointer"
+        >
           <p className={depth === 0 ? "text-base font-semibold" : "text-sm font-semibold"}>
             {prefix}
             {category.name}
@@ -187,6 +189,22 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
             {parentName ? ` · parent: ${parentName}` : ""}
           </p>
         </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={(e) => {
+            e.stopPropagation();
+            setCategoryToDelete(category);
+            setDeleteDialogOpen(true);
+          }}
+          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"/>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          </svg>
+        </Button>
       </div>
     );
   };
@@ -327,12 +345,13 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     router.refresh();
   };
 
-  const remove = async (id: string) => {
+  const remove = async (id: string, cascade: boolean = false) => {
     setSubmitError(null);
+    
     const res = await fetch("/api/cashflow/categories", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, cascade }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -699,6 +718,64 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            {categoryToDelete && categories.some(cat => cat.parent_id === categoryToDelete.id) ? (
+              <DialogDescription>
+                The category <strong>"{categoryToDelete?.name}"</strong> has subcategories. 
+                Are you sure you want to delete it and all its subcategories? This action cannot be undone.
+              </DialogDescription>
+            ) : (
+              <DialogDescription>
+                Are you sure you want to delete the category <strong>"{categoryToDelete?.name}"</strong>? 
+                This action cannot be undone.
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            {categoryToDelete && categories.some(cat => cat.parent_id === categoryToDelete.id) ? (
+              <Button 
+                type="button" 
+                variant="destructive"
+                onClick={() => {
+                  if (categoryToDelete) {
+                    remove(categoryToDelete.id, true); // cascade delete
+                    setDeleteDialogOpen(false);
+                    setCategoryToDelete(null);
+                  }
+                }}
+              >
+                Delete All
+              </Button>
+            ) : (
+              <Button 
+                type="button" 
+                variant="destructive"
+                onClick={() => {
+                  if (categoryToDelete) {
+                    remove(categoryToDelete.id);
+                    setDeleteDialogOpen(false);
+                    setCategoryToDelete(null);
+                  }
+                }}
+              >
+                Delete
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>

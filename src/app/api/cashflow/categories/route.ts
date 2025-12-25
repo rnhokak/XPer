@@ -144,6 +144,46 @@ export async function DELETE(req: Request) {
   const id = typeof body.id === "string" ? body.id : null;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
+  // Check if there are child categories
+  const { data: childCategories, error: childError } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("parent_id", id)
+    .eq("user_id", user.id);
+
+  if (childError) return NextResponse.json({ error: childError.message }, { status: 500 });
+
+  if (childCategories && childCategories.length > 0) {
+    // Check if we're performing a cascading delete
+    const cascade = typeof body.cascade === "boolean" ? body.cascade : false;
+    
+    if (!cascade) {
+      return NextResponse.json({ 
+        error: "Category has subcategories. Please delete all subcategories first or use cascade delete." 
+      }, { status: 400 });
+    }
+
+    // Delete child categories recursively
+    for (const child of childCategories) {
+      await supabase.from("categories").delete().eq("id", child.id).eq("user_id", user.id);
+    }
+  }
+
+  // Check if there are transactions associated with this category
+  const { count: transactionCount, error: countError } = await supabase
+    .from("transactions")
+    .select("*", { count: "exact", head: true })
+    .eq("category_id", id)
+    .eq("user_id", user.id);
+
+  if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
+
+  if (transactionCount && transactionCount > 0) {
+    return NextResponse.json({ 
+      error: `Category has ${transactionCount} associated transactions. Cannot delete category with transactions.` 
+    }, { status: 400 });
+  }
+
   const { error } = await supabase.from("categories").delete().eq("id", id).eq("user_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
