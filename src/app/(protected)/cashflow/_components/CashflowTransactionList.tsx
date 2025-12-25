@@ -24,7 +24,7 @@ import {
   type CashflowQuickAddValues,
   type CashflowTransactionType,
 } from "@/lib/validation/cashflow";
-import { type CategoryFocus, type CategoryGroup } from "@/lib/validation/categories";
+import { type CategoryFocus } from "@/lib/validation/categories";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { useViewportUnit } from "@/hooks/useViewportUnit";
@@ -36,7 +36,6 @@ type Category = {
   name: string;
   type: "income" | "expense" | "transfer";
   parent_id: string | null;
-  category_group: CategoryGroup | null;
   category_focus: CategoryFocus | null;
 };
 type Account = { id: string; name: string; currency: string; type?: string | null };

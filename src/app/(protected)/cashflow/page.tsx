@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
 import { CashflowExpenseChart } from "./_components/CashflowExpenseChart";
 import { type CashflowTransactionType } from "@/lib/validation/cashflow";
-import { type CategoryGroup, type CategoryFocus } from "@/lib/validation/categories";
+import { type CategoryFocus } from "@/lib/validation/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,6 @@ type Category = {
   type: "income" | "expense" | "transfer";
   parent_id: string | null;
   is_default?: boolean | null;
-  category_group: CategoryGroup | null;
   category_focus: CategoryFocus | null;
 };
 type Transaction = {
@@ -61,7 +60,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
     supabase.from("accounts").select("id,name,type,currency,is_default").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }),
     supabase
       .from("categories")
-      .select("id,name,type,parent_id,is_default,category_group,category_focus")
+      .select("id,name,type,parent_id,is_default,category_focus")
       .eq("user_id", user.id)
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false }),

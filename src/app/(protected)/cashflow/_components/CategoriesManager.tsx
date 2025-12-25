@@ -13,12 +13,9 @@ import { ChevronDown, Search } from "lucide-react";
 import {
   categorySchema,
   categoryTypes,
-  categoryGroups,
-  categoryGroupLabels,
   categoryFocuses,
   categoryFocusLabels,
   type CategoryInput,
-  type CategoryGroup,
   type CategoryFocus,
 } from "@/lib/validation/categories";
 
@@ -28,16 +25,13 @@ type Category = {
   type: "income" | "expense" | "transfer";
   parent_id: string | null;
   level: 0 | 1 | 2;
-  category_group: CategoryGroup | null;
   category_focus: CategoryFocus | null;
 };
 
-const EMPTY_GROUP = "__none__";
 const EMPTY_FOCUS = "__none_focus__";
 
 type CategoryMeta = {
   type: CategoryInput["type"];
-  category_group: CategoryGroup | null;
   category_focus: CategoryFocus | null;
 };
 
@@ -49,8 +43,7 @@ const categoryTypeLabels: Record<CategoryInput["type"], string> = {
 
 const initialCategoryMeta: CategoryMeta = {
   type: "expense",
-  category_group: "sinh_hoat",
-  category_focus: "co_ban",
+  category_focus: "NE",
 };
 
 export function CategoriesManager({ categories }: { categories: Category[] }) {
@@ -73,7 +66,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       type: initialCategoryMeta.type,
       parent_id: null,
       level: 0,
-      category_group: initialCategoryMeta.category_group,
       category_focus: initialCategoryMeta.category_focus,
     },
   });
@@ -184,7 +176,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
           </p>
           <p className="text-xs text-muted-foreground">
             {categoryTypeLabels[category.type]} ·{" "}
-            {category.category_group ? categoryGroupLabels[category.category_group] : "Không phân loại"} ·{" "}
             {category.category_focus ? categoryFocusLabels[category.category_focus] : "Không phân loại"} · level {category.level}
             {parentName ? ` · parent: ${parentName}` : ""}
           </p>
@@ -272,7 +263,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       type: target.type,
       parent_id: null,
       level: 0,
-      category_group: target.category_group,
       category_focus: target.category_focus,
     });
     setEditing(null);
@@ -306,7 +296,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   const openModalForType = (type: Category["type"]) => {
     const meta: CategoryMeta = {
       type,
-      category_group: preferredCategoryMeta.category_group,
       category_focus: preferredCategoryMeta.category_focus,
     };
     resetForm(meta);
@@ -336,7 +325,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     }
     const nextMeta: CategoryMeta = {
       type: values.type,
-      category_group: values.category_group ?? null,
       category_focus: values.category_focus ?? null,
     };
     setPreferredCategoryMeta(nextMeta);
@@ -369,7 +357,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       type: cat.type,
       parent_id: cat.parent_id,
       level: cat.level,
-      category_group: cat.category_group,
       category_focus: cat.category_focus,
     });
     setModalOpen(true);
@@ -387,11 +374,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       if (form.getValues("level") !== 0) {
         form.setValue("level", 0);
       }
-      const preferredGroup = preferredCategoryMeta.category_group ?? null;
       const preferredFocus = preferredCategoryMeta.category_focus ?? null;
-      if (form.getValues("category_group") !== preferredGroup) {
-        form.setValue("category_group", preferredGroup);
-      }
       if (form.getValues("category_focus") !== preferredFocus) {
         form.setValue("category_focus", preferredFocus);
       }
@@ -410,11 +393,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     }
 
     const rootMeta = rootCategory ?? parent;
-    const inheritedGroup = rootMeta?.category_group ?? null;
     const inheritedFocus = rootMeta?.category_focus ?? null;
-    if (form.getValues("category_group") !== inheritedGroup) {
-      form.setValue("category_group", inheritedGroup);
-    }
     if (form.getValues("category_focus") !== inheritedFocus) {
       form.setValue("category_focus", inheritedFocus);
     }
@@ -498,44 +477,13 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="category_group"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Group</FormLabel>
-                      <Select
-                        value={field.value ?? EMPTY_GROUP}
-                        onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_GROUP ? null : v)}
-                        disabled={!metadataEditable}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={EMPTY_GROUP}>Không phân loại</SelectItem>
-                          {categoryGroups.map((value) => (
-                            <SelectItem key={value} value={value}>
-                              {categoryGroupLabels[value]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {!metadataEditable ? (
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                          Inherited from {metadataOriginLabel ?? "parent"}.
-                        </p>
-                      ) : null}
-                      <FormMessage>{form.formState.errors.category_group?.message}</FormMessage>
-                    </FormItem>
-                  )}
-                />
+
                 <FormField
                   control={form.control}
                   name="category_focus"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Định hướng</FormLabel>
+                      <FormLabel>Group</FormLabel>
                       <Select
                         value={field.value ?? EMPTY_FOCUS}
                         onValueChange={(v) => metadataEditable && field.onChange(v === EMPTY_FOCUS ? null : v)}

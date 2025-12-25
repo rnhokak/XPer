@@ -30,7 +30,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("categories")
-    .select("id,name,type,parent_id,level,is_default,category_group,category_focus,created_at")
+    .select("id,name,type,parent_id,level,is_default,category_focus,created_at")
     .eq("user_id", user.id)
     .order("level", { ascending: true })
     .order("created_at", { ascending: false });
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
   }
 
-  const { name, type, parent_id, level, category_group, category_focus } = parsed.data;
+  const { name, type, parent_id, level, category_focus } = parsed.data;
 
   let parentLevel: number | null = null;
   let parentType: string | null = null;
@@ -78,7 +78,6 @@ export async function POST(req: Request) {
     type,
     parent_id: parent_id ?? null,
     level,
-    category_group: category_group ?? null,
     category_focus: category_focus ?? null,
   });
 
@@ -96,7 +95,7 @@ export async function PUT(req: Request) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
 
-  const { name, type, parent_id, level, category_group, category_focus } = parsed.data;
+  const { name, type, parent_id, level, category_focus } = parsed.data;
 
   let parentLevel: number | null = null;
   let parentType: string | null = null;
@@ -126,7 +125,6 @@ export async function PUT(req: Request) {
       type,
       parent_id: parent_id ?? null,
       level,
-      category_group: category_group ?? null,
       category_focus: category_focus ?? null,
     })
     .eq("id", id)

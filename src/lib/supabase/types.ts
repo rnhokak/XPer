@@ -31,9 +31,9 @@ export interface Database {
           currency?: string;
           is_default?: boolean;
           created_at?: string | null;
-      };
-      Relationships: [
-        {
+        };
+        Relationships: [
+          {
             foreignKeyName: "accounts_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "users";
@@ -96,8 +96,7 @@ export interface Database {
           user_id: string;
           name: string;
           type: "income" | "expense" | "transfer";
-          category_group: "sinh_hoat" | "an_uong" | "ca_nhan_giai_tri" | "tai_chinh" | "khac" | null;
-          category_focus: "co_ban" | "phat_trien_ban_than" | "dau_tu" | "con_cai" | "khac_focus" | null;
+          category_focus:"NE" | "SE" | "INV" | "EDU" | "ENJ" | "KHAC";
           is_default: boolean;
           parent_id: string | null;
           level: number;
@@ -108,8 +107,7 @@ export interface Database {
           user_id: string;
           name: string;
           type: "income" | "expense" | "transfer";
-          category_group?: "sinh_hoat" | "an_uong" | "ca_nhan_giai_tri" | "tai_chinh" | "khac" | null;
-          category_focus?: "co_ban" | "phat_trien_ban_than" | "dau_tu" | "con_cai" | "khac_focus" | null;
+          category_focus?: "NE" | "SE" | "INV" | "EDU" | "ENJ" | "khac";
           is_default?: boolean;
           parent_id?: string | null;
           level?: number;
@@ -120,8 +118,7 @@ export interface Database {
           user_id?: string;
           name?: string;
           type?: "income" | "expense" | "transfer";
-          category_group?: "sinh_hoat" | "an_uong" | "ca_nhan_giai_tri" | "tai_chinh" | "khac" | null;
-          category_focus?: "co_ban" | "phat_trien_ban_than" | "dau_tu" | "con_cai" | "khac_focus" | null;
+          category_focus?: "NE" | "SE" | "INV" | "EDU" | "ENJ" | "KHAC";
           is_default?: boolean;
           parent_id?: string | null;
           level?: number;
@@ -521,9 +518,9 @@ export interface Database {
             foreignKeyName: "funding_accounts_balance_account_id_fkey";
             columns: ["balance_account_id"];
             referencedRelation: "balance_accounts";
-          referencedColumns: ["id"];
-        }
-      ];
+            referencedColumns: ["id"];
+          }
+        ];
       };
       telegram_link_codes: {
         Row: {
@@ -607,16 +604,16 @@ export interface Database {
           id: string;
           balance_account_id: string;
           source_type:
-            | "DEPOSIT"
-            | "WITHDRAW"
-            | "TRANSFER_IN"
-            | "TRANSFER_OUT"
-            | "TRADE_PNL"
-            | "COMMISSION"
-            | "SWAP"
-            | "BONUS"
-            | "BONUS_REMOVAL"
-            | "ADJUSTMENT";
+          | "DEPOSIT"
+          | "WITHDRAW"
+          | "TRANSFER_IN"
+          | "TRANSFER_OUT"
+          | "TRADE_PNL"
+          | "COMMISSION"
+          | "SWAP"
+          | "BONUS"
+          | "BONUS_REMOVAL"
+          | "ADJUSTMENT";
           source_ref_id: string | null;
           amount: number;
           balance_after: number;
@@ -629,16 +626,16 @@ export interface Database {
           id?: string;
           balance_account_id: string;
           source_type:
-            | "DEPOSIT"
-            | "WITHDRAW"
-            | "TRANSFER_IN"
-            | "TRANSFER_OUT"
-            | "TRADE_PNL"
-            | "COMMISSION"
-            | "SWAP"
-            | "BONUS"
-            | "BONUS_REMOVAL"
-            | "ADJUSTMENT";
+          | "DEPOSIT"
+          | "WITHDRAW"
+          | "TRANSFER_IN"
+          | "TRANSFER_OUT"
+          | "TRADE_PNL"
+          | "COMMISSION"
+          | "SWAP"
+          | "BONUS"
+          | "BONUS_REMOVAL"
+          | "ADJUSTMENT";
           source_ref_id?: string | null;
           amount: number;
           balance_after: number;
@@ -651,16 +648,16 @@ export interface Database {
           id?: string;
           balance_account_id?: string;
           source_type?:
-            | "DEPOSIT"
-            | "WITHDRAW"
-            | "TRANSFER_IN"
-            | "TRANSFER_OUT"
-            | "TRADE_PNL"
-            | "COMMISSION"
-            | "SWAP"
-            | "BONUS"
-            | "BONUS_REMOVAL"
-            | "ADJUSTMENT";
+          | "DEPOSIT"
+          | "WITHDRAW"
+          | "TRANSFER_IN"
+          | "TRANSFER_OUT"
+          | "TRADE_PNL"
+          | "COMMISSION"
+          | "SWAP"
+          | "BONUS"
+          | "BONUS_REMOVAL"
+          | "ADJUSTMENT";
           source_ref_id?: string | null;
           amount?: number;
           balance_after?: number;
