@@ -72,14 +72,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Child category must match parent type" }, { status: 400 });
   }
 
-  const { error } = await supabase.from("categories").insert({
+  const insertData: any = {
     user_id: user.id,
     name: name.trim(),
     type,
     parent_id: parent_id ?? null,
     level,
-    category_focus: category_focus ?? null,
-  });
+  };
+  if (category_focus !== undefined) {
+    insertData.category_focus = category_focus;
+  }
+  
+  const { error } = await supabase.from("categories").insert(insertData);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
@@ -118,15 +122,19 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Child category must match parent type" }, { status: 400 });
   }
 
+  const updateData: any = {
+    name: name.trim(),
+    type,
+    parent_id: parent_id ?? null,
+    level,
+  };
+  if (category_focus !== undefined) {
+    updateData.category_focus = category_focus;
+  }
+  
   const { error } = await supabase
     .from("categories")
-    .update({
-      name: name.trim(),
-      type,
-      parent_id: parent_id ?? null,
-      level,
-      category_focus: category_focus ?? null,
-    })
+    .update(updateData)
     .eq("id", id)
     .eq("user_id", user.id);
 

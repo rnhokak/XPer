@@ -1,6 +1,9 @@
 -- Adjust trading summary to report USD net PnL that includes commissions and swaps.
 create extension if not exists "pgcrypto";
 
+-- Drop the existing function to allow changing the return type
+drop function if exists public.report_trading_summary(uuid, timestamptz);
+
 create or replace function public.report_trading_summary(p_user_id uuid, p_start_time timestamptz)
 returns table (
   pnl_total numeric,

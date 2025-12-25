@@ -96,7 +96,7 @@ export interface Database {
           user_id: string;
           name: string;
           type: "income" | "expense" | "transfer";
-          category_focus:"NE" | "SE" | "INV" | "EDU" | "ENJ" | "KHAC";
+          category_focus: "NE" | "SE" | "INV" | "EDU" | "ENJ" | "KHAC" | null;
           is_default: boolean;
           parent_id: string | null;
           level: number;
@@ -107,7 +107,7 @@ export interface Database {
           user_id: string;
           name: string;
           type: "income" | "expense" | "transfer";
-          category_focus?: "NE" | "SE" | "INV" | "EDU" | "ENJ" | "khac";
+          category_focus?: "NE" | "SE" | "INV" | "EDU" | "ENJ" | "KHAC";
           is_default?: boolean;
           parent_id?: string | null;
           level?: number;
