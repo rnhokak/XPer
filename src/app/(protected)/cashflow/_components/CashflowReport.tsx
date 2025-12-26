@@ -1,10 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useCashflowTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
+import { useCashflowReportTransactions, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { TrendingDown, TrendingUp, Minus, Calendar, CalendarDays, CalendarRange } from "lucide-react";
-
-type Transaction = CashflowTransaction;
 
 const formatNumber = (value: number) => {
   if (value === 0) return "0";
@@ -52,7 +50,7 @@ const previousMonthStart = (d: Date) => {
 type PeriodKey = "day" | "week" | "month";
 type PeriodSummaryWithPrevious = { expense: number; previousExpense: number }; // Track expenses and previous period expenses
 
-const summarizePeriodsWithComparison = (transactions: Transaction[]): Record<PeriodKey, PeriodSummaryWithPrevious> => {
+const summarizePeriodsWithComparison = (transactions: CashflowTransaction[]): Record<PeriodKey, PeriodSummaryWithPrevious> => {
   const now = new Date();
   
   // Current periods
@@ -134,9 +132,8 @@ const getDifference = (current: number, previous: number) => {
   return { diff, percentage, trend: "stable" };
 };
 
-export function CashflowReport({ transactions, range}: { transactions: Transaction[]; range: string; }) {
-  const { data: queryTransactions = transactions } = useCashflowTransactions(range, transactions);
-  const resolvedTransactions = queryTransactions ?? [];
+export function CashflowReport() {
+  const { data: resolvedTransactions = [] } = useCashflowReportTransactions();
   const summaries = useMemo(() => summarizePeriodsWithComparison(resolvedTransactions), [resolvedTransactions]);
 
   const periodMeta: Record<PeriodKey, { label: string; icon: JSX.Element }> = {

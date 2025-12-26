@@ -18,7 +18,7 @@ import {
   type CashflowTransactionType,
 } from "@/lib/validation/cashflow";
 import { useQueryClient } from "@tanstack/react-query";
-import { cashflowTransactionsQueryKey, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
+import { cashflowReportTransactionsQueryKey, cashflowTransactionsQueryKey, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
 import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
 import { type CategoryFocus } from "@/lib/validation/categories";
 import { useNotificationsStore } from "@/store/notifications";
@@ -259,8 +259,13 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
         const next = [response, ...existing];
         return next.slice(0, 50);
       });
+      queryClient.setQueryData<CashflowTransaction[]>(cashflowReportTransactionsQueryKey, (prev) => {
+        const existing = (prev ?? []).filter((tx) => tx.id !== response.id);
+        return [response, ...existing];
+      });
     }
     queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
+    queryClient.invalidateQueries({ queryKey: cashflowReportTransactionsQueryKey });
 
     form.reset({
       type: values.type,

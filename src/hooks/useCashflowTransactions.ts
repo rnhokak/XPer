@@ -16,6 +16,7 @@ export type CashflowTransaction = {
 };
 
 export const cashflowTransactionsQueryKey = (range: string) => ["cashflow-transactions", normalizeCashflowRange(range)];
+export const cashflowReportTransactionsQueryKey = ["cashflow-report-transactions"];
 
 export function useCashflowTransactions(range: string, initialData: CashflowTransaction[] = []) {
   const normalizedRange = normalizeCashflowRange(range);
@@ -31,6 +32,25 @@ export function useCashflowTransactions(range: string, initialData: CashflowTran
       const json = await res.json().catch(() => null);
       if (!res.ok || !Array.isArray(json)) {
         const message = (json as { error?: string } | null)?.error ?? "Failed to load transactions";
+        throw new Error(message);
+      }
+      return json as CashflowTransaction[];
+    },
+    initialData,
+    staleTime: 30_000,
+    gcTime: 60 * 1000 * 5,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCashflowReportTransactions(initialData: CashflowTransaction[] = []) {
+  return useQuery({
+    queryKey: cashflowReportTransactionsQueryKey,
+    queryFn: async () => {
+      const res = await fetch("/api/cashflow/report-transactions", { method: "GET", cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(json)) {
+        const message = (json as { error?: string } | null)?.error ?? "Failed to load report transactions";
         throw new Error(message);
       }
       return json as CashflowTransaction[];

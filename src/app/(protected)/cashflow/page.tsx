@@ -41,6 +41,8 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
 
   const range = normalizeCashflowRange((await searchParams)?.range);
   const start = rangeStart(range === "all" ? null : range);
+  const transactionSelect =
+    "id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)";
 
   // Fetch profile with privacy setting (handle both cases: with and without the column)
   let hideMoneyAmounts = false;
@@ -67,14 +69,14 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
     (start
       ? supabase
           .from("transactions")
-          .select("id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)")
+          .select(transactionSelect)
           .eq("user_id", user.id)
           .gte("transaction_time", start.toISOString())
           .order("transaction_time", { ascending: false })
           .limit(50)
       : supabase
           .from("transactions")
-          .select("id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)")
+          .select(transactionSelect)
           .eq("user_id", user.id)
           .order("transaction_time", { ascending: false })
           .limit(50))
@@ -104,7 +106,7 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
           <CardTitle>Báo cáo nhanh</CardTitle>
         </CardHeader>
         <CardContent>
-          <CashflowReport transactions={transactions} range={range} />
+          <CashflowReport />
         </CardContent>
       </Card>
       
