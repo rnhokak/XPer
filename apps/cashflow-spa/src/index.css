@@ -1,0 +1,50 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 25% 98%;
+  --foreground: 222 35% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 35% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 35% 12%;
+  --primary: 154 64% 34%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 26% 92%;
+  --secondary-foreground: 222 25% 20%;
+  --muted: 210 28% 94%;
+  --muted-foreground: 215 12% 45%;
+  --accent: 162 52% 90%;
+  --accent-foreground: 222 35% 12%;
+  --destructive: 0 72% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 22% 85%;
+  --input: 214 22% 85%;
+  --ring: 154 64% 34%;
+  --radius: 16px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+body {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  background: radial-gradient(circle at top, rgba(74, 222, 128, 0.15), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+}
