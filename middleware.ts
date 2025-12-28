@@ -2,9 +2,9 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, X-Client-Info, apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Accept",
+  "Access-Control-Allow-Credentials": "true",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -13,14 +13,27 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  const origin = req.headers.get("origin");
+  const allowOrigin = origin ?? "*";
+  console.log("[middleware][api]", {
+    method: req.method,
+    path: req.nextUrl.pathname,
+    origin,
+  });
+
+  console.log(`CORS Middleware: Allowing origin ${allowOrigin} for ${req.nextUrl.pathname}`);
+  console.log("Request Headers:", Object.fromEntries(req.headers.entries()));
   if (req.method === "OPTIONS") {
-    return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+    const headers = new Headers(CORS_HEADERS);
+    headers.set("Access-Control-Allow-Origin", allowOrigin);
+    headers.set("Vary", "Origin");
+    return new NextResponse(null, { status: 204, headers });
   }
 
   const response = NextResponse.next();
-  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
+  response.headers.set("Access-Control-Allow-Origin", allowOrigin);
+  response.headers.set("Vary", "Origin");
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => response.headers.set(key, value));
   return response;
 }
 
