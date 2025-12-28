@@ -4,11 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3005",
-    "cashflow:dev": "npm --prefix apps/cashflow-spa run dev",
-    "cashflow:build": "npm --prefix apps/cashflow-spa run build",
-    "prebuild": "npm run cashflow:build",
+    "cashflow:dev": "npm run dev",
+    "cashflow:build": "npm run build",
     "build": "next build",
-    "postbuild": "node scripts/copy-cashflow-spa.mjs",
     "start": "next start",
     "lint": "next lint"
   },
