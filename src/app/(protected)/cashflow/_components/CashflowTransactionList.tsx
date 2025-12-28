@@ -112,15 +112,17 @@ export function CashflowTransactionList({
   categories,
   accounts,
   range,
+  shift,
 }: {
   transactions: Transaction[];
   categories: Category[];
   accounts: Account[];
   range: string;
+  shift: number;
 }) {
   const queryClient = useQueryClient();
-  const { data: transactions = initialTransactions, isFetching } = useCashflowTransactions(range, initialTransactions);
-  const queryKey = cashflowTransactionsQueryKey(range);
+  const { data: transactions = initialTransactions, isFetching } = useCashflowTransactions(range, shift, initialTransactions);
+  const queryKey = cashflowTransactionsQueryKey(range, shift);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);

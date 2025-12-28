@@ -62,7 +62,7 @@ export default async function CashflowNewPage() {
             defaultAccountId={defaultAccount?.id}
             defaultCurrency={defaultCurrency}
             useDialog={false}
-            range="all"
+            range="month"
           />
         </CardContent>
       </Card>

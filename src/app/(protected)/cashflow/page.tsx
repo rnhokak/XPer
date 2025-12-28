@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
+import { normalizeCashflowRange, normalizeRangeShift, rangeBounds } from "@/lib/cashflow/utils";
 import { CashflowExpenseChart } from "./_components/CashflowExpenseChart";
 import { type CashflowTransactionType } from "@/lib/validation/cashflow";
 import { type CategoryFocus } from "@/lib/validation/categories";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { range?: string };
+type SearchParams = { range?: string; shift?: string };
 
 type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
 type Category = {
@@ -40,7 +40,8 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
   const supabase = await createClient();
 
   const range = normalizeCashflowRange((await searchParams)?.range);
-  const start = rangeStart(range === "all" ? null : range);
+  const shift = normalizeRangeShift((await searchParams)?.shift);
+  const { start, end } = rangeBounds(range, shift);
   const transactionSelect =
     "id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)";
 
@@ -66,20 +67,13 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
       .eq("user_id", user.id)
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false }),
-    (start
-      ? supabase
-          .from("transactions")
-          .select(transactionSelect)
-          .eq("user_id", user.id)
-          .gte("transaction_time", start.toISOString())
-          .order("transaction_time", { ascending: false })
-          .limit(50)
-      : supabase
-          .from("transactions")
-          .select(transactionSelect)
-          .eq("user_id", user.id)
-          .order("transaction_time", { ascending: false })
-          .limit(50))
+    supabase
+      .from("transactions")
+      .select(transactionSelect)
+      .eq("user_id", user.id)
+      .gte("transaction_time", start.toISOString())
+      .lt("transaction_time", end.toISOString())
+      .order("transaction_time", { ascending: false })
   ]);
 
   const accounts: Account[] = accountsRes.data ?? [];
@@ -114,12 +108,12 @@ export default async function CashflowPage({ searchParams }: { searchParams: Sea
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Transactions</CardTitle>
-            <p className="text-sm text-muted-foreground">Latest activity (limit 50)</p>
+            <p className="text-sm text-muted-foreground">Latest activity</p>
           </div>
           <CashflowRangeFilter value={range} />
         </CardHeader>
         <CardContent>
-          <CashflowTransactionList transactions={transactions} categories={categories} accounts={accounts} range={range} />
+          <CashflowTransactionList transactions={transactions} categories={categories} accounts={accounts} range={range} shift={shift} />
         </CardContent>
       </Card>
     </div>

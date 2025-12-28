@@ -19,7 +19,7 @@ import {
 } from "@/lib/validation/cashflow";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowReportTransactionsQueryKey, cashflowTransactionsQueryKey, type CashflowTransaction } from "@/hooks/useCashflowTransactions";
-import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
+import { normalizeCashflowRange, rangeBounds } from "@/lib/cashflow/utils";
 import { type CategoryFocus } from "@/lib/validation/categories";
 import { useNotificationsStore } from "@/store/notifications";
 import { CategoryTreeModal } from "./CategoryTreeModal";
@@ -251,13 +251,12 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     const response = responseBody as CashflowTransaction;
 
     const normalizedRange = normalizeCashflowRange(range);
-    const startFilter = rangeStart(normalizedRange === "all" ? null : normalizedRange);
+    const { start, end } = rangeBounds(normalizedRange, 0);
     const transactionDate = new Date(response.transaction_time);
-    if (!Number.isNaN(transactionDate.getTime()) && (!startFilter || transactionDate >= startFilter)) {
-      queryClient.setQueryData<CashflowTransaction[]>(cashflowTransactionsQueryKey(range), (prev) => {
+    if (!Number.isNaN(transactionDate.getTime()) && transactionDate >= start && transactionDate < end) {
+      queryClient.setQueryData<CashflowTransaction[]>(cashflowTransactionsQueryKey(range, 0), (prev) => {
         const existing = (prev ?? []).filter((tx) => tx.id !== response.id);
-        const next = [response, ...existing];
-        return next.slice(0, 50);
+        return [response, ...existing];
       });
       queryClient.setQueryData<CashflowTransaction[]>(cashflowReportTransactionsQueryKey, (prev) => {
         const existing = (prev ?? []).filter((tx) => tx.id !== response.id);

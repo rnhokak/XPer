@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { normalizeCashflowRange } from "@/lib/cashflow/utils";
+import { normalizeCashflowRange, normalizeRangeShift } from "@/lib/cashflow/utils";
 import { type CashflowTransactionType } from "@/lib/validation/cashflow";
 
 export type CashflowTransaction = {
@@ -15,18 +15,22 @@ export type CashflowTransaction = {
   account?: { id?: string | null; name?: string | null; currency?: string | null } | null;
 };
 
-export const cashflowTransactionsQueryKey = (range: string) => ["cashflow-transactions", normalizeCashflowRange(range)];
+export const cashflowTransactionsQueryKey = (range: string, shift = 0) => [
+  "cashflow-transactions",
+  normalizeCashflowRange(range),
+  normalizeRangeShift(String(shift)),
+];
 export const cashflowReportTransactionsQueryKey = ["cashflow-report-transactions"];
 
-export function useCashflowTransactions(range: string, initialData: CashflowTransaction[] = []) {
+export function useCashflowTransactions(range: string, shift = 0, initialData: CashflowTransaction[] = []) {
   const normalizedRange = normalizeCashflowRange(range);
+  const normalizedShift = normalizeRangeShift(String(shift));
   return useQuery({
-    queryKey: cashflowTransactionsQueryKey(range),
+    queryKey: cashflowTransactionsQueryKey(range, shift),
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (normalizedRange !== "all") {
-        params.set("range", normalizedRange);
-      }
+      params.set("range", normalizedRange);
+      if (normalizedShift !== 0) params.set("shift", String(normalizedShift));
       const url = params.size ? `/api/cashflow/transactions?${params}` : "/api/cashflow/transactions";
       const res = await fetch(url, { method: "GET", cache: "no-store" });
       const json = await res.json().catch(() => null);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cashflowQuickAddSchema } from "@/lib/validation/cashflow";
-import { normalizeCashflowRange, rangeStart } from "@/lib/cashflow/utils";
+import { normalizeCashflowRange, normalizeRangeShift, rangeBounds } from "@/lib/cashflow/utils";
 import { createCashflowTransaction, updateCashflowTransaction } from "@/features/cashflow/server/transactions";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,8 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const range = normalizeCashflowRange(searchParams.get("range"));
-  const start = rangeStart(range === "all" ? null : range);
+  const shift = normalizeRangeShift(searchParams.get("shift"));
+  const { start, end } = rangeBounds(range, shift);
 
   let query = supabase
     .from("transactions")
@@ -37,11 +38,8 @@ export async function GET(req: Request) {
     )
     .eq("user_id", user.id)
     .order("transaction_time", { ascending: false })
-    .limit(50);
-
-  if (start) {
-    query = query.gte("transaction_time", start.toISOString());
-  }
+    .gte("transaction_time", start.toISOString())
+    .lt("transaction_time", end.toISOString());
 
   const { data, error } = await query;
 
