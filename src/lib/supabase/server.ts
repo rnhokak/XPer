@@ -32,9 +32,14 @@ export const createClient = async () => {
       set(name: string, value: string, options: any) {
         // Wrap in try/catch because cookies() can be immutable in some RSC contexts
         try {
+          const cookieOptions = {
+            ...options,
+            sameSite: "none",
+            secure: true,
+          };
           const store = cookieStore;
           if (typeof (store as any).set === "function") {
-            (store as any).set(name, value, options);
+            (store as any).set(name, value, cookieOptions);
           } else if (typeof (store as any).append === "function") {
             // Fallback: some implementations expose append
             (store as any).append(name, value);
@@ -45,9 +50,14 @@ export const createClient = async () => {
       },
       remove(name: string, options: any) {
         try {
+          const cookieOptions = {
+            ...options,
+            sameSite: "none",
+            secure: true,
+          };
           const store = cookieStore;
           if (typeof (store as any).set === "function") {
-            (store as any).set(name, "", { ...options, maxAge: 0 });
+            (store as any).set(name, "", { ...cookieOptions, maxAge: 0 });
           }
         } catch {
           // noop
