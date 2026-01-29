@@ -15,6 +15,10 @@ export const createClient = async () => {
   const cookieStore = await cookies();
 
   return createServerClient<Database, "public">(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: {
+      sameSite: "none",
+      secure: true,
+    },
     cookies: {
       get(name: string) {
         const store = cookieStore;
