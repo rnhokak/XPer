@@ -39,6 +39,14 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    href: "/reports",
+    label: "Reports",
+    icon: BarChart3,
+    children: [
+      { href: "/reports", label: "Transaction by Category" },
+    ],
+  },
+  {
     href: "/debts",
     label: "Debts",
     icon: HandCoins,
