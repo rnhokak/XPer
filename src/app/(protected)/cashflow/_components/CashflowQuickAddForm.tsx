@@ -75,6 +75,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const [autoThousand, setAutoThousand] = useState(defaultCurrency === "VND");
   const [recentAmounts, setRecentAmounts] = useState<Array<{ amount: number; ts: number }>>([]);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [lastTransactionTime, setLastTransactionTime] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [smartSuggestions, setSmartSuggestions] = useState<Array<{ category: Category; reason?: string }>>([]);
@@ -87,7 +88,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       account_id: defaultAccountId ?? null,
       category_id: null,
       note: "",
-      transaction_time: defaultDateTimeValue(),
+      transaction_time: lastTransactionTime ? lastTransactionTime : defaultDateTimeValue(), // Use last transaction time if available
       currency: defaultCurrency,
     },
   });
@@ -266,13 +267,20 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
     queryClient.invalidateQueries({ queryKey: cashflowReportTransactionsQueryKey });
 
+    // Extract only the date part from the submitted transaction time to persist for the next entry
+    const submittedDate = new Date(values.transaction_time);
+    const dateOnlyString = toLocalInput(new Date(submittedDate.getFullYear(), submittedDate.getMonth(), submittedDate.getDate()));
+
+    // Store the date-only transaction time to persist for the next entry
+    setLastTransactionTime(dateOnlyString);
+
     form.reset({
       type: values.type,
       amount: undefined,
       account_id: payload.account_id,
       category_id: null,
       note: "",
-      transaction_time: defaultDateTimeValue(),
+      transaction_time: dateOnlyString, // Use the date-only version of the submitted transaction time
       currency: defaultCurrency,
     });
     setAmountInput("");
@@ -289,7 +297,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       setDialogOpen(false);
     }
     persistRecentAmount(values.amount ?? 0, payload.currency ?? defaultCurrency);
-    
+
     notify({
       title: "Success",
       description: "Transaction added successfully!",
@@ -830,13 +838,16 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
               type="button"
               variant="ghost"
               onClick={() => {
+                // Reset the last transaction time to null so the next visit uses current time
+                setLastTransactionTime(null);
+
                 form.reset({
                   type: form.getValues("type"),
                   amount: undefined,
                   account_id: defaultAccountId ?? null,
                   category_id: null,
                   note: "",
-                  transaction_time: defaultDateTimeValue(),
+                  transaction_time: defaultDateTimeValue(), // Reset to current date and time
                   currency: defaultCurrency,
                 });
                 setUserTouchedCategory(false);

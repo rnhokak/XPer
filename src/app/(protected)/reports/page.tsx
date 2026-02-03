@@ -46,12 +46,14 @@ export default async function TransactionByCategoryReportPage({ searchParams }: 
       .from("categories")
       .select("id,name,type,parent_id,is_default,category_focus")
       .eq("user_id", user.id)
+      .eq("type", "expense")  // Only fetch expense categories
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false }),
     supabase
       .from("transactions")
       .select("id,type,amount,currency,note,transaction_time,category_id,account_id")
       .eq("user_id", user.id)
+      .eq("type", "expense")  // Only fetch expense transactions
       .gte("transaction_time", start.toISOString())
       .lt("transaction_time", end.toISOString())
       .order("transaction_time", { ascending: false })
