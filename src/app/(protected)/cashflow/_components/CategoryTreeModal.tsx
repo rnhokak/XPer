@@ -50,7 +50,6 @@ export function CategoryTreeModal({
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      searchInputRef.current?.blur();
       onClose();
     }
   };
@@ -60,7 +59,6 @@ export function CategoryTreeModal({
   };
 
   const handleSelectAndClose = (categoryId: string | null) => {
-    searchInputRef.current?.blur();
     onSelect(categoryId);
     onClose();
   };
@@ -163,7 +161,10 @@ export function CategoryTreeModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={handleDialogOpenChange}
+    >
       <DialogContent className="sm:max-w-2xl gap-0 p-0 sm:p-6">
         <div className="flex h-full flex-col gap-3 sm:gap-4">
           <div className="border-b px-4 py-3 sm:border-none sm:px-0 sm:py-0">
@@ -175,7 +176,7 @@ export function CategoryTreeModal({
             </DialogHeader>
           </div>
           <div className="px-4 sm:px-0">
-            <div className="relative">
+            {/* <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 ref={searchInputRef}
@@ -185,7 +186,7 @@ export function CategoryTreeModal({
                 className="h-10 rounded-xl border px-9 text-sm"
                 inputMode="search"
               />
-            </div>
+            </div> */}
           </div>
           <div
             className="space-y-1 overflow-y-auto px-4 pb-4 pt-1 sm:px-0"
