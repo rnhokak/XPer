@@ -1,7 +1,43 @@
-.next
+# Dependencies
 node_modules
-node_models
+.pnpm-store
+
+# Build outputs
+dist
+.next
+out
+build
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment files
 .env
 .env.local
-.env.production
-.env.development
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Test coverage
+coverage
+
+# Turborepo cache
+.turbo
+
+# Vercel
+.vercel

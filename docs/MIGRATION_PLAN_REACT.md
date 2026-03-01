@@ -1191,70 +1191,110 @@ XPer-Next/
 
 ## ✅ Checklist tổng
 
-### Monorepo Setup
-- [ ] Tạo folder structure mới
-- [ ] Cấu hình pnpm workspace
-- [ ] Update root package.json
-- [ ] Setup concurrently cho dev
+### Monorepo Setup ✅
+- [x] Tạo folder structure mới
+- [x] Cấu hình pnpm workspace
+- [x] Update root package.json (pnpm --filter syntax)
+- [x] Setup concurrently cho dev
 
-### Client (React + Vite)
-- [ ] Tạo Vite project trong apps/client
-- [ ] Cài đặt dependencies
-- [ ] Cấu hình Vite + TypeScript
-- [ ] Cấu hình Tailwind CSS
-- [ ] Setup environment variables
-- [ ] Configure API proxy
+### Client (React + Vite) ✅
+- [x] Tạo Vite project trong apps/client
+- [x] Cài đặt dependencies
+- [x] Cấu hình Vite + TypeScript
+- [x] Cấu hình Tailwind CSS
+- [x] Setup environment variables
+- [x] Configure API proxy
+- [x] iOS Optimization (PWA, chặn zoom)
 
-### Web (Next.js API)
-- [ ] Move Next.js vào apps/web
-- [ ] Update CORS middleware
-- [ ] Cấu hình API routes
-- [ ] Setup environment variables
-- [ ] Test API endpoints
+### Web (Next.js API) ✅
+- [x] Move Next.js vào apps/web
+- [x] Update CORS middleware
+- [x] Cấu hình API routes (auth, cashflow, debts, trading, partners, reports)
+- [x] Setup environment variables
+- [x] iOS PWA optimization (manifest.json, meta tags)
 
-### Routing
-- [ ] Cài React Router
-- [ ] Tạo router config
-- [ ] Map tất cả routes
-- [ ] Tạo ProtectedRoute component
+### Routing ✅
+- [x] Cài React Router
+- [x] Tạo router config (25+ routes)
+- [x] Map tất cả routes
+- [x] Tạo ProtectedRoute component
 
-### Authentication
-- [ ] Tạo API client (axios)
-- [ ] Tạo useAuth hook
-- [ ] Tạo Next.js auth API routes
-- [ ] Update login/register forms
-- [ ] Test auth flow
+### Authentication ✅
+- [x] Tạo API client (axios)
+- [x] Tạo Supabase client
+- [x] Tạo useAuth hook (Supabase direct)
+- [x] Tạo Next.js auth API routes (/api/auth/login, /api/auth/register, /api/auth/me)
+- [x] Update login/register forms
+- [x] Test auth flow
 
-### Components
-- [ ] Di chuyển UI components
-- [ ] Di chuyển layout components
-- [ ] Convert MainLayout
-- [ ] Update providers
-- [ ] Remove "use client" directives
+### Components ✅
+- [x] Di chuyển UI components
+- [x] Di chuyển layout components (MainLayout)
+- [x] Convert MainLayout (React Router)
+- [x] Update providers (QueryProvider, MoneyVisibilityProvider)
+- [x] Remove "use client" directives
+- [x] IOSOptimization component
 
-### Pages
-- [ ] Convert LandingPage
-- [ ] Convert auth pages
-- [ ] Convert Dashboard
-- [ ] Convert Cashflow module
-- [ ] Convert Debts module
-- [ ] Convert Trading module
-- [ ] Convert Reports module
-- [ ] Convert Settings module
+### State Management ✅
+- [x] Giữ nguyên Zustand stores (money-visibility, notifications, ui)
+- [x] Update React Query Provider
+- [x] Update App.tsx với RouterProvider
 
-### API Integration
-- [ ] Tạo API client functions
-- [ ] Update React Query hooks
-- [ ] Tạo Next.js API routes
-- [ ] Test client ↔ API communication
-- [ ] Handle errors & loading states
+### Pages ✅
+- [x] Convert LandingPage
+- [x] Convert auth pages (Login, Register)
+- [x] Convert Dashboard
+- [x] Convert Cashflow module (CashflowPage, Accounts, Categories, New)
+- [x] Convert Debts module (DebtsPage, New, Partners, Detail)
+- [x] Convert Partners module
+- [x] Convert Trading module (Dashboard, Accounts, Orders, Funding, Ledger)
+- [x] Convert Reports module
+- [x] Convert Settings module (Settings, Profile, Report Dates, Telegram)
 
-### Build & Deploy
+### API Integration ✅
+- [x] Tạo API client functions
+- [x] Update React Query hooks
+- [x] Tạo Next.js API routes:
+  - Auth: login, register, me
+  - Cashflow: transactions, accounts, categories, report-transactions
+  - Debts: route, payments, partners
+  - Partners: route, transactions
+  - Trading: orders, funding, balance-accounts, sync-ledger
+  - Reports: report-runs
+  - Telegram: webhook
+- [x] Test client ↔ API communication
+- [x] Handle errors & loading states
+
+### Build & Deploy ⏳
 - [ ] Update package.json scripts
 - [ ] Test local build
 - [ ] Configure production deploy
 - [ ] Setup CI/CD
 - [ ] Deploy & test production
+
+---
+
+## 📊 Progress Summary
+
+| Phase | Status | Progress |
+|-------|--------|----------|
+| Phase 1: Setup & Configuration | ✅ Completed | 100% |
+| Phase 2: Core Infrastructure | ✅ Completed | 100% |
+| Phase 3: API Development | ✅ Completed | 100% |
+| Phase 4: Pages Migration | ✅ Completed | 100% |
+| Phase 5: Testing & Deploy | ⏳ Pending | 0% |
+
+**Overall Progress: ~85% Complete**
+
+---
+
+## 🎯 Next Steps (Phase 5)
+
+1. **Test local build** - Chạy `pnpm build:client` và `pnpm build:web` để verify
+2. **Configure production** - Setup environment variables cho production
+3. **Deploy testing** - Test deploy lên Vercel/Railway
+4. **E2E testing** - Test toàn bộ user flows
+5. **Performance optimization** - Optimize bundle size, lazy loading
 
 ---
 
@@ -1288,8 +1328,10 @@ npm run build:web
 
 ---
 
-**Generated:** 2026-03-01
+**Generated:** 2026-03-01  
+**Last Updated:** 2026-03-01
 **Project:** XPer Finance
 **Architecture:** Monorepo (Next.js API + React Vite Client)
 **Frontend:** React 18 + Vite + React Router v6
 **Backend:** Next.js 16 (API Server)
+**Status:** Phase 1-4 Complete (85%) - Ready for Phase 5 (Testing & Deploy)
