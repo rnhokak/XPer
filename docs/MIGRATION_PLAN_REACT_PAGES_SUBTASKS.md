@@ -620,11 +620,11 @@
 
 #### Subtasks:
 
-- [ ] **6.1.1** Remove Next.js imports
-- [ ] **6.1.2** Add React Router imports
-- [ ] **6.1.3** Convert data fetching to React Query
-- [ ] **6.1.4** Move child components từ `_components/` folder
-- [ ] **6.1.5** Test debts list
+- [x] **6.1.1** Remove Next.js imports
+- [x] **6.1.2** Add React Router imports
+- [x] **6.1.3** Convert data fetching to React Query
+- [x] **6.1.4** Move child components từ `_components/` folder
+- [x] **6.1.5** Test debts list
 
 ---
 
@@ -635,10 +635,10 @@
 
 #### Subtasks:
 
-- [ ] **6.2.1** Remove Next.js imports
-- [ ] **6.2.2** Add React Router imports
-- [ ] **6.2.3** Update form submission
-- [ ] **6.2.4** Test create debt
+- [x] **6.2.1** Remove Next.js imports
+- [x] **6.2.2** Add React Router imports
+- [x] **6.2.3** Update form submission
+- [x] **6.2.4** Test create debt
 
 ---
 
@@ -649,10 +649,10 @@
 
 #### Subtasks:
 
-- [ ] **6.3.1** Remove Next.js imports
-- [ ] **6.3.2** Add React Router imports
-- [ ] **6.3.3** Convert data fetching
-- [ ] **6.3.4** Test partners list
+- [x] **6.3.1** Remove Next.js imports
+- [x] **6.3.2** Add React Router imports
+- [x] **6.3.3** Convert data fetching
+- [x] **6.3.4** Test partners list
 
 ---
 
@@ -663,17 +663,17 @@
 
 #### Subtasks:
 
-- [ ] **6.4.1** Remove Next.js imports
-- [ ] **6.4.2** Add React Router imports
+- [x] **6.4.1** Remove Next.js imports
+- [x] **6.4.2** Add React Router imports
   ```typescript
   import { useParams } from 'react-router-dom';
   ```
-- [ ] **6.4.3** Get debt ID from params
+- [x] **6.4.3** Get debt ID from params
   ```typescript
   const { id } = useParams<{ id: string }>();
   ```
-- [ ] **6.4.4** Fetch debt detail by ID
-- [ ] **6.4.5** Test debt detail view
+- [x] **6.4.4** Fetch debt detail by ID
+- [x] **6.4.5** Test debt detail view
 
 ---
 
@@ -928,10 +928,10 @@
 - [ ] **Task 11** — 5.4 Categories Page (`src/features/cashflow/CategoriesPage.tsx`)
 
 ### Debts Module (4 tasks)
-- [ ] **Task 12** — 6.1 Debts Main Page (`src/features/debts/DebtsPage.tsx`)
-- [ ] **Task 13** — 6.2 New Debt Page (`src/features/debts/NewDebtPage.tsx`)
-- [ ] **Task 14** — 6.3 Partners Page (`src/features/debts/PartnersPage.tsx`)
-- [ ] **Task 15** — 6.4 Debt Detail Page (`src/features/debts/DebtDetailPage.tsx`)
+- [x] **Task 12** — 6.1 Debts Main Page (`src/features/debts/DebtsPage.tsx`)
+- [x] **Task 13** — 6.2 New Debt Page (`src/features/debts/NewDebtPage.tsx`)
+- [x] **Task 14** — 6.3 Partners Page (`src/features/debts/PartnersPage.tsx`)
+- [x] **Task 15** — 6.4 Debt Detail Page (`src/features/debts/DebtDetailPage.tsx`)
 
 ### Trading Module (6 tasks)
 - [ ] **Task 16** — 7.1 Trading Main Page (`src/features/trading/TradingPage.tsx`)
