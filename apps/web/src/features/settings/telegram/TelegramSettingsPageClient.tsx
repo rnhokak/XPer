@@ -33,28 +33,31 @@ export function TelegramSettingsPageClient({ initialLink }: Props) {
 
   const handleGenerate = () => {
     setCodeError(null);
-    startGenerating(async () => {
-      const res = await generateLinkCodeAction();
-      if (!res.success || !res.code || !res.expiresAt) {
-        setCodeError(res.error ?? "Không tạo được mã, thử lại sau.");
-        return;
-      }
-      setCodeState({ code: res.code, expiresAt: res.expiresAt });
+    startGenerating(() => {
+      void (async () => {
+        const res = await generateLinkCodeAction();
+        if (!res.success || !res.code || !res.expiresAt) {
+          setCodeError(res.error ?? "Không tạo được mã, thử lại sau.");
+          return;
+        }
+        setCodeState({ code: res.code, expiresAt: res.expiresAt });
+      })();
     });
   };
 
   const handleUnlink = () => {
     setUnlinkError(null);
-    startUnlinking(async () => {
-      const res = await unlinkTelegramAction();
-      if (!res.success) {
-        setUnlinkError(res.error ?? "Không thể hủy liên kết, thử lại sau.");
-        return;
-      }
-      setLink(null);
+    startUnlinking(() => {
+      void (async () => {
+        const res = await unlinkTelegramAction();
+        if (!res.success) {
+          setUnlinkError(res.error ?? "Không thể hủy liên kết, thử lại sau.");
+          return;
+        }
+        setLink(null);
+      })();
     });
   };
-
   return (
     <div className="flex flex-col gap-4">
       <TelegramLinkStatusCard link={link} onUnlink={handleUnlink} unlinking={isUnlinking} error={unlinkError} />
@@ -62,3 +65,6 @@ export function TelegramSettingsPageClient({ initialLink }: Props) {
     </div>
   );
 }
+
+
+
