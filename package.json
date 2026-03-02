@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"pnpm run dev:web\" \"pnpm run dev:client\"",
+    "dev": "pnpm run dev:web",
     "dev:web": "pnpm --filter @xper/web run dev",
     "dev:client": "pnpm --filter @xper/client run dev",
     "build": "pnpm run build:client && pnpm run build:web",

@@ -21,9 +21,9 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../web/public',
+    outDir: '../web/public/app',
     sourcemap: true,
     emptyOutDir: true,
   },
-  base: '/',
+  base: '/app/',
 })
