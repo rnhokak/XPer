@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { CashflowQuickAddForm } from './components/CashflowQuickAddForm';
 import { useCashflowAccounts, useCashflowCategories } from '@/hooks/useCashflowTransactions';
 
