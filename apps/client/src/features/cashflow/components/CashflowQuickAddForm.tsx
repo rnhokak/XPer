@@ -40,6 +40,7 @@ type Props = {
   defaultCurrency: string;
   useDialog?: boolean;
   range: string;
+  isLoading?: boolean;
 };
 
 const CUSTOM_CURRENCY = "__custom__";
@@ -61,12 +62,11 @@ const timePresets = [
   { label: "-1w", minutes: -10080 },
 ];
 
-export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, defaultCurrency, useDialog = false, range }: Props) {
+export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, defaultCurrency, useDialog = false, range, isLoading = false }: Props) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [customCurrency, setCustomCurrency] = useState("");
   const [userTouchedCategory, setUserTouchedCategory] = useState(false);
   const [suggestedCategoryId, setSuggestedCategoryId] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [autoThousand, setAutoThousand] = useState(defaultCurrency === "VND");
@@ -89,10 +89,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       currency: defaultCurrency,
     },
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!useDialog) return;
@@ -407,7 +403,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
   const dialogMaxHeight = useDialog && viewportHeight ? Math.max(360, viewportHeight - 32) : null;
 
-  const formContent = !mounted ? (
+  const formContent = isLoading ? (
     <div className="space-y-3 pb-24 sm:pb-0">
       <div className="h-6 w-24 animate-pulse rounded bg-muted" />
       <div className="h-10 w-full animate-pulse rounded bg-muted" />
@@ -417,10 +413,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   ) : (
     <div className="space-y-4  sm:pb-0">
       <div className="mb-3 flex items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-50 via-white to-white px-3 py-2 shadow-sm ring-1 ring-emerald-100/70">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-emerald-700">Quick add</p>
-          <p className="text-sm text-muted-foreground">Nhập tiền nhanh, tối ưu cho điện thoại.</p>
-        </div>
         <div className="inline-flex rounded-full bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-100">
           {cashflowTransactionTypeLabels[selectedType]}
         </div>

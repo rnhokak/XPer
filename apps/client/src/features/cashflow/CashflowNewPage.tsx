@@ -1,24 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CashflowQuickAddForm } from './components/CashflowQuickAddForm';
 import { useCashflowAccounts, useCashflowCategories } from '@/hooks/useCashflowTransactions';
-import { Loader2 } from 'lucide-react';
 
 export default function CashflowNewPage() {
   const { data: accounts = [], isLoading: accountsLoading } = useCashflowAccounts();
   const { data: categories = [], isLoading: categoriesLoading } = useCashflowCategories();
 
-  const isLoading = accountsLoading || categoriesLoading;
-
   const defaultAccount = accounts.find((a) => a.is_default) ?? accounts[0] ?? null;
   const defaultCurrency = defaultAccount?.currency ?? "VND";
-
-  if (isLoading) {
-    return (
-      <div className="flex h-64 w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto w-full max-w-4xl overflow-x-hidden px-[2px] sm:px-4 pb-[110px] md:pb-0">
@@ -28,9 +17,6 @@ export default function CashflowNewPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Quick Add</CardTitle>
-        </CardHeader>
         <CardContent>
           <CashflowQuickAddForm
             categories={categories}
@@ -39,6 +25,7 @@ export default function CashflowNewPage() {
             defaultCurrency={defaultCurrency}
             useDialog={false}
             range="month"
+            isLoading={accountsLoading || categoriesLoading}
           />
         </CardContent>
       </Card>
