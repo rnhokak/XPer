@@ -764,7 +764,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       </Form>
 
       <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:static sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        <Button type="submit" form="form" disabled={isSubmitting} className="w-full sm:static" style={{ marginBottom: '95px' }}>
+        <Button type="submit" form="form" disabled={isSubmitting} className="w-full sm:static" style={{ marginBottom: '125px' }}>
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
