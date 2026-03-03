@@ -1,13 +1,13 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CashflowRangeFilter } from './components/CashflowRangeFilter';
 import { CashflowTransactionList } from './components/CashflowTransactionList';
 import { CashflowReport } from './components/CashflowReport';
 import { CashflowExpenseChart } from './components/CashflowExpenseChart';
 import { normalizeCashflowRange, normalizeRangeShift } from '@/lib/cashflow/utils';
 import { useCashflowTransactions, useCashflowAccounts, useCashflowCategories } from '@/hooks/useCashflowTransactions';
-import { Loader2 } from 'lucide-react';
 
 export default function CashflowPage() {
   const [searchParams] = useSearchParams();
@@ -18,15 +18,9 @@ export default function CashflowPage() {
   const { data: accounts = [], isLoading: accountsLoading } = useCashflowAccounts();
   const { data: categories = [], isLoading: categoriesLoading } = useCashflowCategories();
 
-  const isLoading = transactionsLoading || accountsLoading || categoriesLoading;
-
-  if (isLoading) {
-    return (
-      <div className="flex h-64 w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const transactionsReady = transactions.length > 0 || !transactionsLoading;
+  const accountsReady = accounts.length > 0 || !accountsLoading;
+  const categoriesReady = categories.length > 0 || !categoriesLoading;
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 overflow-x-hidden">
@@ -45,7 +39,11 @@ export default function CashflowPage() {
           <CardTitle>Báo cáo nhanh</CardTitle>
         </CardHeader>
         <CardContent>
-          <CashflowReport />
+          {transactionsReady && accountsReady && categoriesReady ? (
+            <CashflowReport />
+          ) : (
+            <ReportSkeleton />
+          )}
         </CardContent>
       </Card>
 
@@ -58,13 +56,17 @@ export default function CashflowPage() {
           <CashflowRangeFilter value={range} />
         </CardHeader>
         <CardContent>
-          <CashflowTransactionList
-            transactions={transactions}
-            categories={categories}
-            accounts={accounts}
-            range={range}
-            shift={shift}
-          />
+          {transactionsReady ? (
+            <CashflowTransactionList
+              transactions={transactions}
+              categories={categories}
+              accounts={accounts}
+              range={range}
+              shift={shift}
+            />
+          ) : (
+            <TransactionListSkeleton />
+          )}
         </CardContent>
       </Card>
 
@@ -73,9 +75,51 @@ export default function CashflowPage() {
           <CardTitle>Chi tiêu theo ngày</CardTitle>
         </CardHeader>
         <CardContent>
-          <CashflowExpenseChart transactions={transactions} />
+          {transactionsReady ? (
+            <CashflowExpenseChart transactions={transactions} />
+          ) : (
+            <ChartSkeleton />
+          )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ReportSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-3">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="space-y-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TransactionListSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-center justify-between gap-4 rounded-lg border p-3">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="h-6 w-20" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="flex h-48 items-center justify-center">
+      <Skeleton className="h-full w-full" />
     </div>
   );
 }

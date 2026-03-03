@@ -131,31 +131,33 @@ export function CashflowExpenseChart({ transactions }: { transactions: CashflowT
       </CardHeader>
       <CardContent className="pt-0">
         <div className="space-y-3">
-          <div className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-inner">
-            <svg
-              role="img"
-              className="overflow-visible"
-              width="100%"
-              height={CHART_HEIGHT + 24}
-            >
-              <defs>
-                <linearGradient id={barGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#fb7185" stopOpacity="0.9" />
-                  <stop offset="100%" stopColor="#ef4444" stopOpacity="0.6" />
-                </linearGradient>
-                <linearGradient id={lineGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#94a3b8" />
-                  <stop offset="100%" stopColor="#475569" />
-                </linearGradient>
-              </defs>
-              <line
-                x1={0}
-                x2={viewWidth}
-                y1={CHART_HEIGHT - 0.5}
-                y2={CHART_HEIGHT - 0.5}
-                stroke="rgba(15,23,42,0.08)"
-                strokeWidth="1"
-              />
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-full rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-inner">
+              <svg
+                role="img"
+                className="block w-full"
+                viewBox={`0 0 ${viewWidth} ${CHART_HEIGHT + 32}`}
+                preserveAspectRatio="none"
+                style={{ minHeight: CHART_HEIGHT + 32 }}
+              >
+                <defs>
+                  <linearGradient id={barGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#fb7185" stopOpacity="0.9" />
+                    <stop offset="100%" stopColor="#ef4444" stopOpacity="0.6" />
+                  </linearGradient>
+                  <linearGradient id={lineGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#94a3b8" />
+                    <stop offset="100%" stopColor="#475569" />
+                  </linearGradient>
+                </defs>
+                <line
+                  x1={0}
+                  x2={viewWidth}
+                  y1={CHART_HEIGHT - 0.5}
+                  y2={CHART_HEIGHT - 0.5}
+                  stroke="rgba(15,23,42,0.08)"
+                  strokeWidth="0.5"
+                />
               {daySlots.map((slot, idx) => {
                 const x = idx * step + (step - barWidth) / 2;
                 const height = (slot.current / maxValue) * CHART_HEIGHT;
@@ -179,9 +181,9 @@ export function CashflowExpenseChart({ transactions }: { transactions: CashflowT
                   <text
                     key={`label-${slot.label}-${idx}`}
                     x={x}
-                    y={CHART_HEIGHT + 10}
+                    y={CHART_HEIGHT + 18}
                     textAnchor="middle"
-                    fontSize="9"
+                    fontSize="10"
                     fill="#475569"
                   >
                     {slot.label}

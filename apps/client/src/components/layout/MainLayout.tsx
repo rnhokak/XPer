@@ -89,10 +89,35 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
   const { isSidebarOpen, toggleSidebar, closeSidebar } = useUIStore();
   const { hideAmounts, toggleHideAmounts } = useMoneyVisibilityStore();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const preferredName = userDisplayName || userEmail || "User";
   const initials = useMemo(() => preferredName.charAt(0).toUpperCase(), [preferredName]);
   const bottomNavItems = useMemo(() => navItems.filter((item) => item.href !== "/settings"), []);
+
+  // Handle header auto-hide on scroll
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+            setHeaderVisible(false);
+          } else {
+            setHeaderVisible(true);
+          }
+          lastScrollY.current = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const activeNav = useMemo(() => {
     const pathname = location.pathname;
@@ -264,7 +289,10 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
 
       <div className="flex min-h-screen flex-1 flex-col md:pl-72">
         <header
-          className="sticky z-40 border-b border-slate-200 bg-white/90 backdrop-blur"
+          className={cn(
+            "sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur transition-transform duration-200",
+            !headerVisible && "-translate-y-full"
+          )}
           style={{ top: "env(safe-area-inset-top)" }}
         >
           <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-2 py-3 sm:px-6">
@@ -336,7 +364,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2 shadow-2xl backdrop-blur md:hidden">
         <div className="relative mx-auto max-w-lg pt-0">
           {addAction && AddIcon ? (
-            <div className="pointer-events-none absolute left-1/2 pb-1 top-0 z-50 flex -translate-x-1/2 -translate-y-6 items-center justify-center">
+            <div className="pointer-events-none absolute left-1/2 pb-3 top-0 z-50 flex -translate-x-1/2 -translate-y-6 items-center justify-center">
               <button
                 type="button"
                 className="pointer-events-auto flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_40px_rgba(16,185,129,0.35)] ring-2 ring-emerald-200/80 transition hover:scale-[1.02] active:scale-[0.99]"
