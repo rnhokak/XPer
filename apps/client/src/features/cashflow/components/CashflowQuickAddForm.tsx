@@ -419,7 +419,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       </div>
 
       <Form {...form}>
-        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+        <form id="form" className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <div className="flex gap-2">
             {cashflowTransactionTypes.map((type) => (
               <Button
