@@ -334,7 +334,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       </div>
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2 shadow-2xl backdrop-blur md:hidden">
-        <div className="relative mx-auto max-w-lg pt-6">
+        <div className="relative mx-auto max-w-lg pt-0">
           {addAction && AddIcon ? (
             <div className="pointer-events-none absolute left-1/2 top-0 z-50 flex -translate-x-1/2 -translate-y-6 items-center justify-center">
               <button

@@ -23,7 +23,6 @@ import { normalizeCashflowRange, rangeBounds } from "@/lib/cashflow/utils";
 import { type CategoryFocus } from "@/lib/validation/categories";
 import { useNotificationsStore } from "@/store/notifications";
 import { CategoryTreeModal } from "./CategoryTreeModal";
-import { Link } from "react-router-dom";
 
 type Category = {
   id: string;
@@ -409,14 +408,14 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const dialogMaxHeight = useDialog && viewportHeight ? Math.max(360, viewportHeight - 32) : null;
 
   const formContent = !mounted ? (
-    <div className="space-y-3">
+    <div className="space-y-3 pb-24 sm:pb-0">
       <div className="h-6 w-24 animate-pulse rounded bg-muted" />
       <div className="h-10 w-full animate-pulse rounded bg-muted" />
       <div className="h-10 w-full animate-pulse rounded bg-muted" />
       <div className="h-24 w-full animate-pulse rounded bg-muted" />
     </div>
   ) : (
-    <div className="space-y-4">
+    <div className="space-y-4  sm:pb-0">
       <div className="mb-3 flex items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-50 via-white to-white px-3 py-2 shadow-sm ring-1 ring-emerald-100/70">
         <div>
           <p className="text-xs uppercase tracking-wide text-emerald-700">Quick add</p>
@@ -769,19 +768,21 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
           />
 
           {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
-                Adding...
-              </span>
-            ) : (
-              "Add Transaction"
-            )}
-          </Button>
         </form>
       </Form>
+
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:static sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <Button type="submit" form="form" disabled={isSubmitting} className="w-full sm:static" style={{ marginBottom: '95px' }}>
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
+              Adding...
+            </span>
+          ) : (
+            "Add Transaction"
+          )}
+        </Button>
+      </div>
     </div>
   );
 
