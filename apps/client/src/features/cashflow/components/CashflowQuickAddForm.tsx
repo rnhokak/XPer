@@ -218,6 +218,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
   const notify = useNotificationsStore((state) => state.notify);
   const createMutation = useCreateTransaction();
+  const isSubmitting = createMutation.isPending;
 
   const onSubmit = async (values: CashflowQuickAddValues) => {
     setSubmitError(null);
@@ -769,18 +770,16 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
           {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
 
-          <Button type="submit" disabled={form.formState.isSubmitting} className="w-full">
-            {form.formState.isSubmitting ? "Adding..." : "Add Transaction"}
+          <Button type="submit" disabled={isSubmitting} className="w-full">
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
+                Adding...
+              </span>
+            ) : (
+              "Add Transaction"
+            )}
           </Button>
-
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <Button type="button" variant="ghost" className="h-auto p-0 text-xs" asChild>
-              <Link to="/cashflow/categories">Manage categories</Link>
-            </Button>
-            <Button type="button" variant="ghost" className="h-auto p-0 text-xs" asChild>
-              <Link to="/cashflow/accounts">Manage accounts</Link>
-            </Button>
-          </div>
         </form>
       </Form>
     </div>
@@ -801,7 +800,9 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
             {formContent}
           </DialogContent>
         </Dialog>
-        <Button onClick={() => setDialogOpen(true)}>Add Transaction</Button>
+        <Button onClick={() => setDialogOpen(true)} disabled={isSubmitting}>
+          Add Transaction
+        </Button>
       </>
     );
   }
