@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +13,12 @@ const getUserAndClient = async () => {
   return { supabase, user };
 };
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user } = await getUserAndClient();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const debtId = params?.id;
+  const { id } = await params;
+  const debtId = id;
   if (!debtId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
