@@ -158,6 +158,21 @@ export function CashflowTransactionList({
     return groups;
   }, [sorted]);
 
+  const dayTotals = useMemo(() => {
+    const totals: Record<string, { income: number; expense: number; currency: string }> = {};
+    Object.entries(groupedByDay).forEach(([dayLabel, transactions]) => {
+      const income = transactions
+        .filter((tx) => tx.type === "income")
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      const expense = transactions
+        .filter((tx) => tx.type === "expense")
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      const currency = transactions[0]?.currency ?? "VND";
+      totals[dayLabel] = { income, expense, currency };
+    });
+    return totals;
+  }, [groupedByDay]);
+
   const form = useForm<CashflowQuickAddValues>({
     resolver: zodResolver(cashflowQuickAddSchema),
     defaultValues: {
@@ -339,36 +354,55 @@ export function CashflowTransactionList({
     <div className="space-y-3">
       {isFetching ? <p className="text-xs text-muted-foreground">Đang đồng bộ dữ liệu...</p> : null}
       <div className="md:hidden space-y-4">
-        {Object.entries(groupedByDay).map(([dayLabel, dayTransactions]) => (
-          <div key={dayLabel} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{dayLabel}</p>
-            {dayTransactions.map((tx) => (
-              <button
-                key={tx.id}
-                type="button"
-                onClick={() => openDetail(tx)}
-                className="w-full text-left rounded-lg border bg-white p-3 shadow-sm transition hover:shadow"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
-                    <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
-                    {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
-                  </div>
-                  <div className={`money-blur text-base font-semibold ${getAmountTextClass(tx.type)}`}>
-                    {formatNumber(tx.amount, tx.currency)} {tx.currency}
-                  </div>
+        {Object.entries(groupedByDay).map(([dayLabel, dayTransactions]) => {
+          const totals = dayTotals[dayLabel];
+          return (
+            <div key={dayLabel} className="space-y-2">
+              <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{dayLabel}</p>
+                <div className="flex items-center gap-2 text-xs">
+                  {totals?.income ? (
+                    <span className="flex items-center gap-1 text-emerald-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      +{formatNumber(totals.income, totals.currency)}
+                    </span>
+                  ) : null}
+                  {totals?.expense ? (
+                    <span className="flex items-center gap-1 text-red-600">
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                      -{formatNumber(totals.expense, totals.currency)}
+                    </span>
+                  ) : null}
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
-                    {cashflowTransactionTypeLabels[tx.type]}
-                  </span>
-                  {tx.account?.name ? <span>{tx.account.name}</span> : null}
-                </div>
-              </button>
-            ))}
-          </div>
-        ))}
+              </div>
+              {dayTransactions.map((tx) => (
+                <button
+                  key={tx.id}
+                  type="button"
+                  onClick={() => openDetail(tx)}
+                  className="w-full text-left rounded-lg border bg-white p-3 shadow-sm transition hover:shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
+                      <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
+                      {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
+                    </div>
+                    <div className={`money-blur text-base font-semibold ${getAmountTextClass(tx.type)}`}>
+                      {formatNumber(tx.amount, tx.currency)} {tx.currency}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
+                      {cashflowTransactionTypeLabels[tx.type]}
+                    </span>
+                    {tx.account?.name ? <span>{tx.account.name}</span> : null}
+                  </div>
+                </button>
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       <div className="hidden md:block">
@@ -384,31 +418,52 @@ export function CashflowTransactionList({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Object.entries(groupedByDay).map(([dayLabel, dayTransactions]) => (
-              <Fragment key={dayLabel}>
-                <TableRow>
-                  <TableCell colSpan={6} className="bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {dayLabel}
-                  </TableCell>
-                </TableRow>
-                {dayTransactions.map((tx) => (
-                  <TableRow key={tx.id} className="cursor-pointer" onClick={() => openDetail(tx)}>
-                    <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.transaction_time)}</TableCell>
-                    <TableCell>
-                      <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
-                        {cashflowTransactionTypeLabels[tx.type]}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
-                    <TableCell className={`money-blur text-right font-semibold ${getAmountTextClass(tx.type)}`}>
-                      {formatNumber(tx.amount, tx.currency)} {tx.currency}
+            {Object.entries(groupedByDay).map(([dayLabel, dayTransactions]) => {
+              const totals = dayTotals[dayLabel];
+              return (
+                <Fragment key={dayLabel}>
+                  <TableRow>
+                    <TableCell colSpan={6}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {dayLabel}
+                        </span>
+                        <div className="flex items-center gap-3 text-xs">
+                          {totals?.income ? (
+                            <span className="flex items-center gap-1 font-semibold text-emerald-600">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Thu: +{formatNumber(totals.income, totals.currency)} {totals.currency}
+                            </span>
+                          ) : null}
+                          {totals?.expense ? (
+                            <span className="flex items-center gap-1 font-semibold text-red-600">
+                              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                              Chi: -{formatNumber(totals.expense, totals.currency)} {totals.currency}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))}
-              </Fragment>
-            ))}
+                  {dayTransactions.map((tx) => (
+                    <TableRow key={tx.id} className="cursor-pointer" onClick={() => openDetail(tx)}>
+                      <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.transaction_time)}</TableCell>
+                      <TableCell>
+                        <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
+                          {cashflowTransactionTypeLabels[tx.type]}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
+                      <TableCell className={`money-blur text-right font-semibold ${getAmountTextClass(tx.type)}`}>
+                        {formatNumber(tx.amount, tx.currency)} {tx.currency}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

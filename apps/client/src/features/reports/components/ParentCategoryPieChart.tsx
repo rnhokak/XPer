@@ -65,12 +65,18 @@ export function ParentCategoryPieChart({ parentCategories }: Props) {
       // Convert angles to radians
       const startRad = (startAngle * Math.PI) / 180;
       const endRad = (endAngle * Math.PI) / 180;
+      const midRad = ((startAngle + endAngle) * Math.PI) / 360;
 
       // Calculate coordinates for the arc
       const x1 = 100 + 80 * Math.cos(startRad);
       const y1 = 100 + 80 * Math.sin(startRad);
       const x2 = 100 + 80 * Math.cos(endRad);
       const y2 = 100 + 80 * Math.sin(endRad);
+
+      // Calculate label position (at 60% radius for visibility)
+      const labelRadius = 50;
+      const labelX = 100 + labelRadius * Math.cos(midRad);
+      const labelY = 100 + labelRadius * Math.sin(midRad);
 
       // Large arc flag: 1 if angle > 180, 0 otherwise
       const largeArcFlag = angle > 180 ? 1 : 0;
@@ -90,6 +96,9 @@ export function ParentCategoryPieChart({ parentCategories }: Props) {
         percentage: (percentage * 100).toFixed(1),
         angle,
         startAngle,
+        labelX,
+        labelY,
+        displayPercentage: angle > 15 ? (percentage * 100).toFixed(0) : null,
       };
     });
   }, [validCategories, colors, totalAmount]);
@@ -123,6 +132,24 @@ export function ParentCategoryPieChart({ parentCategories }: Props) {
           >
             {formatCurrency(totalAmount)}
           </text>
+          {/* Percentage labels on slices */}
+          {slices.map((slice) =>
+            slice.displayPercentage ? (
+              <text
+                key={`label-${slice.category.id}`}
+                x={slice.labelX}
+                y={slice.labelY}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="text-xs font-bold fill-white"
+                style={{
+                  textShadow: "0px 0px 2px rgba(0,0,0,0.5)",
+                }}
+              >
+                {slice.displayPercentage}%
+              </text>
+            ) : null
+          )}
         </svg>
       </div>
 

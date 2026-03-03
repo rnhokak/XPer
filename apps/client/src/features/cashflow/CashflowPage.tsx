@@ -5,7 +5,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CashflowRangeFilter } from './components/CashflowRangeFilter';
 import { CashflowTransactionList } from './components/CashflowTransactionList';
 import { CashflowReport } from './components/CashflowReport';
-import { CashflowExpenseChart } from './components/CashflowExpenseChart';
 import { normalizeCashflowRange, normalizeRangeShift } from '@/lib/cashflow/utils';
 import { useCashflowTransactions, useCashflowAccounts, useCashflowCategories } from '@/hooks/useCashflowTransactions';
 
@@ -69,19 +68,6 @@ export default function CashflowPage() {
           )}
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Chi tiêu theo ngày</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {transactionsReady ? (
-            <CashflowExpenseChart transactions={transactions} />
-          ) : (
-            <ChartSkeleton />
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
@@ -112,14 +98,6 @@ function TransactionListSkeleton() {
           <Skeleton className="h-6 w-20" />
         </div>
       ))}
-    </div>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div className="flex h-48 items-center justify-center">
-      <Skeleton className="h-full w-full" />
     </div>
   );
 }

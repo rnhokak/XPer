@@ -22,19 +22,36 @@ type Props = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Math.max(0, Math.round(value)));
 
+function calculateTotalAmount(categories: Category[]): number {
+  let total = 0;
+  const traverse = (cats: Category[]) => {
+    cats.forEach((cat) => {
+      total += cat.totalAmount;
+      if (cat.children.length > 0) {
+        traverse(cat.children);
+      }
+    });
+  };
+  traverse(categories);
+  return total;
+}
+
 function CategoryItem({
   category,
   expandedCategories,
   toggleCategory,
   level = 0,
+  parentTotal = 0,
 }: {
   category: Category;
   expandedCategories: Set<string>;
   toggleCategory: (categoryId: string) => void;
   level?: number;
+  parentTotal?: number;
 }) {
   const isExpanded = expandedCategories.has(category.id);
   const hasChildren = category.children && category.children.length > 0;
+  const percentage = parentTotal > 0 ? ((category.totalAmount / parentTotal) * 100).toFixed(1) : "0";
 
   return (
     <div className="w-full">
@@ -52,7 +69,10 @@ function CategoryItem({
 
         <div className="flex-1 flex items-center justify-between">
           <span className="font-medium">{category.name}</span>
-          <span className="text-sm font-medium text-muted-foreground">{formatCurrency(category.totalAmount)}</span>
+          <div className="text-right">
+            <span className="text-sm font-medium text-muted-foreground">{formatCurrency(category.totalAmount)}</span>
+            <span className="ml-2 text-xs text-muted-foreground">({percentage}%)</span>
+          </div>
         </div>
       </div>
 
@@ -65,6 +85,7 @@ function CategoryItem({
               expandedCategories={expandedCategories}
               toggleCategory={toggleCategory}
               level={level + 1}
+              parentTotal={category.totalAmount}
             />
           ))}
         </div>
@@ -74,6 +95,8 @@ function CategoryItem({
 }
 
 export function CategoryTreeView({ categories, expandedCategories, toggleCategory }: Props) {
+  const totalAmount = calculateTotalAmount(categories);
+
   if (categories.length === 0) {
     return (
       <div className="flex h-32 items-center justify-center rounded-md border border-dashed p-8 text-center">
@@ -84,12 +107,19 @@ export function CategoryTreeView({ categories, expandedCategories, toggleCategor
 
   return (
     <div className="space-y-1">
+      <div className="mb-4 rounded-lg bg-slate-50 p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-slate-700">Tổng tất cả danh mục</span>
+          <span className="text-base font-bold text-slate-900">{formatCurrency(totalAmount)} đ</span>
+        </div>
+      </div>
       {categories.map((category) => (
         <CategoryItem
           key={category.id}
           category={category}
           expandedCategories={expandedCategories}
           toggleCategory={toggleCategory}
+          parentTotal={totalAmount}
         />
       ))}
     </div>

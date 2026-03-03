@@ -103,6 +103,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
+          // Hide when scrolling down, show when scrolling up or at top
           if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
             setHeaderVisible(false);
           } else {
@@ -290,10 +291,10 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       <div className="flex min-h-screen flex-1 flex-col md:pl-72">
         <header
           className={cn(
-            "sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur transition-transform duration-200",
+            "fixed left-0 right-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur transition-transform duration-200",
             !headerVisible && "-translate-y-full"
           )}
-          style={{ top: "env(safe-area-inset-top)" }}
+          style={{ top: "env(safe-area-inset-top, 0px)" }}
         >
           <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-2 py-3 sm:px-6">
             <div className="flex items-center gap-3">
@@ -302,7 +303,6 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
               </Button>
               <div>
                 <p className="text-xs text-muted-foreground">{activeNav?.label ?? "XPer"}</p>
-                <p className="text-base font-semibold leading-tight">{preferredName}</p>
               </div>
             </div>
 
@@ -355,7 +355,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
         </header>
 
         <main className="flex-1">
-          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-2 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-4 sm:px-6 md:max-w-5xl md:pb-12">
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-2 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-[calc(60px+env(safe-area-inset-top))] sm:px-6 md:max-w-5xl md:pb-12">
             {children}
           </div>
         </main>
@@ -364,7 +364,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2 shadow-2xl backdrop-blur md:hidden">
         <div className="relative mx-auto max-w-lg pt-0">
           {addAction && AddIcon ? (
-            <div className="pointer-events-none absolute left-1/2 pb-3 top-0 z-50 flex -translate-x-1/2 -translate-y-6 items-center justify-center">
+            <div className="pointer-events-none absolute left-1/2 mb-5 top-0 z-50 flex -translate-x-1/2 -translate-y-6 items-center justify-center">
               <button
                 type="button"
                 className="pointer-events-auto flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_40px_rgba(16,185,129,0.35)] ring-2 ring-emerald-200/80 transition hover:scale-[1.02] active:scale-[0.99]"
