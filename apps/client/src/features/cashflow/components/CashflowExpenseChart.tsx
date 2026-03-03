@@ -202,6 +202,7 @@ export function CashflowExpenseChart({ transactions }: { transactions: CashflowT
                 />
               )}
             </svg>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             <span className="flex items-center gap-2 text-rose-600">
