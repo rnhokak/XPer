@@ -1,0 +1,21 @@
+{
+  "name": "xper-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm run dev:all",
+    "dev:all": "concurrently -n web,client -c blue,green \"pnpm run dev:web\" \"pnpm run dev:client\"",
+    "dev:web": "pnpm --filter @xper/web run dev",
+    "dev:client": "pnpm --filter @xper/client run dev",
+    "build": "pnpm run build:client && pnpm run build:web",
+    "build:client": "pnpm --filter @xper/client run build",
+    "build:web": "pnpm --filter @xper/web run build",
+    "start": "pnpm --filter @xper/web run start",
+    "lint": "pnpm --filter @xper/web run lint",
+    "vercel-build": "pnpm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "next": "^16.0.7"
+  }
+}
