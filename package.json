@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "pnpm run dev:all",
     "dev:all": "concurrently -n web,client -c blue,green \"pnpm run dev:web\" \"pnpm run dev:client\"",
