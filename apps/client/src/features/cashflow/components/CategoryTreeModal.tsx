@@ -171,7 +171,7 @@ export function CategoryTreeModal({
             </DialogHeader>
           </div>
           <div className="px-4 sm:px-0">
-            {/* <div className="relative">
+            <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 ref={searchInputRef}
@@ -181,7 +181,7 @@ export function CategoryTreeModal({
                 className="h-10 rounded-xl border px-9 text-sm"
                 inputMode="search"
               />
-            </div> */}
+            </div>
           </div>
           <div
             className="space-y-1 overflow-y-auto px-4 pb-4 pt-1 sm:px-0"
