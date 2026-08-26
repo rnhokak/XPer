@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui";
 import { useMoneyVisibilityStore } from "@/store/money-visibility";
@@ -149,8 +150,11 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
   const AddIcon = addAction?.icon ?? null;
 
   const handleLogout = useCallback(async () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('refresh_token');
+    try {
+      await apiClient.post('/auth/logout')
+    } catch {
+      // Ignore logout failures and continue clearing the local UI state.
+    }
     navigate("/auth/login", { replace: true });
   }, [navigate]);
 

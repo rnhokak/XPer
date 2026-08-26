@@ -44,5 +44,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ user: data.user, session: data.session });
+  return NextResponse.json({ user: data.user });
 }

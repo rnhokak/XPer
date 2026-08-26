@@ -173,14 +173,14 @@ export function CategoryTreeModal({
           <div className="px-4 sm:px-0">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
+              {/* <Input
                 ref={searchInputRef}
                 placeholder={searchPlaceholder}
                 value={searchTerm}
                 onChange={(event) => handleSearchChange(event.target.value)}
                 className="h-10 rounded-xl border px-9 text-sm"
                 inputMode="search"
-              />
+              /> */}
             </div>
           </div>
           <div
