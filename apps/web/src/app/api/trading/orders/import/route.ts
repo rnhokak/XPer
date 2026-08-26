@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/lib/supabase/types";
 export const dynamic = "force-dynamic";
 
 const importRowSchema = z.object({
@@ -97,24 +98,35 @@ export async function POST(req: Request) {
       note: row.note?.trim() ? row.note.trim() : null,
       user_id: user.id,
       balance_account_id: row.balance_account_id,
-    };
+    } as Database["public"]["Tables"]["trading_orders"]["Insert"] & { is_imported: boolean };
   });
 
-// Validate balance_account_id ownership/type
-const balanceIdsInput = Array.from(new Set(rows.map((r) => r.balance_account_id)));
-const balanceMap = await loadBalanceCurrencies(supabase, balanceIdsInput);
-for (const row of rows) {
-  const acc = balanceMap.get(row.balance_account_id);
-  if (!acc) {
-    return NextResponse.json({ error: "Balance account not found" }, { status: 400 });
+  // Validate balance_account_id ownership/type
+  const balanceIdsInput = Array.from(
+    new Set(rows.map((r) => r.balance_account_id).filter((id): id is string => typeof id === "string" && id.length > 0))
+  );
+
+  const balanceMap = await loadBalanceCurrencies(supabase, balanceIdsInput);
+  for (const row of rows) {
+    if (!row.balance_account_id) {
+      return NextResponse.json({ error: "Balance account is required" }, { status: 400 });
+    }
+
+    const acc = balanceMap.get(row.balance_account_id);
+    if (!acc) {
+      return NextResponse.json({ error: "Balance account not found" }, { status: 400 });
+    }
+    if (acc.user_id !== user.id || acc.account_type !== "TRADING") {
+      return NextResponse.json({ error: "Balance account not owned by user or not TRADING type" }, { status: 400 });
+    }
   }
-  if (acc.user_id !== user.id || acc.account_type !== "TRADING") {
-    return NextResponse.json({ error: "Balance account not owned by user or not TRADING type" }, { status: 400 });
-  }
-}
 
   // Skip rows with duplicate tickets for this user
-  const tickets = rows.map((r) => r.ticket).filter((t): t is string => Boolean(t));
+  const tickets = rows
+    .map((r) => r.ticket)
+    .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    .map((t) => t.trim());
+
   let existingTickets: string[] = [];
   if (tickets.length) {
     const { data: existing, error: existingError } = await supabase
@@ -135,7 +147,7 @@ for (const row of rows) {
     return NextResponse.json({ success: true, count: 0, skipped: tickets.length, message: "All rows were duplicates" });
   }
 
-  const { data: inserted, error } = await supabase.from("trading_orders").insert(filteredRows).select("*");
+  const { data: inserted, error } = await supabase.from("trading_orders").insert(filteredRows as any).select("*");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
