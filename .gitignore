@@ -45,5 +45,4 @@ coverage
 .supabase/telemetry.json
 .supabase/telemetry.json
 /supabase/.temp/start-secrets
-yarn.lock
-pnpm-lock.yaml
+
