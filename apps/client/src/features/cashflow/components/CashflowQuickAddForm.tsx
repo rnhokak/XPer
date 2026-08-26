@@ -18,7 +18,13 @@ import {
   type CashflowTransactionType,
 } from "@/lib/validation/cashflow";
 import { useQueryClient } from "@tanstack/react-query";
-import { cashflowReportTransactionsQueryKey, cashflowTransactionsQueryKey, type CashflowTransaction, useCreateTransaction } from "@/hooks/useCashflowTransactions";
+import {
+  cashflowReportTransactionsQueryKey,
+  cashflowTransactionsQueryKey,
+  type CashflowTransaction,
+  useCashflowReportTransactions,
+  useCreateTransaction,
+} from "@/hooks/useCashflowTransactions";
 import { normalizeCashflowRange, rangeBounds } from "@/lib/cashflow/utils";
 import { type CategoryFocus } from "@/lib/validation/categories";
 import { useNotificationsStore } from "@/store/notifications";
@@ -129,6 +135,34 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   }, [currency]);
 
   const categoriesByType = useMemo(() => categories.filter((c) => c.type === selectedType), [categories, selectedType]);
+  const { data: reportTransactions = [] } = useCashflowReportTransactions();
+
+  const popularRecentCategories = useMemo(() => {
+    const counts = new Map<string, { category: Category; count: number }>();
+
+    [...reportTransactions]
+      .filter((tx) => tx.type === selectedType && tx.category?.id)
+      .sort((a, b) => new Date(b.transaction_time).getTime() - new Date(a.transaction_time).getTime())
+      .slice(0, 30)
+      .forEach((tx) => {
+        const categoryId = tx.category?.id;
+        if (!categoryId) return;
+        const category = categories.find((c) => c.id === categoryId && c.type === selectedType);
+        if (!category) return;
+
+        const existing = counts.get(categoryId) ?? { category, count: 0 };
+        existing.count += 1;
+        counts.set(categoryId, existing);
+      });
+
+    return [...counts.values()]
+      .sort((a, b) => b.count - a.count || a.category.name.localeCompare(b.category.name))
+      .slice(0, 5)
+      .map(({ category, count }) => ({
+        category,
+        reason: count > 1 ? `${count}x gần đây` : "Gần đây",
+      }));
+  }, [categories, reportTransactions, selectedType]);
 
   useEffect(() => {
     const suggestions: Array<{ category: Category; reason?: string }> = [];
@@ -148,6 +182,8 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
           lowered.some((name) => c.name.toLowerCase().includes(name))
       );
     };
+
+    popularRecentCategories.forEach((item) => addSuggestion(item.category, item.reason));
 
     const storedId = (() => {
       try {
@@ -209,7 +245,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     } else {
       setSuggestedCategoryId(null);
     }
-  }, [amount, accounts, accountId, categories, categoriesByType, form, selectedCategoryId, selectedType, transactionTime, userTouchedCategory]);
+  }, [amount, accounts, accountId, categories, categoriesByType, form, popularRecentCategories, selectedCategoryId, selectedType, transactionTime, userTouchedCategory]);
 
   const notify = useNotificationsStore((state) => state.notify);
   const createMutation = useCreateTransaction();

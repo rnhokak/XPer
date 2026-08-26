@@ -3,9 +3,18 @@ import { NextResponse } from "next/server";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_SITE_URL,
+  process.env.NEXT_PUBLIC_CLIENT_URL,
+  process.env.CORS_ORIGIN,
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:3005",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+  "http://127.0.0.1:3005",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
 ].filter(Boolean) as string[];
 
 const ENV_ALLOWED_ORIGINS =
@@ -38,6 +47,10 @@ export function middleware(req: NextRequest) {
 
   if (req.method === "OPTIONS") {
     const headers = new Headers(CORS_HEADERS);
+    const requestedHeaders = req.headers.get("access-control-request-headers");
+    if (requestedHeaders) {
+      headers.set("Access-Control-Allow-Headers", requestedHeaders);
+    }
     if (allowOrigin) {
       headers.set("Access-Control-Allow-Origin", allowOrigin);
       headers.set("Vary", "Origin");

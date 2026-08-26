@@ -127,18 +127,25 @@ export async function PUT(req: Request) {
   }
 
   if (account!.account_type === "FUNDING") {
-    const { error: detailErr } = await supabase
+    const { data: existingFunding, error: fundingFetchErr } = await supabase
       .from("funding_accounts")
-      .upsert(
-        {
-          balance_account_id: parsed.data.id,
-          provider: null,
-          note: null,
-        },
-        { onConflict: "balance_account_id" }
-      );
-    if (detailErr) {
-      return NextResponse.json({ error: detailErr.message }, { status: 500 });
+      .select("id")
+      .eq("balance_account_id", parsed.data.id)
+      .maybeSingle();
+
+    if (fundingFetchErr) {
+      return NextResponse.json({ error: fundingFetchErr.message }, { status: 500 });
+    }
+
+    if (!existingFunding) {
+      const { error: detailErr } = await supabase.from("funding_accounts").insert({
+        balance_account_id: parsed.data.id,
+        provider: null,
+        note: null,
+      });
+      if (detailErr) {
+        return NextResponse.json({ error: detailErr.message }, { status: 500 });
+      }
     }
   }
 

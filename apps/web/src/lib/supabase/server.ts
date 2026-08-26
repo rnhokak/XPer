@@ -3,6 +3,12 @@ import { type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { type Database } from "./types";
 
+const isProduction = process.env.NODE_ENV === "production";
+const defaultCookieOptions = {
+  sameSite: "lax" as const,
+  secure: isProduction,
+};
+
 // Next 15+ returns a Promise from cookies(); use async factory.
 export const createClient = async () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -16,8 +22,7 @@ export const createClient = async () => {
 
   return createServerClient<Database, "public">(supabaseUrl, supabaseAnonKey, {
     cookieOptions: {
-      sameSite: "none",
-      secure: true,
+      ...defaultCookieOptions,
     },
     cookies: {
       get(name: string) {
@@ -38,8 +43,7 @@ export const createClient = async () => {
         try {
           const cookieOptions = {
             ...options,
-            sameSite: "none",
-            secure: true,
+            ...defaultCookieOptions,
           };
           const store = cookieStore;
           if (typeof (store as any).set === "function") {
@@ -56,8 +60,7 @@ export const createClient = async () => {
         try {
           const cookieOptions = {
             ...options,
-            sameSite: "none",
-            secure: true,
+            ...defaultCookieOptions,
           };
           const store = cookieStore;
           if (typeof (store as any).set === "function") {
