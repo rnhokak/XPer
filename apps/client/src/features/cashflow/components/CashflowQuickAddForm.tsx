@@ -63,6 +63,7 @@ const toIsoStringWithOffset = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 const defaultDateTimeValue = () => toLocalInput(new Date());
+const getCurrentDateTimeValue = () => toLocalInput(new Date());
 const timePresets = [
   { label: "Now", minutes: 0 },
   { label: "-1w", minutes: -10080 },
@@ -76,7 +77,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const [dialogOpen, setDialogOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [autoThousand, setAutoThousand] = useState(defaultCurrency === "VND");
-  const [recentAmounts, setRecentAmounts] = useState<Array<{ amount: number; ts: number }>>([]);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [lastTransactionTime, setLastTransactionTime] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -129,11 +129,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const transactionTime = useWatch({ control: form.control, name: "transaction_time" });
   const currency = useWatch({ control: form.control, name: "currency" }) ?? defaultCurrency;
 
-  useEffect(() => {
-    loadRecentAmounts(currency);
-    setAutoThousand(currency === "VND");
-  }, [currency]);
-
   const categoriesByType = useMemo(() => categories.filter((c) => c.type === selectedType), [categories, selectedType]);
   const { data: reportTransactions = [] } = useCashflowReportTransactions();
 
@@ -174,15 +169,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       suggestions.push({ category, reason });
     };
 
-    const findByKeywords = (names: string[]) => {
-      const lowered = names.map((name) => name.toLowerCase());
-      return categories.find(
-        (c) =>
-          c.type === selectedType &&
-          lowered.some((name) => c.name.toLowerCase().includes(name))
-      );
-    };
-
     popularRecentCategories.forEach((item) => addSuggestion(item.category, item.reason));
 
     const storedId = (() => {
@@ -199,32 +185,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
         addSuggestion(storedCategory, "Last used");
       }
     }
-
-    const hour = transactionTime ? new Date(transactionTime).getHours() : new Date().getHours();
-    const amountValue = typeof amount === "number" ? amount : null;
-    const acctType = accounts.find((a) => a.id === accountId)?.type?.toLowerCase() ?? "";
-
-    const heuristics: Array<{ condition: boolean; keywords: string[]; reason: string }> = [];
-    if (selectedType === "expense") {
-      heuristics.push(
-        { condition: amountValue !== null && amountValue <= 50000, keywords: ["coffee", "cafe"], reason: "Nhỏ, cà phê" },
-        { condition: amountValue !== null && amountValue <= 150000 && hour >= 10 && hour <= 14, keywords: ["lunch", "meal"], reason: "Giữa trưa" },
-        { condition: amountValue !== null && amountValue <= 80000 && acctType.includes("wallet"), keywords: ["ride", "grab", "taxi"], reason: "Di chuyển ví" }
-      );
-    } else if (selectedType === "income") {
-      heuristics.push(
-        { condition: amountValue !== null && amountValue >= 10000000, keywords: ["salary"], reason: "Lương lớn" },
-        { condition: amountValue !== null && amountValue >= 1000000, keywords: ["bonus"], reason: "Bonus" },
-        { condition: amountValue !== null && amountValue < 1000000, keywords: ["gift"], reason: "Tiền thưởng" }
-      );
-    }
-
-    heuristics.forEach((item) => {
-      if (!item.condition) return;
-      const matched = findByKeywords(item.keywords);
-      addSuggestion(matched, item.reason);
-    });
-
+   
     if (suggestions.length < 5) {
       categoriesByType
         .filter((category) => !seen.has(category.id))
@@ -280,10 +241,9 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
         queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
         queryClient.invalidateQueries({ queryKey: cashflowReportTransactionsQueryKey });
 
-        const submittedDate = new Date(values.transaction_time!);
-        const dateOnlyString = toLocalInput(new Date(submittedDate.getFullYear(), submittedDate.getMonth(), submittedDate.getDate()));
+        const nextTransactionTime = getCurrentDateTimeValue();
 
-        setLastTransactionTime(dateOnlyString);
+        setLastTransactionTime(nextTransactionTime);
 
         form.reset({
           type: values.type,
@@ -291,7 +251,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
           account_id: payload.account_id,
           category_id: null,
           note: "",
-          transaction_time: dateOnlyString,
+          transaction_time: nextTransactionTime,
           currency: defaultCurrency,
         });
         setAmountInput("");
@@ -350,11 +310,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
     return trimmed;
   };
 
-  const formatSuggestedLabel = (value: number) => {
-    if (currency === "VND") return `${Math.round(value / 1000)}k`;
-    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
-  };
-
   const numericInputPattern = /^-?\d*(\.\d*)?$/;
 
   const formatNumericValue = (value: string) => {
@@ -383,26 +338,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
   const formatNumberForInput = (value: number) => formatNumericValue(String(value));
 
-  const suggestedAmounts = useMemo(() => {
-    const seen = new Set<number>();
-    const sorted: Array<{ label: string; value: number | null }> = recentAmounts
-      .slice()
-      .sort((a, b) => b.ts - a.ts)
-      .reduce<Array<{ label: string; value: number | null }>>((acc, item) => {
-        if (seen.has(item.amount)) {
-          return acc;
-        }
-        seen.add(item.amount);
-        acc.push({ label: formatSuggestedLabel(item.amount), value: item.amount });
-        return acc;
-      }, [])
-      .slice(0, 4);
-    if (currency === "VND") {
-      sorted.push({ label: "+000", value: null });
-    }
-    return sorted;
-  }, [recentAmounts, currency]);
-
   const persistRecentAmount = (value: number, curr: string) => {
     if (!Number.isFinite(value) || value <= 0) return;
     const key = `cashflow:recentAmounts:${curr}`;
@@ -415,25 +350,12 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
         ...existing.filter((item) => item.amount !== value),
       ].slice(0, 8);
       localStorage.setItem(key, JSON.stringify(merged));
-      setRecentAmounts(merged);
     } catch {
       // ignore storage errors
     }
   };
 
-  const loadRecentAmounts = (curr: string) => {
-    const key = `cashflow:recentAmounts:${curr}`;
-    try {
-      const raw = localStorage.getItem(key);
-      const parsed: Array<{ amount: number; ts: number }> = raw ? JSON.parse(raw) : [];
-      setRecentAmounts(parsed);
-    } catch {
-      setRecentAmounts([]);
-    }
-  };
-
   useEffect(() => {
-    loadRecentAmounts(currency);
     setAutoThousand(currency === "VND");
   }, [currency]);
 
@@ -611,32 +533,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                         ) : null}
                       </div>
                     </div>
-                    {suggestedAmounts.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {suggestedAmounts.map((item, idx) => (
-                          <Button
-                            key={idx}
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="rounded-full"
-                            onClick={() => {
-                              if (item.value === null) {
-                                const current = field.value ?? 0;
-                                const newValue = current * 1000;
-                                field.onChange(newValue);
-                                setAmountInput(formatNumberForInput(newValue));
-                              } else {
-                                field.onChange(item.value);
-                                setAmountInput(formatNumberForInput(item.value));
-                              }
-                            }}
-                          >
-                            {item.label}
-                          </Button>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
                 </FormControl>
                 <FormMessage>{form.formState.errors.amount?.message}</FormMessage>
@@ -682,7 +578,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                   <span>Amount & time</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                  {smartSuggestions.map(({ category, reason }) => {
+                  {smartSuggestions.map(({ category }) => {
                     const active = selectedCategoryId === category.id;
                     return (
                       <button
@@ -701,9 +597,6 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
                       >
                         <div className="min-w-0 flex items-center gap-2 text-sm">
                           <span className="font-semibold truncate">{category.name}</span>
-                          {reason ? (
-                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{reason}</span>
-                          ) : null}
                         </div>
                         {active ? <span className="text-xs font-semibold">✓</span> : null}
                       </button>
