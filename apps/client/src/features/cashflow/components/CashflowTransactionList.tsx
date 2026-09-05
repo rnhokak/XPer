@@ -1,31 +1,13 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Fragment, useMemo, useState, useEffect } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
+import { Fragment, useMemo, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  cashflowQuickAddSchema,
   cashflowTransactionTypeLabels,
-  type CashflowQuickAddValues,
   type CashflowTransactionType,
 } from "@/lib/validation/cashflow";
 import { type CategoryFocus } from "@/lib/validation/categories";
 import { useQueryClient } from "@tanstack/react-query";
 import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction, useUpdateTransaction, useDeleteTransaction } from "@/hooks/useCashflowTransactions";
-import { CategoryTreeModal } from "./CategoryTreeModal";
+import { CashflowTransactionDetailDialog } from "./CashflowTransactionDetailDialog";
 
 type Category = {
   id: string;
@@ -51,21 +33,12 @@ const formatDateTime = (value: string) => {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-const toLocalInputValue = (value: string | Date | null | undefined) => {
-  if (!value) return "";
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-};
-
 const toIsoStringWithOffset = (value?: string | null) => {
   if (!value) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 
-const NONE_VALUE = "__none__";
 const typeBadgeBaseClasses = "rounded-full px-2 py-1 text-xs font-semibold";
 const getTypeBadgeClasses = (type: CashflowTransactionType) => {
   if (type === "income") return "bg-emerald-50 text-emerald-700";
@@ -77,26 +50,6 @@ const getAmountTextClass = (type: CashflowTransactionType) => {
   if (type === "transfer") return "text-slate-600";
   return "text-red-600";
 };
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkIsMobile = () => {
-      if (typeof window !== 'undefined') {
-        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isSmallScreen = window.innerWidth < 768;
-        setIsMobile(isMobileDevice || isSmallScreen);
-      }
-    };
-
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
-    return () => window.removeEventListener('resize', checkIsMobile);
-  }, []);
-
-  return isMobile;
-}
 
 export function CashflowTransactionList({
   transactions: initialTransactions,
@@ -120,18 +73,6 @@ export function CashflowTransactionList({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [suggestedCategoryId, setSuggestedCategoryId] = useState<string | null>(null);
-  const [userTouchedCategory, setUserTouchedCategory] = useState(false);
-
-  const isMobileView = useIsMobile();
-
-  useEffect(() => {
-    if (!selected) {
-      setConfirmDeleteOpen(false);
-    }
-  }, [selected]);
 
   const sorted = useMemo(() => {
     const data = [...transactions].sort((a, b) => {
@@ -173,111 +114,13 @@ export function CashflowTransactionList({
     return totals;
   }, [groupedByDay]);
 
-  const form = useForm<CashflowQuickAddValues>({
-    resolver: zodResolver(cashflowQuickAddSchema),
-    defaultValues: {
-      type: "expense",
-      amount: 0,
-      account_id: null,
-      category_id: null,
-      note: "",
-      transaction_time: "",
-      currency: "VND",
-    },
-  });
-
-  const selectedType = form.watch("type") ?? "expense";
-  const selectedCategoryId = form.watch("category_id");
-  const amount = form.watch("amount");
-  const accountId = form.watch("account_id");
-  const transactionTimeValue = form.watch("transaction_time");
-  const categoriesByType = useMemo(() => categories.filter((c) => c.type === selectedType), [categories, selectedType]);
-
-  useEffect(() => {
-    const suggestions: Array<{ category: Category; reason?: string }> = [];
-    const seen = new Set<string>();
-
-    const addSuggestion = (category?: Category, reason?: string) => {
-      if (!category || seen.has(category.id)) return;
-      seen.add(category.id);
-      suggestions.push({ category, reason });
-    };
-
-    const findByKeywords = (names: string[]) => {
-      const lowered = names.map((name) => name.toLowerCase());
-      return categories.find(
-        (c) =>
-          c.type === selectedType &&
-          lowered.some((name) => c.name.toLowerCase().includes(name))
-      );
-    };
-
-    const storedId = (() => {
-      try {
-        return localStorage.getItem(`cashflow:lastCategory:${selectedType}`);
-      } catch {
-        return null;
-      }
-    })();
-
-    if (storedId) {
-      const storedCategory = categories.find((c) => c.id === storedId && c.type === selectedType);
-      if (storedCategory) {
-        addSuggestion(storedCategory, "Last used");
-      }
-    }
-
-    const hour = transactionTimeValue ? new Date(transactionTimeValue).getHours() : new Date().getHours();
-    const amountValue = typeof amount === "number" ? amount : null;
-    const acctType = accounts.find((a) => a.id === accountId)?.type?.toLowerCase() ?? "";
-
-    const heuristics: Array<{ condition: boolean; keywords: string[]; reason: string }> = [];
-    if (selectedType === "expense") {
-      heuristics.push(
-        { condition: amountValue !== null && amountValue <= 50000, keywords: ["coffee", "cafe"], reason: "Nhỏ, cà phê" },
-        { condition: amountValue !== null && amountValue <= 150000 && hour >= 10 && hour <= 14, keywords: ["lunch", "meal"], reason: "Giữa trưa" },
-        { condition: amountValue !== null && amountValue <= 80000 && acctType.includes("wallet"), keywords: ["ride", "grab", "taxi"], reason: "Di chuyển ví" }
-      );
-    } else if (selectedType === "income") {
-      heuristics.push(
-        { condition: amountValue !== null && amountValue >= 10000000, keywords: ["salary"], reason: "Lương lớn" },
-        { condition: amountValue !== null && amountValue >= 1000000, keywords: ["bonus"], reason: "Bonus" },
-        { condition: amountValue !== null && amountValue < 1000000, keywords: ["gift"], reason: "Tiền thưởng" }
-      );
-    }
-
-    heuristics.forEach((item) => {
-      if (!item.condition) return;
-      const matched = findByKeywords(item.keywords);
-      addSuggestion(matched, item.reason);
-    });
-
-    if (suggestions.length < 5) {
-      categoriesByType
-        .filter((category) => !seen.has(category.id))
-        .slice(0, 5 - suggestions.length)
-        .forEach((category) => addSuggestion(category));
-    }
-  }, [amount, accounts, accountId, categories, categoriesByType, form, selectedCategoryId, selectedType, transactionTimeValue, userTouchedCategory]);
-
   const openDetail = (tx: CashflowTransaction) => {
     setSubmitError(null);
     setDeleteError(null);
-    form.reset({
-      type: tx.type,
-      amount: tx.amount,
-      account_id: tx.account?.id ?? null,
-      category_id: tx.category?.id ?? null,
-      note: tx.note ?? "",
-      transaction_time: toLocalInputValue(tx.transaction_time),
-      currency: tx.currency,
-    });
     setSelected(tx);
-    setUserTouchedCategory(false);
-    setSuggestedCategoryId(tx.category?.id ?? null);
   };
 
-  const handleSave = async (values: CashflowQuickAddValues) => {
+  const handleSave = async (values: any) => {
     if (!selected) return;
     const current = selected;
     setSubmitError(null);
@@ -323,7 +166,7 @@ export function CashflowTransactionList({
     const current = selected;
     setDeleteError(null);
     setDeleting(true);
-    
+
     deleteMutation.mutate(
       current.id,
       {
@@ -339,11 +182,6 @@ export function CashflowTransactionList({
         },
       }
     );
-  };
-
-  const handleConfirmDelete = async () => {
-    setConfirmDeleteOpen(false);
-    await handleDelete();
   };
 
   if (sorted.length === 0) {
@@ -468,203 +306,19 @@ export function CashflowTransactionList({
         </Table>
       </div>
 
-      <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent
-          className={`max-h-[90vh] overflow-y-auto ${
-            isMobileView
-              ? "w-full max-w-[95vw] scale-100"
-              : "max-w-lg"
-          }`}
-          style={{
-            maxHeight: 'calc(var(--full-vh, 100vh) - 2rem)',
-          }}
-        >
-          <DialogHeader className="space-y-2">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <DialogTitle>Chi tiết giao dịch</DialogTitle>
-                <DialogDescription>Xem, sửa hoặc xoá giao dịch.</DialogDescription>
-              </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="mr-5"
-                onClick={() => setConfirmDeleteOpen(true)}
-                disabled={deleting}
-              >
-                Xoá
-              </Button>
-            </div>
-          </DialogHeader>
-
-          {selected ? (
-            <Form {...form}>
-              <form className="space-y-3" onSubmit={form.handleSubmit(handleSave)}>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Loại</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="expense">Expense</SelectItem>
-                            <SelectItem value="income">Income</SelectItem>
-                            <SelectItem value="transfer">Transfer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage>{form.formState.errors.type?.message}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Số tiền</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={field.value ?? ""}
-                            onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-                          />
-                        </FormControl>
-                        <FormMessage>{form.formState.errors.amount?.message}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Category (optional)</Label>
-                  <button
-                    type="button"
-                    onClick={() => setCategoryModalOpen(true)}
-                    className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60"
-                  >
-                    <span className="truncate">
-                      {selectedCategoryId
-                        ? categories.find((cat) => cat.id === selectedCategoryId)?.name
-                        : "Select category"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">Choose</span>
-                  </button>
-                  <CategoryTreeModal
-                    open={categoryModalOpen}
-                    onClose={() => setCategoryModalOpen(false)}
-                    categories={categoriesByType}
-                    selected={selectedCategoryId ?? null}
-                    onSelect={(next) => {
-                      form.setValue("category_id", next);
-                      setUserTouchedCategory(true);
-                      setSuggestedCategoryId(next);
-                    }}
-                    suggestedId={suggestedCategoryId}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="account_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Account</FormLabel>
-                      <Select
-                        value={field.value ?? NONE_VALUE}
-                        onValueChange={(val) => field.onChange(val === NONE_VALUE ? null : val)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NONE_VALUE}>None</SelectItem>
-                          {accounts.map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id}>
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage>{form.formState.errors.account_id?.message}</FormMessage>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="note"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Note</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          value={field.value ?? ""}
-                          rows={3}
-                          className="resize-none"
-                        />
-                      </FormControl>
-                      <FormMessage>{form.formState.errors.note?.message}</FormMessage>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="transaction_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Transaction time</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="datetime-local"
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage>{form.formState.errors.transaction_time?.message}</FormMessage>
-                    </FormItem>
-                  )}
-                />
-
-                {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-                {deleteError ? <p className="text-sm text-red-500">{deleteError}</p> : null}
-
-                <DialogFooter>
-                  <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? "Saving..." : "Save changes"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm delete</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleting}>
-              {deleting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CashflowTransactionDetailDialog
+        transaction={selected}
+        open={Boolean(selected)}
+        categories={categories}
+        accounts={accounts}
+        saveError={submitError}
+        deleteError={deleteError}
+        isSaving={updateMutation.isPending}
+        isDeleting={deleting}
+        onClose={() => setSelected(null)}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
     </div>
   );
 }
