@@ -201,6 +201,17 @@ export default function TradingOrdersPage() {
     setDialogOpen(true)
   }, [activeBalanceAccountId, form, notify])
 
+  useEffect(() => {
+    const handleAdd = (e: Event) => {
+      const custom = e as CustomEvent<string>
+      if (custom.detail === 'trading:orders:new') {
+        openNewDialog()
+      }
+    }
+    window.addEventListener('xper:add', handleAdd)
+    return () => window.removeEventListener('xper:add', handleAdd)
+  }, [openNewDialog])
+
   const openEditDialog = (order: OrderRow) => {
     setEditingOrder(order)
     form.reset({

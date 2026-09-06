@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
@@ -78,17 +79,22 @@ export default function TradingFundingPage() {
   const [activeBalanceAccountId, setActiveBalanceAccountId] = useState('')
 
   const accountMap = useMemo(() => {
-    const map = new Map<string, { name: string; currency: string }>()
-    fundingAccounts
-      .filter((acc) => acc.account_type === 'FUNDING')
-      .forEach((acc) => map.set(acc.id, { name: acc.name, currency: acc.currency }))
+    const map = new Map<string, { name: string; currency: string; account_type: 'TRADING' | 'FUNDING' }>()
+    fundingAccounts.forEach((acc) =>
+      map.set(acc.id, { name: acc.name, currency: acc.currency, account_type: acc.account_type })
+    )
     return map
   }, [fundingAccounts])
 
   const fundingAccountOptions = useMemo(() => 
     fundingAccounts
-      .filter((acc) => acc.account_type === 'FUNDING')
-      .map((acc) => ({ balance_account_id: acc.id, name: acc.name, currency: acc.currency })),
+      .filter((acc) => acc.is_active)
+      .map((acc) => ({
+        balance_account_id: acc.id,
+        name: acc.name,
+        currency: acc.currency,
+        account_type: acc.account_type,
+      })),
     [fundingAccounts]
   )
 
@@ -111,7 +117,7 @@ export default function TradingFundingPage() {
     defaultValues: {
       type: 'deposit',
       amount: undefined,
-      currency: 'USD',
+      currency: fundingAccountOptions[0]?.currency ?? 'USD',
       method: methodOptions[0],
       note: undefined,
       transaction_time: defaultDateTimeValue(),
@@ -130,19 +136,32 @@ export default function TradingFundingPage() {
   }, [fundingAccountOptions, activeBalanceAccountId])
 
   const openNewDialog = useCallback(() => {
+    const targetAccountId = activeBalanceAccountId || fundingAccountOptions[0]?.balance_account_id || ''
+    const targetAccount = targetAccountId ? accountMap.get(targetAccountId) : undefined
     form.reset({
       type: 'deposit',
       amount: undefined,
-      currency: 'USD',
+      currency: targetAccount?.currency || 'USD',
       method: methodOptions[0],
       note: undefined,
       transaction_time: defaultDateTimeValue(),
-      balance_account_id: activeBalanceAccountId || fundingAccountOptions[0]?.balance_account_id || '',
+      balance_account_id: targetAccountId,
     })
     setAmountInput('')
     setEditingRow(null)
     setDialogOpen(true)
-  }, [activeBalanceAccountId, form, fundingAccountOptions])
+  }, [activeBalanceAccountId, form, fundingAccountOptions, accountMap])
+
+  useEffect(() => {
+    const handleAdd = (e: Event) => {
+      const custom = e as CustomEvent<string>
+      if (custom.detail === 'trading:funding:new') {
+        openNewDialog()
+      }
+    }
+    window.addEventListener('xper:add', handleAdd)
+    return () => window.removeEventListener('xper:add', handleAdd)
+  }, [openNewDialog])
 
   const openEditDialog = (row: FundingRow) => {
     setEditingRow(row)
@@ -187,10 +206,12 @@ export default function TradingFundingPage() {
       notify({ type: 'error', title: 'Chưa chọn balance account', description: 'Chọn balance account trước khi lưu.' })
       return
     }
+    const txDate = new Date(values.transaction_time)
+    const transaction_time = Number.isNaN(txDate.getTime()) ? new Date().toISOString() : txDate.toISOString()
     const payload = {
       ...values,
       amount: Number(values.amount),
-      transaction_time: new Date(values.transaction_time).toISOString(),
+      transaction_time,
       note: values.note?.trim() ? values.note.trim() : null,
     }
 
@@ -210,14 +231,16 @@ export default function TradingFundingPage() {
           description: 'Giao dịch mới đã được thêm.',
         })
       }
+      const targetAccountId = activeBalanceAccountId || fundingAccountOptions[0]?.balance_account_id || ''
+      const targetAccount = targetAccountId ? accountMap.get(targetAccountId) : undefined
       form.reset({
         type: 'deposit',
         amount: undefined,
-        currency: 'USD',
+        currency: targetAccount?.currency || 'USD',
         method: methodOptions[0],
         note: undefined,
         transaction_time: defaultDateTimeValue(),
-        balance_account_id: activeBalanceAccountId || fundingAccountOptions[0]?.balance_account_id || '',
+        balance_account_id: targetAccountId,
       })
       setAmountInput('')
       setDialogOpen(false)
@@ -343,7 +366,7 @@ export default function TradingFundingPage() {
                     name="balance_account_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-semibold">Balance account (FUNDING)</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Balance account</FormLabel>
                         <Select
                           value={field.value ?? ''}
                           onValueChange={(val) => {
@@ -361,7 +384,7 @@ export default function TradingFundingPage() {
                           <SelectContent>
                             {fundingAccountOptions.map((acc) => (
                               <SelectItem key={acc.balance_account_id} value={acc.balance_account_id}>
-                                {acc.name} · {acc.currency}
+                                {acc.name} ({acc.account_type === 'TRADING' ? 'Trading' : 'Funding'}) · {acc.currency}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -464,6 +487,21 @@ export default function TradingFundingPage() {
         </Dialog>
       </div>
 
+      {fundingAccountOptions.length === 0 && (
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-amber-800">Chưa có balance account</CardTitle>
+            <CardDescription className="text-amber-700">
+              Bạn cần có ít nhất một balance account đang hoạt động để ghi nhận funding. Hãy tạo hoặc kích hoạt account tại{' '}
+              <Link to="/trading/accounts" className="font-semibold underline hover:text-amber-900">
+                Balance Accounts
+              </Link>
+              .
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {error ? (
         <Card>
           <CardHeader>
@@ -536,7 +574,18 @@ export default function TradingFundingPage() {
                         {currencyFormatter(row.amount, row.currency)}
                       </TableCell>
                       <TableCell>{row.method}</TableCell>
-                      <TableCell>{row.balance_account_id}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">
+                            {accountMap.get(row.balance_account_id)?.name ?? row.balance_account_id}
+                          </p>
+                          {accountMap.get(row.balance_account_id)?.account_type ? (
+                            <span className="text-xs text-muted-foreground">
+                              {accountMap.get(row.balance_account_id)?.account_type === 'TRADING' ? 'Trading account' : 'Funding account'}
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       <TableCell>{row.note ?? '—'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

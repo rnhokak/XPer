@@ -31,7 +31,7 @@ const loadFundingAccount = async (supabase: Awaited<ReturnType<typeof createClie
     .maybeSingle();
   if (error) return { error: error.message };
   if (!data) return { error: "Balance account not found" };
-  if (data.user_id !== userId || data.account_type !== "FUNDING") {
+  if (data.user_id !== userId || !["TRADING", "FUNDING"].includes(data.account_type)) {
     return { error: "Balance account invalid or not owned by user" };
   }
   return { ok: true };
@@ -73,10 +73,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  const txDate = new Date(parsed.data.transaction_time);
+  const transaction_time = Number.isNaN(txDate.getTime()) ? new Date().toISOString() : txDate.toISOString();
+
   const payload = {
     ...parsed.data,
     user_id: user.id,
-    transaction_time: new Date(parsed.data.transaction_time).toISOString(),
+    transaction_time,
     note: parsed.data.note?.trim() ? parsed.data.note.trim() : null,
   };
 
@@ -115,9 +118,12 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  const txDate = new Date(parsed.data.transaction_time);
+  const transaction_time = Number.isNaN(txDate.getTime()) ? new Date().toISOString() : txDate.toISOString();
+
   const payload = {
     ...parsed.data,
-    transaction_time: new Date(parsed.data.transaction_time).toISOString(),
+    transaction_time,
     note: parsed.data.note?.trim() ? parsed.data.note.trim() : null,
   };
 
