@@ -120,7 +120,17 @@ export function useCashflowAccounts() {
 export function useCashflowCategories() {
   return useApiQuery({
     queryKey: ['cashflow-categories'],
-    queryFn: getCategories,
+    queryFn: async () => {
+      try {
+        const categories = await getCategories()
+        await db.categories.bulkPut(categories)
+        return categories
+      } catch (error) {
+        const localCategories = await db.categories.toArray()
+        if (localCategories.length > 0) return localCategories as CashflowCategory[]
+        throw error
+      }
+    },
   })
 }
 

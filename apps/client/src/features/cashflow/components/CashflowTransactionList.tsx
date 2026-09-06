@@ -75,6 +75,11 @@ export function CashflowTransactionList({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const getCategoryName = (transaction: CashflowTransaction) =>
+    transaction.category?.name ??
+    (transaction.category?.id ? categories.find((category) => category.id === transaction.category?.id)?.name : undefined) ??
+    "Uncategorized";
+
   useEffect(() => {
     const handleSyncProcessed = (event: Event) => {
       const detail = (event as CustomEvent<{ operation?: { opType: string; body?: any }; data?: CashflowTransaction }>).detail;
@@ -250,7 +255,7 @@ export function CashflowTransactionList({
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
-                      <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
+                      <p className="text-sm font-semibold">{getCategoryName(tx)}</p>
                       {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
                     </div>
                     <div className={`money-blur text-base font-semibold ${getAmountTextClass(tx.type)}`}>
@@ -336,7 +341,7 @@ export function CashflowTransactionList({
                           {cashflowTransactionTypeLabels[tx.type]}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
+                      <TableCell className="font-medium">{getCategoryName(tx)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
                       <TableCell className={`money-blur text-right font-semibold ${getAmountTextClass(tx.type)}`}>
