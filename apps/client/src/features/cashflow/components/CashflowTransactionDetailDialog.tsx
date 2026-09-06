@@ -339,6 +339,9 @@ export function CashflowTransactionDetailDialog({
                 {deleteError ? <p className="text-sm text-red-500">{deleteError}</p> : null}
 
                 <DialogFooter className="flex items-center gap-3">
+                   <Button variant="outline" onClick={onClose} disabled={isSaving} className="min-w-[120px]">
+                    Close
+                  </Button>
                   <Button type="submit" disabled={isSaving} className="min-w-[150px]">
                     {isSaving ? (
                       <span className="flex items-center justify-center gap-2">
@@ -348,9 +351,6 @@ export function CashflowTransactionDetailDialog({
                     ) : (
                       "Save changes"
                     )}
-                  </Button>
-                  <Button variant="outline" onClick={onClose} disabled={isSaving} className="min-w-[120px]">
-                    Close
                   </Button>
                 </DialogFooter>
               </form>

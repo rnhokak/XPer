@@ -14,7 +14,8 @@ import { orderFormSchema, type OrderFormValues } from '@/lib/validation/trading'
 import { useNotificationsStore } from '@/store/notifications'
 import { useOrders, useCreateOrder, useUpdateOrder, useDeleteOrder, useSyncOrdersLedger } from '@/hooks/useTradingData'
 import { useBalanceAccounts } from '@/hooks/useTradingData'
-import { Loader2, Percent } from 'lucide-react'
+import { Loader2, Percent, Upload } from 'lucide-react'
+import { TradingOrderImportDialog } from './components/TradingOrderImportDialog'
 
 type OrderRow = {
   id: string
@@ -41,6 +42,7 @@ type OrderRow = {
   pnl_amount?: number | null
   pnl_percent?: number | null
   note?: string | null
+  is_imported?: boolean
   created_at: string
   updated_at: string
 }
@@ -98,6 +100,7 @@ export default function TradingOrdersPage() {
   const [mounted, setMounted] = useState(false)
   const [filters, setFilters] = useState<{ symbol: string; status: StatusFilter }>({ symbol: '', status: 'all' })
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<OrderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<OrderRow | null>(null)
   const [page, setPage] = useState(1)
@@ -320,6 +323,15 @@ export default function TradingOrdersPage() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleLedgerSync} disabled={syncingLedger || syncLedgerMutation.isPending}>
             {syncingLedger || syncLedgerMutation.isPending ? 'Syncing...' : 'Sync Ledger'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setImportDialogOpen(true)}
+            disabled={tradingAccountOptions.length === 0}
+            className="flex items-center gap-1.5"
+          >
+            <Upload className="h-4 w-4" />
+            Import CSV
           </Button>
           <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
             <DialogTrigger asChild>
@@ -686,7 +698,21 @@ export default function TradingOrdersPage() {
                 ) : (
                   paginatedOrders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.symbol}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5">
+                            <span>{order.symbol}</span>
+                            {order.is_imported && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-200 text-blue-700 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                                Imported
+                              </Badge>
+                            )}
+                          </div>
+                          {order.ticket && (
+                            <span className="text-[11px] text-muted-foreground font-mono">#{order.ticket}</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={order.side === 'buy' ? 'default' : 'secondary'}>
                           {order.side === 'buy' ? 'Buy' : 'Sell'}
@@ -706,10 +732,23 @@ export default function TradingOrdersPage() {
                       <TableCell className="text-sm">{formatDateTime(order.open_time)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="ghost" onClick={() => openEditDialog(order)}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEditDialog(order)}
+                            disabled={order.is_imported}
+                            title={order.is_imported ? 'Lệnh đã import không thể chỉnh sửa' : 'Edit order'}
+                          >
                             Edit
                           </Button>
-                          <Button size="sm" variant="ghost" className="text-red-600" onClick={() => setDeleteTarget(order)}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={order.is_imported ? 'text-muted-foreground' : 'text-red-600'}
+                            onClick={() => setDeleteTarget(order)}
+                            disabled={order.is_imported}
+                            title={order.is_imported ? 'Lệnh đã import không thể xóa' : 'Delete order'}
+                          >
                             Delete
                           </Button>
                         </div>
@@ -759,6 +798,13 @@ export default function TradingOrdersPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      <TradingOrderImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        tradingAccounts={tradingAccountOptions}
+        defaultBalanceAccountId={activeBalanceAccountId}
+      />
     </div>
   )
 }

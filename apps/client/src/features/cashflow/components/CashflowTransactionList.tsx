@@ -7,7 +7,8 @@ import {
 } from "@/lib/validation/cashflow";
 import { type CategoryFocus } from "@/lib/validation/categories";
 import { useQueryClient } from "@/lib/query";
-import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction, useUpdateTransaction, useDeleteTransaction } from "@/hooks/useCashflowTransactions";
+import db from "@/lib/db";
+import { useCashflowTransactions, type CashflowTransaction, useUpdateTransaction, useDeleteTransaction } from "@/hooks/useCashflowTransactions";
 import { CashflowTransactionDetailDialog } from "./CashflowTransactionDetailDialog";
 
 type Category = {
@@ -69,11 +70,49 @@ export function CashflowTransactionList({
   const { data: transactions = initialTransactions, isFetching } = useCashflowTransactions(range, shift, initialTransactions);
   const updateMutation = useUpdateTransaction();
   const deleteMutation = useDeleteTransaction();
-  const queryKey = cashflowTransactionsQueryKey(range, shift);
   const [selected, setSelected] = useState<CashflowTransaction | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const getCategoryName = (transaction: CashflowTransaction) =>
+    transaction.category?.name ??
+    (transaction.category?.id ? categories.find((category) => category.id === transaction.category?.id)?.name : undefined) ??
+    "Uncategorized";
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkPendingStatus = async () => {
+      const pendingItems = transactions.filter((tx) => tx.pending);
+      if (pendingItems.length === 0) return;
+
+      const pendingOps = await db.pending.toArray();
+      const pendingIds = new Set(
+        pendingOps.map((op) => op.body?.__localId || op.body?.id).filter(Boolean)
+      );
+
+      const hasResolvedItems = pendingItems.some((tx) => !pendingIds.has(tx.id));
+      if (hasResolvedItems && isMounted) {
+        queryClient.setQueriesData<CashflowTransaction[]>(
+          { queryKey: ["cashflow-transactions"] },
+          (prev) => {
+            if (!Array.isArray(prev)) return prev;
+            return prev.map((tx) =>
+              tx.pending && !pendingIds.has(tx.id)
+                ? { ...tx, pending: false, error: false }
+                : tx
+            );
+          }
+        );
+        void queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
+      }
+    };
+
+    void checkPendingStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, [transactions, queryClient]);
 
   useEffect(() => {
     const handleSyncProcessed = (event: Event) => {
@@ -82,7 +121,19 @@ export function CashflowTransactionList({
       const syncedId = operation?.opType === "create" ? operation.body?.__localId : operation?.body?.id;
 
       if (syncedId) {
-        queryClient.setQueryData<CashflowTransaction[]>(queryKey, (prev) => {
+        queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-transactions"] }, (prev) => {
+          if (!prev) return prev;
+          if (operation?.opType === "delete") {
+            return prev.filter((transaction) => transaction.id !== syncedId);
+          }
+          return prev.map((transaction) =>
+            transaction.id === syncedId
+              ? { ...transaction, ...(detail.data ?? {}), pending: false, error: false }
+              : transaction,
+          );
+        });
+
+        queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-report-transactions"] }, (prev) => {
           if (!prev) return prev;
           if (operation?.opType === "delete") {
             return prev.filter((transaction) => transaction.id !== syncedId);
@@ -95,12 +146,13 @@ export function CashflowTransactionList({
         });
       }
 
-      void queryClient.invalidateQueries({ queryKey: cashflowTransactionsQueryKey(range, shift) });
+      void queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
+      void queryClient.invalidateQueries({ queryKey: ["cashflow-report-transactions"] });
     };
 
     window.addEventListener("xper:sync:processed", handleSyncProcessed);
     return () => window.removeEventListener("xper:sync:processed", handleSyncProcessed);
-  }, [queryClient, range, shift]);
+  }, [queryClient]);
 
   const sorted = useMemo(() => {
     const data = [...transactions].sort((a, b) => {
@@ -180,7 +232,8 @@ export function CashflowTransactionList({
             pending: true,
           };
           setSelected(null);
-          queryClient.setQueryData<CashflowTransaction[]>(queryKey, (prev) => (prev ? prev.map((tx) => (tx.id === current.id ? updatedTx : tx)) : prev));
+          queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-transactions"] }, (prev) => (prev ? prev.map((tx) => (tx.id === current.id ? updatedTx : tx)) : prev));
+          queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-report-transactions"] }, (prev) => (prev ? prev.map((tx) => (tx.id === current.id ? updatedTx : tx)) : prev));
         },
         onError: (error) => {
           setSubmitError(error.message || "Cập nhật thất bại");
@@ -201,7 +254,8 @@ export function CashflowTransactionList({
         onSuccess: () => {
           setSelected(null);
           setDeleting(false);
-          queryClient.setQueryData<CashflowTransaction[]>(queryKey, (prev) => prev?.filter((tx) => tx.id !== current.id));
+          queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-transactions"] }, (prev) => prev?.filter((tx) => tx.id !== current.id));
+          queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-report-transactions"] }, (prev) => prev?.filter((tx) => tx.id !== current.id));
         },
         onError: (error) => {
           setDeleting(false);
@@ -250,7 +304,7 @@ export function CashflowTransactionList({
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
-                      <p className="text-sm font-semibold">{tx.category?.name ?? "Uncategorized"}</p>
+                      <p className="text-sm font-semibold">{getCategoryName(tx)}</p>
                       {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
                     </div>
                     <div className={`money-blur text-base font-semibold ${getAmountTextClass(tx.type)}`}>
@@ -336,7 +390,7 @@ export function CashflowTransactionList({
                           {cashflowTransactionTypeLabels[tx.type]}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">{tx.category?.name ?? "Uncategorized"}</TableCell>
+                      <TableCell className="font-medium">{getCategoryName(tx)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
                       <TableCell className={`money-blur text-right font-semibold ${getAmountTextClass(tx.type)}`}>
