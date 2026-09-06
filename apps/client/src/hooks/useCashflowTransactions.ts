@@ -71,12 +71,31 @@ const getAndCacheCurrentMonthTransactions = async () => {
   try {
     const remoteTransactions = await getTransactions('month', 0)
     const currentLocalTransactions = await getLocalTransactionsForRange('month', 0)
-    const pendingTransactions = currentLocalTransactions.filter((transaction) => transaction.pending)
+    const pendingOps = await db.pending.toArray()
+    const pendingOpIds = new Set(
+      pendingOps.map((op) => op.body?.__localId || op.body?.id).filter(Boolean)
+    )
+
+    // Clean up or resolve any local transactions that are marked pending but no longer in db.pending
+    const resolvedLocalPending = currentLocalTransactions.filter(
+      (tx) => tx.pending && !pendingOpIds.has(tx.id)
+    )
+    for (const tx of resolvedLocalPending) {
+      if (tx.id.startsWith('local-')) {
+        await db.transactions.delete(tx.id)
+      } else {
+        await db.transactions.update(tx.id, { pending: false, error: false })
+      }
+    }
+
+    const pendingTransactions = currentLocalTransactions.filter(
+      (transaction) => transaction.pending && pendingOpIds.has(transaction.id)
+    )
     const pendingIds = new Set(pendingTransactions.map((transaction) => transaction.id))
     const cachedTransactions = remoteTransactions.filter((transaction) => !pendingIds.has(transaction.id))
     const remoteIds = new Set(remoteTransactions.map((transaction) => transaction.id))
     const staleIds = currentLocalTransactions
-      .filter((transaction) => !transaction.pending && !remoteIds.has(transaction.id))
+      .filter((transaction) => !transaction.pending && !remoteIds.has(transaction.id) && !pendingOpIds.has(transaction.id))
       .map((transaction) => transaction.id)
     if (staleIds.length > 0) await db.transactions.bulkDelete(staleIds)
     await db.transactions.bulkPut(cachedTransactions)
@@ -92,7 +111,27 @@ const getReportTransactionsFromLocalDb = async () => {
   try {
     const remoteTransactions = await getReportTransactions()
     const currentLocalTransactions = await db.transactions.toArray() as unknown as CashflowTransaction[]
-    const pendingIds = new Set(currentLocalTransactions.filter((transaction) => transaction.pending).map((transaction) => transaction.id))
+    const pendingOps = await db.pending.toArray()
+    const pendingOpIds = new Set(
+      pendingOps.map((op) => op.body?.__localId || op.body?.id).filter(Boolean)
+    )
+
+    const resolvedLocalPending = currentLocalTransactions.filter(
+      (tx) => tx.pending && !pendingOpIds.has(tx.id)
+    )
+    for (const tx of resolvedLocalPending) {
+      if (tx.id.startsWith('local-')) {
+        await db.transactions.delete(tx.id)
+      } else {
+        await db.transactions.update(tx.id, { pending: false, error: false })
+      }
+    }
+
+    const pendingIds = new Set(
+      currentLocalTransactions
+        .filter((transaction) => transaction.pending && pendingOpIds.has(transaction.id))
+        .map((transaction) => transaction.id)
+    )
     await db.transactions.bulkPut(remoteTransactions.filter((transaction) => !pendingIds.has(transaction.id)))
   } catch (error) {
     const localTransactions = await db.transactions.toArray()

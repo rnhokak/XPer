@@ -1,8 +1,52 @@
-import axios from 'axios'
+import { apiClient } from '@/lib/api/client'
 import db, { PendingOp } from '@/lib/db'
+import { useApiCache } from '@/lib/query'
 
 const PROCESSING_KEY = 'sync:processing'
 const PROCESS_AGAIN_KEY = 'sync:process-again'
+
+function syncCashflowQueries(op: PendingOp, serverData?: any) {
+  if (op.resource !== 'cashflow/transactions') return
+
+  const body = op.body || {}
+  const syncedId = op.opType === 'create' ? body.__localId : body.id
+  if (!syncedId) return
+
+  const queryClient = useApiCache()
+
+  queryClient.setQueriesData<any>(
+    { queryKey: ['cashflow-transactions'] },
+    (prev) => {
+      if (!Array.isArray(prev)) return prev
+      if (op.opType === 'delete') {
+        return prev.filter((tx) => tx.id !== syncedId)
+      }
+      return prev.map((tx) =>
+        tx.id === syncedId
+          ? { ...tx, ...(serverData ?? {}), pending: false, error: false }
+          : tx,
+      )
+    },
+  )
+
+  queryClient.setQueriesData<any>(
+    { queryKey: ['cashflow-report-transactions'] },
+    (prev) => {
+      if (!Array.isArray(prev)) return prev
+      if (op.opType === 'delete') {
+        return prev.filter((tx) => tx.id !== syncedId)
+      }
+      return prev.map((tx) =>
+        tx.id === syncedId
+          ? { ...tx, ...(serverData ?? {}), pending: false, error: false }
+          : tx,
+      )
+    },
+  )
+
+  void queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
+  void queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
+}
 
 export async function enqueueOperation(op: Omit<PendingOp, 'id' | 'createdAt' | 'tries'>) {
   const item: PendingOp = { ...op, createdAt: Date.now(), tries: 0 }
@@ -57,23 +101,23 @@ async function handleCashflowTransactionSync(op: PendingOp, response?: any) {
 }
 
 async function sendOp(op: PendingOp) {
-  const url = `/api/${op.resource}`
+  const path = `/${op.resource}`
 
   try {
     if (op.opType === 'create') {
-      const response = await axios.post(url, op.body)
+      const response = await apiClient.post(path, op.body)
       await handleCashflowTransactionSync(op, response)
       return response
     }
 
     if (op.opType === 'update') {
-      const response = await axios.put(`${url}`, op.body)
+      const response = await apiClient.put(path, op.body)
       await handleCashflowTransactionSync(op, response)
       return response
     }
 
     if (op.opType === 'delete') {
-      const response = await axios.delete(`${url}`, { data: op.body })
+      const response = await apiClient.delete(path, { data: op.body })
       await handleCashflowTransactionSync(op, response)
       return response
     }
@@ -96,6 +140,7 @@ export async function processQueue({ limit = 20 } = {}) {
       try {
         const response = await sendOp(item)
         await db.pending.delete(item.id!)
+        syncCashflowQueries(item, response?.data)
         window.dispatchEvent(
           new CustomEvent('xper:sync:processed', {
             detail: { id: item.id, operation: item, data: response?.data },

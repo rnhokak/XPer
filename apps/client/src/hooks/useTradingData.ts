@@ -15,10 +15,12 @@ import {
   updateOrder,
   deleteOrder,
   syncOrdersLedger,
+  importOrders,
   getLedger,
   type BalanceAccount,
   type FundingRow,
   type OrderRow,
+  type ImportOrderRow,
 } from '@/lib/api/trading'
 
 const tradingDashboardQueryKey = ['trading', 'dashboard']
@@ -115,6 +117,19 @@ export function useSyncOrdersLedger() {
     queryClient.invalidateQueries({ queryKey: ordersQueryKey })
     queryClient.invalidateQueries({ queryKey: ['trading', 'ledger'] })
   } })
+}
+
+export function useImportOrders() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (rows: ImportOrderRow[]) => importOrders(rows),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ordersQueryKey })
+      queryClient.invalidateQueries({ queryKey: ['trading', 'ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['trading', 'balances'] })
+      queryClient.invalidateQueries({ queryKey: ['trading', 'dashboard'] })
+    },
+  })
 }
 
 const ledgerQueryKey = ['trading', 'ledger']

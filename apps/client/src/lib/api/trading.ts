@@ -72,8 +72,41 @@ export type OrderRow = {
   pnl_amount?: number | null
   pnl_percent?: number | null
   note?: string | null
+  is_imported?: boolean
   created_at: string
   updated_at: string
+}
+
+export type ImportOrderRow = {
+  ticket?: string | null
+  symbol: string
+  side: 'buy' | 'sell'
+  entry_price: number
+  sl_price?: number | null
+  tp_price?: number | null
+  volume: number
+  leverage?: number | null
+  original_position_size?: number | null
+  commission_usd?: number | null
+  swap_usd?: number | null
+  equity_usd?: number | null
+  margin_level?: number | null
+  close_reason?: string | null
+  status: 'open' | 'closed' | 'cancelled'
+  open_time: string
+  close_time?: string | null
+  close_price?: number | null
+  pnl_amount?: number | null
+  pnl_percent?: number | null
+  note?: string | null
+  balance_account_id: string
+}
+
+export type ImportOrdersResponse = {
+  success: boolean
+  count: number
+  skipped: number
+  message?: string
 }
 
 export type LedgerRow = {
@@ -175,6 +208,11 @@ export async function deleteOrder(id: string) {
 
 export async function syncOrdersLedger() {
   const response = await apiClient.post('/trading/orders/sync-ledger')
+  return response.data
+}
+
+export async function importOrders(rows: ImportOrderRow[]) {
+  const response = await apiClient.post<ImportOrdersResponse>('/trading/orders/import', { rows })
   return response.data
 }
 
