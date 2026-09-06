@@ -45,5 +45,5 @@ coverage
 .supabase/telemetry.json
 .supabase/telemetry.json
 /supabase/.temp/start-secrets
-
+/supabase/.temp/
 /apps/web/public/app/assets/

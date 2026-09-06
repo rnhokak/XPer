@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "pnpm run build",
   "devCommand": "pnpm run dev:web",
-  "installCommand": "pnpm install --fetch-retries=5 --fetch-retry-factor=2 --network-concurrency=1",
+  "installCommand": "pnpm install",
   "framework": "nextjs",
   "outputDirectory": "apps/web/.next"
 }

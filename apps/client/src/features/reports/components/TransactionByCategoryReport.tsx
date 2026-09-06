@@ -21,8 +21,10 @@ type Transaction = {
   currency: string;
   note: string | null;
   transaction_time: string;
-  category_id: string | null;
-  account_id: string | null;
+  category_id?: string | null;
+  category?: { id: string | null; name: string | null; type?: string } | null;
+  account_id?: string | null;
+  account?: { id: string | null; name: string | null; currency?: string | null } | null;
 };
 
 type CategoryWithChildren = Category & {
@@ -62,9 +64,10 @@ function buildCategoryTree(categories: Category[], transactions: Transaction[]):
 
   // Calculate transaction amounts per category
   transactions.forEach((transaction) => {
-    if (!transaction.category_id) return;
+    const categoryId = transaction.category_id ?? transaction.category?.id;
+    if (!categoryId) return;
 
-    const category = categoryMap.get(transaction.category_id);
+    const category = categoryMap.get(categoryId);
     if (category) {
       category.transactions.push(transaction);
       category.totalAmount += transaction.amount;
@@ -74,7 +77,7 @@ function buildCategoryTree(categories: Category[], transactions: Transaction[]):
   // Build parent-child relationships
   const rootCategories: CategoryWithChildren[] = [];
   categoryMap.forEach((category) => {
-    if (category.parent_id) {
+    if (category.parent_id && categoryMap.has(category.parent_id)) {
       const parent = categoryMap.get(category.parent_id);
       if (parent) {
         parent.children.push(category);
