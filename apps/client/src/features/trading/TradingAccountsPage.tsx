@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createBalanceAccountSchema, type CreateBalanceAccountInput } from '@/lib/validation/balance'
 import { useNotificationsStore } from '@/store/notifications'
 import {
@@ -129,7 +136,7 @@ export default function TradingAccountsPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Balance Accounts</h1>
-          <p className="text-sm text-muted-foreground">Quản lý ví. Account mới mặc định loại TRADING.</p>
+          <p className="text-sm text-muted-foreground">Quản lý ví và tài khoản trading/funding.</p>
         </div>
         <Button variant="outline" onClick={resetForm} disabled={!editing}>
           {editing ? 'Reset form' : 'Ready'}
@@ -149,11 +156,37 @@ export default function TradingAccountsPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>{editing ? 'Cập nhật account' : 'Tạo account mới'}</CardTitle>
-            <CardDescription>Điền tên và currency. Account mặc định loại TRADING.</CardDescription>
+            <CardDescription>Chọn loại tài khoản, điền tên và currency.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+                <FormField
+                  control={form.control}
+                  name="account_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Loại tài khoản</FormLabel>
+                      <Select
+                        value={field.value ?? 'TRADING'}
+                        onValueChange={field.onChange}
+                        disabled={!!editing}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn loại tài khoản" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="TRADING">Trading account (Lệnh giao dịch & funding)</SelectItem>
+                          <SelectItem value="FUNDING">Funding account (Ví nạp / rút tiền)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage>{form.formState.errors.account_type?.message}</FormMessage>
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="currency"
