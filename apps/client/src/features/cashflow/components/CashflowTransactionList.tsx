@@ -1,11 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Fragment, useMemo, useState } from "react";
+import { CircleAlert, Clock3 } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   cashflowTransactionTypeLabels,
   type CashflowTransactionType,
 } from "@/lib/validation/cashflow";
 import { type CategoryFocus } from "@/lib/validation/categories";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@/lib/query";
 import { cashflowTransactionsQueryKey, useCashflowTransactions, type CashflowTransaction, useUpdateTransaction, useDeleteTransaction } from "@/hooks/useCashflowTransactions";
 import { CashflowTransactionDetailDialog } from "./CashflowTransactionDetailDialog";
 
@@ -73,6 +74,33 @@ export function CashflowTransactionList({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const handleSyncProcessed = (event: Event) => {
+      const detail = (event as CustomEvent<{ operation?: { opType: string; body?: any }; data?: CashflowTransaction }>).detail;
+      const operation = detail?.operation;
+      const syncedId = operation?.opType === "create" ? operation.body?.__localId : operation?.body?.id;
+
+      if (syncedId) {
+        queryClient.setQueryData<CashflowTransaction[]>(queryKey, (prev) => {
+          if (!prev) return prev;
+          if (operation?.opType === "delete") {
+            return prev.filter((transaction) => transaction.id !== syncedId);
+          }
+          return prev.map((transaction) =>
+            transaction.id === syncedId
+              ? { ...transaction, ...(detail.data ?? {}), pending: false, error: false }
+              : transaction,
+          );
+        });
+      }
+
+      void queryClient.invalidateQueries({ queryKey: cashflowTransactionsQueryKey(range, shift) });
+    };
+
+    window.addEventListener("xper:sync:processed", handleSyncProcessed);
+    return () => window.removeEventListener("xper:sync:processed", handleSyncProcessed);
+  }, [queryClient, range, shift]);
 
   const sorted = useMemo(() => {
     const data = [...transactions].sort((a, b) => {
@@ -149,10 +177,10 @@ export function CashflowTransactionList({
             category: category ? { id: category.id, name: category.name, type: category.type } : null,
             account: account ? { id: account.id, name: account.name, currency: account.currency } : null,
             user_id: current.user_id,
+            pending: true,
           };
           setSelected(null);
           queryClient.setQueryData<CashflowTransaction[]>(queryKey, (prev) => (prev ? prev.map((tx) => (tx.id === current.id ? updatedTx : tx)) : prev));
-          queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
         },
         onError: (error) => {
           setSubmitError(error.message || "Cập nhật thất bại");
@@ -174,7 +202,6 @@ export function CashflowTransactionList({
           setSelected(null);
           setDeleting(false);
           queryClient.setQueryData<CashflowTransaction[]>(queryKey, (prev) => prev?.filter((tx) => tx.id !== current.id));
-          queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
         },
         onError: (error) => {
           setDeleting(false);
@@ -235,6 +262,24 @@ export function CashflowTransactionList({
                       {cashflowTransactionTypeLabels[tx.type]}
                     </span>
                     {tx.account?.name ? <span>{tx.account.name}</span> : null}
+                    {tx.pending ? (
+                      <span
+                        title="Đang chờ đồng bộ"
+                        aria-label="Đang chờ đồng bộ"
+                        className="ml-2 inline-flex items-center text-yellow-700"
+                      >
+                        <Clock3 className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                    ) : null}
+                    {tx.error ? (
+                      <span
+                        title="Lỗi đồng bộ"
+                        aria-label="Lỗi đồng bộ"
+                        className="ml-2 inline-flex items-center text-red-700"
+                      >
+                        <CircleAlert className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                    ) : null}
                   </div>
                 </button>
               ))}
@@ -295,7 +340,27 @@ export function CashflowTransactionList({
                       <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
                       <TableCell className={`money-blur text-right font-semibold ${getAmountTextClass(tx.type)}`}>
-                        {formatNumber(tx.amount, tx.currency)} {tx.currency}
+                        <div className="flex items-center justify-end gap-3">
+                          <div>{formatNumber(tx.amount, tx.currency)} {tx.currency}</div>
+                          {tx.pending ? (
+                            <span
+                              title="Đang chờ đồng bộ"
+                              aria-label="Đang chờ đồng bộ"
+                              className="inline-flex items-center text-yellow-700"
+                            >
+                              <Clock3 className="h-4 w-4" aria-hidden="true" />
+                            </span>
+                          ) : null}
+                          {tx.error ? (
+                            <span
+                              title="Lỗi đồng bộ"
+                              aria-label="Lỗi đồng bộ"
+                              className="inline-flex items-center text-red-700"
+                            >
+                              <CircleAlert className="h-4 w-4" aria-hidden="true" />
+                            </span>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

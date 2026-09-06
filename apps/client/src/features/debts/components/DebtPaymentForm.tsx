@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@/lib/query'
 import { debtPaymentSchema, type DebtPaymentInput } from '@/lib/validation/debts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { type Account, type Category } from '@/hooks/useDebtsData'
-import { API_BASE_URL } from '@/lib/env'
+import { apiClient } from '@/lib/api/client'
 
 type Props = {
   debtId: string
@@ -85,18 +85,8 @@ export function DebtPaymentForm({
 
   const createPaymentMutation = useMutation({
     mutationFn: async (payload: DebtPaymentInput) => {
-      const res = await fetch(`${API_BASE_URL}/debts/payments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? 'Không thể ghi nhận thanh toán')
-      }
-
-      return res.json().catch(() => ({}))
+      const response = await apiClient.post('/debts/payments', payload)
+      return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debts'] })

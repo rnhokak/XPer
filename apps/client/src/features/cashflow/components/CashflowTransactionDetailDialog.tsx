@@ -209,9 +209,10 @@ export function CashflowTransactionDetailDialog({
     <>
       <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
         <DialogContent
-          className={`max-h-[90vh] overflow-y-auto ${"w-full max-w-[95vw] scale-100"}`}
+          className="w-full max-w-[590px] mx-auto my-5 rounded-lg overflow-hidden max-h-[90vh] overflow-y-auto scale-100"
           style={{
             maxHeight: "calc(var(--full-vh, 100vh) - 2rem)",
+            WebkitOverflowScrolling: "touch",
           }}
         >
           <DialogHeader className="space-y-2">
@@ -256,6 +257,11 @@ export function CashflowTransactionDetailDialog({
                       </FormItem>
                     )}
                   />
+                </div>
+
+                <div className="space-y-4">
+                  <CashflowAmountFields control={form.control} currency={currency} />
+                  <CashflowDateFields control={form.control} />
                 </div>
 
                 <div className="space-y-2">
@@ -327,15 +333,12 @@ export function CashflowTransactionDetailDialog({
                   )}
                 />
 
-                <div className="space-y-4">
-                  <CashflowAmountFields control={form.control} currency={currency} />
-                  <CashflowDateFields control={form.control} />
-                </div>
+
 
                 {saveError ? <p className="text-sm text-red-500">{saveError}</p> : null}
                 {deleteError ? <p className="text-sm text-red-500">{deleteError}</p> : null}
 
-                <DialogFooter>
+                <DialogFooter className="flex items-center gap-3">
                   <Button type="submit" disabled={isSaving} className="min-w-[150px]">
                     {isSaving ? (
                       <span className="flex items-center justify-center gap-2">
@@ -346,6 +349,9 @@ export function CashflowTransactionDetailDialog({
                       "Save changes"
                     )}
                   </Button>
+                  <Button variant="outline" onClick={onClose} disabled={isSaving} className="min-w-[120px]">
+                    Close
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -354,7 +360,7 @@ export function CashflowTransactionDetailDialog({
       </Dialog>
 
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-[590px] mx-auto my-5 rounded-lg" style={{ WebkitOverflowScrolling: "touch" }}>
           <DialogHeader>
             <DialogTitle>Confirm delete</DialogTitle>
             <DialogDescription>

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useApiQuery } from '@/lib/query'
 import { type CategoryFocus } from '@/lib/validation/categories'
 import { getAccounts, getCategories } from '@/lib/api/cashflow'
 import { getDebts, getDebtDetail, getDebtPartners } from '@/lib/api/debts'
@@ -88,7 +88,7 @@ const computeOutstanding = (
 }
 
 export function useDebtsOverviewData(userId: string) {
-  return useQuery({
+  return useApiQuery({
     queryKey: debtsOverviewQueryKey(userId),
     queryFn: async () => {
       const [partners, accounts, categories, debts] = await Promise.all([
@@ -110,7 +110,7 @@ export function useDebtsOverviewData(userId: string) {
 }
 
 export function useDebtsFormData(userId: string) {
-  return useQuery({
+  return useApiQuery({
     queryKey: debtsFormQueryKey(userId),
     queryFn: async () => {
       const [partners, accounts, categories] = await Promise.all([
@@ -126,7 +126,7 @@ export function useDebtsFormData(userId: string) {
 }
 
 export function useDebtPartners(userId: string) {
-  return useQuery({
+  return useApiQuery({
     queryKey: debtPartnersQueryKey(userId),
     queryFn: getDebtPartners,
     enabled: Boolean(userId),
@@ -134,7 +134,7 @@ export function useDebtPartners(userId: string) {
 }
 
 export function useDebtDetailData(userId: string, debtId: string | undefined) {
-  return useQuery({
+  return useApiQuery({
     queryKey: debtDetailQueryKey(debtId ?? '', userId),
     queryFn: async () => {
       if (!debtId) return null

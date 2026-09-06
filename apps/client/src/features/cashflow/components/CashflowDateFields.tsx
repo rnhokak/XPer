@@ -7,7 +7,7 @@ import { type CashflowQuickAddValues } from "@/lib/validation/cashflow";
 const toLocalInput = (input: string | Date) => {
   const date = input instanceof Date ? input : new Date(input);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+  return local.toISOString().slice(0, 23);
 };
 
 const defaultDateTimeValue = () => toLocalInput(new Date());
@@ -70,6 +70,7 @@ export function CashflowDateFields({ control }: Props) {
                 </div>
                 <Input
                   type="datetime-local"
+                  step="0.001"
                   value={field.value ?? ""}
                   onChange={(e) => {
                     const val = e.target.value;

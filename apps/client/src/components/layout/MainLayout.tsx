@@ -281,6 +281,8 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
             Đăng xuất
           </Button>
         </div>
+
+        <p className="px-3 pt-4 text-[11px] text-slate-400">Version {__APP_VERSION__}</p>
       </aside>
 
       {isSidebarOpen && (

@@ -4,11 +4,18 @@ import path from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'service-worker.ts',
       includeAssets: ['icons/icon-180.png'],
+      cleanupOutdatedCaches: true,
       manifest: {
         name: 'XPer Finance',
         short_name: 'XPer',
@@ -66,6 +73,11 @@ export default defineConfig({
   publicDir: 'public',
   server: {
     port: 3001,
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3005',
