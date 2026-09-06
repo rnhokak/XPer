@@ -88,6 +88,20 @@ const getAndCacheCurrentMonthTransactions = async () => {
   }
 }
 
+const getReportTransactionsFromLocalDb = async () => {
+  try {
+    const remoteTransactions = await getReportTransactions()
+    const currentLocalTransactions = await db.transactions.toArray() as unknown as CashflowTransaction[]
+    const pendingIds = new Set(currentLocalTransactions.filter((transaction) => transaction.pending).map((transaction) => transaction.id))
+    await db.transactions.bulkPut(remoteTransactions.filter((transaction) => !pendingIds.has(transaction.id)))
+  } catch (error) {
+    const localTransactions = await db.transactions.toArray()
+    if (localTransactions.length === 0) throw error
+  }
+
+  return await db.transactions.toArray() as unknown as CashflowTransaction[]
+}
+
 export function useCashflowTransactions(range: string, shift: number, initialData?: CashflowTransaction[]) {
   const normalizedRange = normalizeCashflowRange(range)
   const normalizedShift = normalizeRangeShift(String(shift))
@@ -106,7 +120,7 @@ export const cashflowReportTransactionsQueryKey = ['cashflow-report-transactions
 export function useCashflowReportTransactions() {
   return useApiQuery({
     queryKey: cashflowReportTransactionsQueryKey,
-    queryFn: getReportTransactions,
+    queryFn: getReportTransactionsFromLocalDb,
   })
 }
 
