@@ -203,7 +203,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
         .forEach((category) => addSuggestion(category));
     }
 
-    setSmartSuggestions(suggestions.slice(0, 5));
+    setSmartSuggestions(suggestions.slice(0, 6));
 
     if (userTouchedCategory) {
       return;

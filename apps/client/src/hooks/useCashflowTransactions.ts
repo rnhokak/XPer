@@ -196,7 +196,9 @@ const toLocalTransactionRecord = (values: CashflowQuickAddValues, tmpId: string)
   note: values.note ?? null,
   transaction_time: values.transaction_time ?? new Date().toISOString(),
   category: values.category_id ? { id: values.category_id, name: null, type: values.type } : null,
+  category_id: values.category_id ?? null,
   account: values.account_id ? { id: values.account_id, name: null, currency: values.currency ?? 'VND' } : null,
+  account_id: values.account_id ?? null,
   user_id: 'local',
   pending: true,
 })
@@ -206,6 +208,7 @@ const enqueueTransactionOperation = (op: Parameters<typeof enqueueOperation>[0])
 }
 
 export function useCreateTransaction() {
+  const queryClient = useApiCache()
   return useApiMutation({
     mutationFn: async (values: CashflowQuickAddValues) => {
       const tmpId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -219,6 +222,11 @@ export function useCreateTransaction() {
       })
 
       return localTx
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
     },
   })
 }
@@ -248,6 +256,11 @@ export function useUpdateTransaction() {
         )
       })
       return { id }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
     },
     onError: async (_err, _vars, context: any) => {
       if (context?.id) {
@@ -279,6 +292,11 @@ export function useDeleteTransaction() {
         return old.filter((transaction) => transaction.id !== id)
       })
       return { id }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
     },
   })
 }
@@ -322,6 +340,7 @@ export function useCreateCategory() {
     mutationFn: (values: CategoryInput) => createCategory(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cashflow-categories'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }
@@ -333,6 +352,7 @@ export function useUpdateCategory() {
       updateCategory(id, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cashflow-categories'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }
@@ -344,6 +364,7 @@ export function useDeleteCategory() {
       deleteCategory(id, cascade),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cashflow-categories'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }

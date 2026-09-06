@@ -46,6 +46,7 @@ function syncCashflowQueries(op: PendingOp, serverData?: any) {
 
   void queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
   void queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
+  void queryClient.invalidateQueries({ queryKey: ['reports'] })
 }
 
 export async function enqueueOperation(op: Omit<PendingOp, 'id' | 'createdAt' | 'tries'>) {

@@ -5,21 +5,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CashflowRangeFilter } from './components/CashflowRangeFilter';
 import { CashflowTransactionList } from './components/CashflowTransactionList';
 import { CashflowReport } from './components/CashflowReport';
+import { CashflowExpenseLineChart } from './components/CashflowExpenseLineChart';
 import { normalizeCashflowRange, normalizeRangeShift } from '@/lib/cashflow/utils';
 import { useCashflowTransactions, useCashflowAccounts, useCashflowCategories } from '@/hooks/useCashflowTransactions';
 
 export default function CashflowPage() {
   const [searchParams] = useSearchParams();
-  const range = normalizeCashflowRange(searchParams.get('range') ?? undefined);
+  const range = normalizeCashflowRange(searchParams.get('range') ?? '30');
   const shift = normalizeRangeShift(searchParams.get('shift') ?? undefined);
 
   const { data: transactions = [], isLoading: transactionsLoading } = useCashflowTransactions(range, shift);
+  const { data: monthTransactions = [] } = useCashflowTransactions('month', shift);
   const { data: accounts = [], isLoading: accountsLoading } = useCashflowAccounts();
   const { data: categories = [], isLoading: categoriesLoading } = useCashflowCategories();
 
   const transactionsReady = transactions.length > 0 || !transactionsLoading;
   const accountsReady = accounts.length > 0 || !accountsLoading;
   const categoriesReady = categories.length > 0 || !categoriesLoading;
+
+  const chartTransactions = range === 'month' ? transactions : monthTransactions;
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 overflow-x-hidden">
@@ -45,6 +49,19 @@ export default function CashflowPage() {
           )}
         </CardContent>
       </Card>
+
+      {transactionsReady ? (
+        <CashflowExpenseLineChart transactions={chartTransactions} shift={shift} />
+      ) : (
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-44 w-full" />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
