@@ -17,7 +17,7 @@ import {
   type CashflowQuickAddValues,
   type CashflowTransactionType,
 } from "@/lib/validation/cashflow";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@/lib/query";
 import {
   cashflowReportTransactionsQueryKey,
   cashflowTransactionsQueryKey,
@@ -62,12 +62,12 @@ const toIsoStringWithOffset = (value?: string | null) => {
 const defaultDateTimeValue = () => {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+  return local.toISOString().slice(0, 23);
 };
 const getCurrentDateTimeValue = () => {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+  return local.toISOString().slice(0, 23);
 };
 
 export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, defaultCurrency, useDialog = false, range, isLoading = false }: Props) {
@@ -78,6 +78,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [lastTransactionTime, setLastTransactionTime] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const queryClient = useQueryClient();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [smartSuggestions, setSmartSuggestions] = useState<Array<{ category: Category; reason?: string }>>([]);
@@ -114,6 +115,17 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
       viewport?.removeEventListener("resize", updateViewportHeight);
     };
   }, [useDialog]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     form.setValue("account_id", defaultAccountId ?? null);
@@ -208,7 +220,7 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
 
   const notify = useNotificationsStore((state) => state.notify);
   const createMutation = useCreateTransaction();
-  const isSubmitting = createMutation.isPending;
+  const isSubmitting = createMutation.isPending && isOnline;
 
   const onSubmit = async (values: CashflowQuickAddValues) => {
     setSubmitError(null);
@@ -236,10 +248,14 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
             return [response, ...existing];
           });
         }
-        queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
-        queryClient.invalidateQueries({ queryKey: cashflowReportTransactionsQueryKey });
-
-        const nextTransactionTime = getCurrentDateTimeValue();
+        const submittedTime = values.transaction_time ? new Date(values.transaction_time) : new Date();
+        submittedTime.setMilliseconds(submittedTime.getMilliseconds() + 1);
+        const nextTransactionTime = Number.isNaN(submittedTime.getTime())
+          ? getCurrentDateTimeValue()
+          : (() => {
+              const local = new Date(submittedTime.getTime() - submittedTime.getTimezoneOffset() * 60000);
+              return local.toISOString().slice(0, 23);
+            })();
 
         setLastTransactionTime(nextTransactionTime);
 
@@ -335,8 +351,8 @@ export function CashflowQuickAddForm({ categories, accounts, defaultAccountId, d
           </div>
 
           <div className="space-y-4">
-            <CashflowAmountFields control={form.control} currency={currency} />
             <CashflowDateFields control={form.control} />
+            <CashflowAmountFields control={form.control} currency={currency} />
           </div>
 
           <div className="space-y-2">

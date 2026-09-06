@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@/lib/query'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { partnerSchema, type PartnerInput } from '@/lib/validation/debts'
 import { type Category, type Partner } from '@/hooks/useDebtsData'
-import { API_BASE_URL } from '@/lib/env'
+import { apiClient } from '@/lib/api/client'
 
 const PARTNER_TYPES = ['person', 'bank', 'company', 'other']
 
@@ -37,18 +37,12 @@ export function PartnersManager({ partners, categories }: { partners: Partner[];
 
   const upsertMutation = useMutation({
     mutationFn: async ({ payload, isEdit }: { payload: Record<string, unknown>; isEdit: boolean }) => {
-      const res = await fetch(`${API_BASE_URL}/debts/partners`, {
+      const response = await apiClient.request({
+        url: '/debts/partners',
         method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        data: payload,
       })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? 'Failed to save partner')
-      }
-
-      return res.json().catch(() => ({}))
+      return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debts'] })
@@ -59,18 +53,8 @@ export function PartnersManager({ partners, categories }: { partners: Partner[];
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`${API_BASE_URL}/debts/partners`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? 'Failed to delete partner')
-      }
-
-      return res.json().catch(() => ({}))
+      const response = await apiClient.delete('/debts/partners', { data: { id } })
+      return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debts'] })

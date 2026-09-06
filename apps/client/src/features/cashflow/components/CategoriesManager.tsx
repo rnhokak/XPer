@@ -332,7 +332,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
             resetForm(nextMeta);
             setModalOpen(false);
           },
-          onError: (error) => {
+          onError: (error: Error) => {
             setSubmitError(error.message ?? "Failed to save category");
           },
         }
@@ -366,7 +366,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
         onSuccess: () => {
           if (editing?.id === id) resetForm();
         },
-        onError: (error) => {
+        onError: (error: Error) => {
           setSubmitError(error.message ?? "Failed to delete");
         },
       }

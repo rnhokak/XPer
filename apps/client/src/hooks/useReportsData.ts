@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useApiQuery } from '@/lib/query'
 import { getReportsData } from '@/lib/api/reports'
 import { type CashflowRange } from '@/lib/cashflow/utils'
 
@@ -31,7 +31,7 @@ type Transaction = {
 }
 
 export function useReportsData(range: CashflowRange, shift: number, userId: string) {
-  return useQuery({
+  return useApiQuery({
     queryKey: ['reports', range, shift, userId],
     queryFn: async () => {
       const data = await getReportsData(range, shift)

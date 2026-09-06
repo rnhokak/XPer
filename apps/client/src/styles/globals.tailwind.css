@@ -30,6 +30,14 @@ body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Ensure gestures and pinch-zoom are allowed by default */
+html, body {
+  touch-action: auto;
+  -ms-touch-action: auto;
+  -webkit-user-select: text;
+  -webkit-text-size-adjust: 100%;
+}
+
 * {
   @apply border-border;
 }

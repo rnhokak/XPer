@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@/lib/query'
 import { debtCreateSchema, type DebtCreateInput } from '@/lib/validation/debts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { type Account, type Category, type Partner } from '@/hooks/useDebtsData'
-import { API_BASE_URL } from '@/lib/env'
+import { apiClient } from '@/lib/api/client'
 
 
 type Props = {
@@ -92,18 +92,8 @@ export function DebtQuickCreateForm({ partners, accounts, categories, defaultAcc
 
   const createMutation = useMutation({
     mutationFn: async (payload: DebtCreateInput) => {
-      const res = await fetch(`${API_BASE_URL}/debts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? 'Không thể tạo khoản vay')
-      }
-
-      return res.json().catch(() => ({}))
+      const response = await apiClient.post('/debts', payload)
+      return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debts'] })

@@ -91,7 +91,7 @@ export function CashflowAmountFields({ control, currency }: Props) {
                   onChange={(e) => {
                     const raw = e.target.value;
                     const cleaned = raw.replace(/,/g, "");
-                    const normalized = normalizeAmount(applyThousandShortcuts(cleaned));
+                    const normalized = normalizeAmount(cleaned);
                     field.onChange(normalized);
                     if (!cleaned) {
                       setAmountInput("");
@@ -101,7 +101,8 @@ export function CashflowAmountFields({ control, currency }: Props) {
                   }}
                   onBlur={(e) => {
                     const cleaned = e.target.value.replace(/,/g, "");
-                    const normalized = normalizeAmount(applyThousandShortcuts(cleaned));
+                    const nextValue = applyThousandShortcuts(cleaned);
+                    const normalized = normalizeAmount(nextValue);
                     setAmountInput(normalized !== undefined ? formatNumberForInput(normalized) : "");
                     field.onChange(normalized);
                   }}
