@@ -16,6 +16,7 @@ import { useOrders, useCreateOrder, useUpdateOrder, useDeleteOrder, useSyncOrder
 import { useBalanceAccounts } from '@/hooks/useTradingData'
 import { Loader2, Percent, Upload } from 'lucide-react'
 import { TradingOrderImportDialog } from './components/TradingOrderImportDialog'
+import { TradingWinLossChart } from './components/TradingWinLossChart'
 
 type OrderRow = {
   id: string
@@ -654,6 +655,13 @@ export default function TradingOrdersPage() {
           <CardContent className="text-sm text-muted-foreground">Commission + Swap</CardContent>
         </Card>
       </div>
+
+      <TradingWinLossChart
+        orders={initialOrders.filter((order) =>
+          filters.symbol ? order.symbol.toLowerCase().includes(filters.symbol.toLowerCase()) : true
+        )}
+        currency={tradingAccountOptions[0]?.currency ?? 'USD'}
+      />
 
       <Card>
         <CardHeader>
