@@ -102,8 +102,25 @@ const getAndCacheCurrentMonthTransactions = async () => {
     return [...pendingTransactions, ...cachedTransactions]
   } catch (error) {
     const localTransactions = await getLocalTransactionsForRange('month', 0)
-    if (localTransactions.length > 0) return localTransactions
-    throw error
+    return localTransactions
+  }
+}
+
+const getTransactionsForRangeWithFallback = async (range: string, shift: number) => {
+  try {
+    const remoteTransactions = await getTransactions(range, shift)
+    const pendingOps = await db.pending.toArray()
+    const pendingOpIds = new Set(
+      pendingOps.map((op) => op.body?.__localId || op.body?.id).filter(Boolean)
+    )
+    const remoteToCache = remoteTransactions.filter((tx) => !pendingOpIds.has(tx.id))
+    if (remoteToCache.length > 0) {
+      await db.transactions.bulkPut(remoteToCache)
+    }
+    return remoteTransactions
+  } catch {
+    const localTransactions = await getLocalTransactionsForRange(range, shift)
+    return localTransactions
   }
 }
 
@@ -133,9 +150,8 @@ const getReportTransactionsFromLocalDb = async () => {
         .map((transaction) => transaction.id)
     )
     await db.transactions.bulkPut(remoteTransactions.filter((transaction) => !pendingIds.has(transaction.id)))
-  } catch (error) {
-    const localTransactions = await db.transactions.toArray()
-    if (localTransactions.length === 0) throw error
+  } catch {
+    // Continue with whatever is in local DB
   }
 
   return await db.transactions.toArray() as unknown as CashflowTransaction[]
@@ -149,7 +165,7 @@ export function useCashflowTransactions(range: string, shift: number, initialDat
     queryKey: cashflowTransactionsQueryKey(normalizedRange, normalizedShift),
     queryFn: () => isCurrentMonthQuery(normalizedRange, normalizedShift)
       ? getAndCacheCurrentMonthTransactions()
-      : getTransactions(normalizedRange, normalizedShift),
+      : getTransactionsForRangeWithFallback(normalizedRange, normalizedShift),
     initialData: initialData ?? undefined,
   })
 }
@@ -166,7 +182,16 @@ export function useCashflowReportTransactions() {
 export function useCashflowAccounts() {
   return useApiQuery({
     queryKey: ['cashflow-accounts'],
-    queryFn: getAccounts,
+    queryFn: async () => {
+      try {
+        const accounts = await getAccounts()
+        await db.accounts.bulkPut(accounts)
+        return accounts
+      } catch {
+        const localAccounts = await db.accounts.toArray()
+        return localAccounts as unknown as CashflowAccount[]
+      }
+    },
   })
 }
 
@@ -178,10 +203,9 @@ export function useCashflowCategories() {
         const categories = await getCategories()
         await db.categories.bulkPut(categories)
         return categories
-      } catch (error) {
+      } catch {
         const localCategories = await db.categories.toArray()
-        if (localCategories.length > 0) return localCategories as CashflowCategory[]
-        throw error
+        return localCategories as unknown as CashflowCategory[]
       }
     },
   })

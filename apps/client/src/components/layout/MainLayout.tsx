@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet } from "lucide-react";
+import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet, WifiOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apiClient } from "@/lib/api/client";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui";
 import { useMoneyVisibilityStore } from "@/store/money-visibility";
@@ -103,13 +103,20 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
-          // Hide when scrolling down, show when scrolling up or at top
-          if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-            setHeaderVisible(false);
-          } else {
+          // Bound check for iOS pull-to-refresh / rubber band
+          if (currentScrollY <= 10) {
             setHeaderVisible(true);
+          } else {
+            const diff = currentScrollY - lastScrollY.current;
+            // Hide on downward scroll past threshold, show on upward scroll
+            if (diff > 8 && currentScrollY > 60) {
+              setHeaderVisible(false);
+              setMenuOpen(false);
+            } else if (diff < -8) {
+              setHeaderVisible(true);
+            }
           }
-          lastScrollY.current = currentScrollY;
+          lastScrollY.current = Math.max(0, currentScrollY);
           ticking = false;
         });
         ticking = true;
@@ -148,15 +155,16 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
     return null;
   }, [location.pathname]);
   const AddIcon = addAction?.icon ?? null;
+  const { signOut, isOffline } = useAuth();
 
   const handleLogout = useCallback(async () => {
     try {
-      await apiClient.post('/auth/logout')
+      await signOut();
     } catch {
       // Ignore logout failures and continue clearing the local UI state.
     }
     navigate("/auth/login", { replace: true });
-  }, [navigate]);
+  }, [signOut, navigate]);
 
   // Close user menu on outside click or Escape
   useEffect(() => {
@@ -192,7 +200,8 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-72 transform overflow-y-auto border-r border-slate-200 bg-white/90 px-3 py-4 shadow-lg backdrop-blur transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-50 w-72 transform overflow-y-auto border-r border-slate-200 bg-white/95 px-3 shadow-xl backdrop-blur transition-transform duration-300 ease-in-out",
+          "pt-[calc(env(safe-area-inset-top,0px)+1rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] md:py-4",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full",
           "md:translate-x-0"
         )}
@@ -269,7 +278,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
             </div>
             <div className="space-y-0.5">
               <p className="text-sm font-semibold">{preferredName}</p>
-              <p className="text-xs text-muted-foreground">Đang đăng nhập</p>
+              <p className="text-xs text-muted-foreground">{isOffline ? "Ngoại tuyến (Offline)" : "Đang kết nối"}</p>
             </div>
           </div>
           <Button
@@ -289,7 +298,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
         <button
           type="button"
           aria-label="Đóng sidebar"
-          className="fixed inset-0 z-20 bg-black/30 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
           onClick={closeSidebar}
         />
       )}
@@ -297,18 +306,22 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       <div className="flex min-h-screen flex-1 flex-col md:pl-72">
         <header
           className={cn(
-            "fixed left-0 right-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur transition-transform duration-200",
-            !headerVisible && "-translate-y-full"
+            "fixed inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-md transition-transform duration-300 ease-in-out md:left-72",
+            !headerVisible && "-translate-y-[calc(100%+8px)]"
           )}
-          style={{ top: "env(safe-area-inset-top, 0px)" }}
         >
-          <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-2 py-3 sm:px-6">
+          <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-3 pb-2.5 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] sm:px-6">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Mở menu">
                 <Menu className="h-5 w-5" />
               </Button>
-              <div>
+              <div className="flex items-center gap-2">
                 <p className="text-xs text-muted-foreground">{activeNav?.label ?? "XPer"}</p>
+                {isOffline && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    <WifiOff className="h-3 w-3" /> Offline
+                  </span>
+                )}
               </div>
             </div>
 
@@ -361,30 +374,30 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
         </header>
 
         <main className="flex-1">
-          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-2 pb-[calc(env(safe-area-inset-bottom)+96px)] pt-[calc(60px+env(safe-area-inset-top))] sm:px-6 md:max-w-5xl md:pb-12">
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] pt-[calc(env(safe-area-inset-top,0px)+4rem)] sm:px-6 md:max-w-5xl md:pb-12 md:pt-20">
             {children}
           </div>
         </main>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2 shadow-2xl backdrop-blur md:hidden">
-        <div className="relative mx-auto max-w-lg pt-0">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/90 backdrop-blur-md px-3 pt-1.5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.35rem))] shadow-[0_-4px_20px_rgba(0,0,0,0.04)] md:hidden">
+        <div className="relative mx-auto max-w-lg">
           {addAction && AddIcon ? (
-            <div className="pointer-events-none absolute left-1/2 mb-5 top-0 z-50 flex -translate-x-1/2 -translate-y-6 items-center justify-center">
+            <div className="pointer-events-none absolute -top-5 left-1/2 z-40 flex -translate-x-1/2 items-center justify-center">
               <button
                 type="button"
-                className="pointer-events-auto flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_40px_rgba(16,185,129,0.35)] ring-2 ring-emerald-200/80 transition hover:scale-[1.02] active:scale-[0.99]"
+                className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-500/25 ring-2 ring-white transition hover:scale-[1.02] active:scale-[0.98]"
                 onClick={handleAddAction}
                 aria-label={addAction.label}
               >
-                <AddIcon className="h-5 w-5" />
+                <AddIcon className="h-4 w-4" />
                 <span>{addAction.label}</span>
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white/90 px-2 py-2 shadow-[0_-10px_30px_rgba(15,23,42,0.14)] backdrop-blur">
+          <div className="grid grid-cols-5 gap-1">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
               const pathname = location.pathname;
@@ -398,15 +411,15 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                   to={item.href}
                   onClick={closeSidebar}
                   className={cn(
-                    "flex flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[12px] font-semibold transition min-h-[52px]",
+                    "flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-1 transition-all active:scale-95 min-h-[46px]",
                     active
-                      ? "bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100"
-                      : "text-slate-500 hover:bg-slate-100"
+                      ? "bg-emerald-50 text-emerald-700 font-semibold shadow-xs"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/70"
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className={cn("h-5 w-5", active && "text-emerald-600")} />
-                  <span className="leading-none">{item.label}</span>
+                  <Icon className={cn("h-5 w-5", active ? "text-emerald-600" : "text-slate-500")} />
+                  <span className="text-[11px] leading-tight truncate max-w-[64px] text-center">{item.label}</span>
                 </Link>
               );
             })}

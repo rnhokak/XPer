@@ -87,22 +87,52 @@ const computeOutstanding = (
   return remaining < 0 ? 0 : remaining
 }
 
+import db from '@/lib/db'
+
 export function useDebtsOverviewData(userId: string) {
   return useApiQuery({
     queryKey: debtsOverviewQueryKey(userId),
     queryFn: async () => {
-      const [partners, accounts, categories, debts] = await Promise.all([
-        getDebtPartners(),
-        getAccounts(),
-        getCategories(),
-        getDebts(),
-      ])
+      try {
+        const [partners, accounts, categories, debts] = await Promise.all([
+          getDebtPartners(),
+          getAccounts(),
+          getCategories(),
+          getDebts(),
+        ])
 
-      return {
-        partners,
-        accounts,
-        categories: categories.filter((c) => c.type === 'debt'),
-        debts,
+        try {
+          await Promise.all([
+            db.debtPartners.bulkPut(partners),
+            db.accounts.bulkPut(accounts),
+            db.categories.bulkPut(categories),
+            db.debts.bulkPut(debts),
+          ])
+        } catch {}
+
+        return {
+          partners,
+          accounts,
+          categories: categories.filter((c) => c.type === 'debt'),
+          debts,
+        }
+      } catch (err) {
+        const [partners, accounts, categories, debts] = await Promise.all([
+          db.debtPartners.toArray(),
+          db.accounts.toArray(),
+          db.categories.toArray(),
+          db.debts.toArray(),
+        ])
+
+        if (partners.length > 0 || accounts.length > 0 || categories.length > 0 || debts.length > 0) {
+          return {
+            partners: partners as unknown as Partner[],
+            accounts: accounts as unknown as Account[],
+            categories: (categories as unknown as Category[]).filter((c) => c.type === 'debt'),
+            debts: debts as unknown as DebtRow[],
+          }
+        }
+        throw err
       }
     },
     enabled: Boolean(userId),
@@ -113,13 +143,38 @@ export function useDebtsFormData(userId: string) {
   return useApiQuery({
     queryKey: debtsFormQueryKey(userId),
     queryFn: async () => {
-      const [partners, accounts, categories] = await Promise.all([
-        getDebtPartners(),
-        getAccounts(),
-        getCategories(),
-      ])
+      try {
+        const [partners, accounts, categories] = await Promise.all([
+          getDebtPartners(),
+          getAccounts(),
+          getCategories(),
+        ])
 
-      return { partners, accounts, categories: categories.filter((c) => c.type === 'debt') }
+        try {
+          await Promise.all([
+            db.debtPartners.bulkPut(partners),
+            db.accounts.bulkPut(accounts),
+            db.categories.bulkPut(categories),
+          ])
+        } catch {}
+
+        return { partners, accounts, categories: categories.filter((c) => c.type === 'debt') }
+      } catch (err) {
+        const [partners, accounts, categories] = await Promise.all([
+          db.debtPartners.toArray(),
+          db.accounts.toArray(),
+          db.categories.toArray(),
+        ])
+
+        if (partners.length > 0 || accounts.length > 0 || categories.length > 0) {
+          return {
+            partners: partners as unknown as Partner[],
+            accounts: accounts as unknown as Account[],
+            categories: (categories as unknown as Category[]).filter((c) => c.type === 'debt'),
+          }
+        }
+        throw err
+      }
     },
     enabled: Boolean(userId),
   })
@@ -128,7 +183,19 @@ export function useDebtsFormData(userId: string) {
 export function useDebtPartners(userId: string) {
   return useApiQuery({
     queryKey: debtPartnersQueryKey(userId),
-    queryFn: getDebtPartners,
+    queryFn: async () => {
+      try {
+        const partners = await getDebtPartners()
+        try {
+          await db.debtPartners.bulkPut(partners)
+        } catch {}
+        return partners
+      } catch (err) {
+        const local = await db.debtPartners.toArray()
+        if (local.length > 0) return local as unknown as Partner[]
+        throw err
+      }
+    },
     enabled: Boolean(userId),
   })
 }
@@ -139,12 +206,27 @@ export function useDebtDetailData(userId: string, debtId: string | undefined) {
     queryFn: async () => {
       if (!debtId) return null
 
-      const data = await getDebtDetail(debtId)
-      return {
-        debt: data.debt,
-        payments: data.payments,
-        accounts: data.accounts,
-        categories: data.categories,
+      try {
+        const data = await getDebtDetail(debtId)
+        return {
+          debt: data.debt,
+          payments: data.payments,
+          accounts: data.accounts,
+          categories: data.categories,
+        }
+      } catch (err) {
+        const localDebt = await db.debts.get(debtId)
+        if (localDebt) {
+          const accounts = await db.accounts.toArray()
+          const categories = await db.categories.toArray()
+          return {
+            debt: localDebt as unknown as DebtRow,
+            payments: [],
+            accounts: accounts as unknown as Account[],
+            categories: categories as unknown as Category[],
+          }
+        }
+        throw err
       }
     },
     enabled: Boolean(userId && debtId),
