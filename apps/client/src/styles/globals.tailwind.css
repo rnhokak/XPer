@@ -36,6 +36,7 @@ html, body {
   -ms-touch-action: auto;
   -webkit-user-select: text;
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 * {
