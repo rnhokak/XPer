@@ -24,6 +24,9 @@ apiClient.interceptors.response.use(
     }
 
     original._retry = true
+    try {
+      localStorage.removeItem('xper:auth:user')
+    } catch {}
     window.location.href = `${APP_BASE_PATH}/auth/login`
     return Promise.reject(error)
   }
