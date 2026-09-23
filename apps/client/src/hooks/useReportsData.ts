@@ -1,7 +1,7 @@
 import { useApiQuery } from '@/lib/query'
 import { rangeBounds, type CashflowRange } from '@/lib/cashflow/utils'
 import db from '@/lib/db'
-import { getCategories, getTransactions } from '@/lib/api/cashflow'
+import { getAccounts, getCategories, getTransactions } from '@/lib/api/cashflow'
 import { type CashflowTransaction } from '@/hooks/useCashflowTransactions'
 
 export type Account = {
@@ -35,13 +35,24 @@ export type Transaction = {
 export const getReportsDataFromLocalDb = async (range: CashflowRange, shift: number) => {
   const bounds = rangeBounds(range, shift)
 
-  // 1. Ensure categories are available in local DB
+  // 1. Ensure categories and accounts are available in local DB
   let localCategories = await db.categories.toArray()
   if (localCategories.length === 0) {
     try {
       const remoteCategories = await getCategories()
       await db.categories.bulkPut(remoteCategories)
       localCategories = await db.categories.toArray()
+    } catch {
+      // Offline: proceed with whatever is stored in local db
+    }
+  }
+
+  let localAccounts = await db.accounts.toArray()
+  if (localAccounts.length === 0) {
+    try {
+      const remoteAccounts = await getAccounts()
+      await db.accounts.bulkPut(remoteAccounts)
+      localAccounts = await db.accounts.toArray()
     } catch {
       // Offline: proceed with whatever is stored in local db
     }
@@ -113,7 +124,7 @@ export const getReportsDataFromLocalDb = async (range: CashflowRange, shift: num
     }))
 
   return {
-    accounts: [] as Account[],
+    accounts: localAccounts as unknown as Account[],
     categories,
     transactions,
   }
