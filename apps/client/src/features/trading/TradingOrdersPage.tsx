@@ -828,7 +828,7 @@ export default function TradingOrdersPage() {
 
         <CardContent className="p-3 sm:p-6 pt-0">
           {/* Mobile Card View (optimized for iPhone 14) */}
-          <div className={cn("space-y-2.5", viewLayout === 'table' ? "hidden sm:hidden" : "block sm:hidden")}>
+          <div className={cn("space-y-2.5", viewLayout === 'table' ? "hidden" : "block sm:hidden")}>
             {paginatedOrders.length === 0 ? (
               <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
                 Không tìm thấy lệnh giao dịch nào phù hợp.
@@ -998,19 +998,19 @@ export default function TradingOrdersPage() {
           </div>
 
           {/* Desktop Table View (and mobile if viewLayout === 'table') */}
-          <div className={cn("overflow-x-auto", viewLayout === 'cards' ? "hidden sm:block" : "block")}>
-            <Table>
+          <div className={cn("overflow-x-auto -mx-3 sm:-mx-6 px-3 sm:px-6", viewLayout === 'cards' ? "hidden sm:block" : "block")}>
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Side</TableHead>
-                  <TableHead>Volume</TableHead>
-                  <TableHead>Entry</TableHead>
-                  <TableHead>Close</TableHead>
-                  <TableHead>P&L</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Open Time</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="whitespace-nowrap">Symbol</TableHead>
+                  <TableHead className="whitespace-nowrap w-16">Side</TableHead>
+                  <TableHead className="whitespace-nowrap w-20">Volume</TableHead>
+                  <TableHead className="whitespace-nowrap w-28">Entry</TableHead>
+                  <TableHead className="whitespace-nowrap w-28">Close</TableHead>
+                  <TableHead className="whitespace-nowrap w-24">P&L</TableHead>
+                  <TableHead className="whitespace-nowrap w-20">Status</TableHead>
+                  <TableHead className="whitespace-nowrap w-36">Open Time</TableHead>
+                  <TableHead className="text-right w-28">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1043,18 +1043,18 @@ export default function TradingOrdersPage() {
                           {order.side === 'buy' ? 'Buy' : 'Sell'}
                         </Badge>
                       </TableCell>
-                      <TableCell>{formatNumber(order.volume, 2)}</TableCell>
-                      <TableCell>{formatNumber(order.entry_price, 5)}</TableCell>
-                      <TableCell>{formatNumber(order.close_price, 5)}</TableCell>
-                      <TableCell className={getOrderNetPnl(order) >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                      <TableCell className="whitespace-nowrap font-mono text-xs">{formatNumber(order.volume, 2)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono text-xs">{formatNumber(order.entry_price, 5)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono text-xs">{formatNumber(order.close_price, 5)}</TableCell>
+                      <TableCell className={cn("whitespace-nowrap font-mono text-xs font-semibold", getOrderNetPnl(order) >= 0 ? 'text-emerald-600' : 'text-red-600')}>
                         {getOrderNetPnl(order) >= 0 ? '+' : ''}{formatNumber(getOrderNetPnl(order))}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={order.status === 'open' ? 'default' : order.status === 'closed' ? 'secondary' : 'outline'}>
+                        <Badge variant={order.status === 'open' ? 'default' : order.status === 'closed' ? 'secondary' : 'outline'} className="text-[11px]">
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{formatDateTime(order.open_time)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">{formatDateTime(order.open_time)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
