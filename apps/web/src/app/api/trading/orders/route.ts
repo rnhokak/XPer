@@ -63,7 +63,7 @@ export async function GET(req: Request) {
     query = query.eq("status", status);
   }
 
-  const { data, error } = await query.order("open_time", { ascending: false });
+  const { data, error } = await query.order("open_time", { ascending: false }).limit(100000);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

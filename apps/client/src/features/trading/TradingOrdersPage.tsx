@@ -344,7 +344,7 @@ export default function TradingOrdersPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-x-hidden w-full">
       {/* Top Header & Actions */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -748,7 +748,7 @@ export default function TradingOrdersPage() {
       />
 
       {/* Orders List Container */}
-      <Card className="rounded-2xl border-slate-200/90 shadow-sm overflow-hidden">
+      <Card className="rounded-2xl border-slate-200/90 shadow-sm overflow-hidden w-full">
         <CardHeader className="p-3.5 sm:p-6 pb-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center justify-between">
@@ -764,8 +764,8 @@ export default function TradingOrdersPage() {
                 </CardDescription>
               </div>
 
-              {/* View Layout Toggle for mobile */}
-              <div className="flex items-center rounded-lg border bg-slate-100/80 p-0.5 sm:hidden">
+              {/* View Layout Toggle — Desktop only (table may overflow on mobile) */}
+              <div className="hidden sm:flex items-center rounded-lg border bg-slate-100/80 p-0.5">
                 <button
                   type="button"
                   onClick={() => setViewLayout('cards')}
@@ -773,7 +773,7 @@ export default function TradingOrdersPage() {
                     "p-1.5 rounded-md text-xs transition-all",
                     viewLayout === 'cards' ? "bg-white text-emerald-700 shadow-xs font-semibold" : "text-slate-500"
                   )}
-                  title="Dạng thẻ (Mobile Card)"
+                  title="Dạng thẻ"
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
                 </button>
@@ -784,7 +784,7 @@ export default function TradingOrdersPage() {
                     "p-1.5 rounded-md text-xs transition-all",
                     viewLayout === 'table' ? "bg-white text-emerald-700 shadow-xs font-semibold" : "text-slate-500"
                   )}
-                  title="Dạng bảng (Table)"
+                  title="Dạng bảng"
                 >
                   <LayoutList className="h-3.5 w-3.5" />
                 </button>
@@ -827,8 +827,8 @@ export default function TradingOrdersPage() {
         </CardHeader>
 
         <CardContent className="p-3 sm:p-6 pt-0">
-          {/* Mobile Card View (optimized for iPhone 14) */}
-          <div className={cn("space-y-2.5", viewLayout === 'table' ? "hidden" : "block sm:hidden")}>
+          {/* Mobile Card View — always shown on small screens regardless of viewLayout */}
+          <div className={cn("space-y-2.5", "block sm:hidden")}>
             {paginatedOrders.length === 0 ? (
               <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
                 Không tìm thấy lệnh giao dịch nào phù hợp.
@@ -997,8 +997,8 @@ export default function TradingOrdersPage() {
             )}
           </div>
 
-          {/* Desktop Table View (and mobile if viewLayout === 'table') */}
-          <div className={cn("overflow-x-auto -mx-3 sm:-mx-6 px-3 sm:px-6", viewLayout === 'cards' ? "hidden sm:block" : "block")}>
+          {/* Desktop Table View (and desktop-initiated table view on ≥sm) */}
+          <div className={cn("overflow-x-auto", viewLayout === 'cards' ? "hidden sm:block" : "hidden sm:block")}>
             <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
