@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet, WifiOff } from "lucide-react";
+import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet, WifiOff, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,14 +54,14 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    href: "/trading",
+    href: "/trading/orders",
     label: "Trading",
     icon: BarChart3,
     children: [
+      { href: "/trading/orders", label: "Orders" },
       { href: "/trading/dashboard", label: "Dashboard" },
       { href: "/trading/accounts", label: "Balance Accounts" },
       { href: "/trading/funding", label: "Funding History" },
-      { href: "/trading/orders", label: "Orders" },
       { href: "/trading/ledger", label: "Ledger" },
     ],
   },
@@ -127,9 +127,21 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const [bottomSubmenuHref, setBottomSubmenuHref] = useState<string | null>(null);
+
+  // Close bottom submenu on route change
+  useEffect(() => {
+    setBottomSubmenuHref(null);
+  }, [location.pathname]);
+
   const activeNav = useMemo(() => {
     const pathname = location.pathname;
-    const exact = navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+    const exact = navItems.find((item) => {
+      if (item.href === "/trading/orders") {
+        return pathname.startsWith("/trading");
+      }
+      return pathname === item.href || pathname.startsWith(`${item.href}/`);
+    });
     if (exact) return exact;
     return (
       navItems.find((item) =>
@@ -138,16 +150,18 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
     );
   }, [location.pathname]);
 
+  const bottomSubmenuItem = useMemo(() => {
+    if (!bottomSubmenuHref) return null;
+    return navItems.find((item) => item.href === bottomSubmenuHref) ?? null;
+  }, [bottomSubmenuHref]);
+
   const addAction = useMemo<AddAction | null>(() => {
     const pathname = location.pathname;
     if (pathname.startsWith("/cashflow") && !pathname.startsWith("/cashflow/new")) {
       return { label: "Add giao dịch", icon: PlusCircle, href: "/cashflow/new" };
     }
-    if (pathname.startsWith("/trading/orders")) {
+    if (pathname.startsWith("/trading")) {
       return { label: "Add order", icon: PlusCircle, event: "trading:orders:new" };
-    }
-    if (pathname.startsWith("/trading/funding")) {
-      return { label: "Log funding", icon: PlusCircle, event: "trading:funding:new" };
     }
     if (pathname.startsWith("/debts")) {
       return { label: "Khoản mới", icon: PlusCircle, href: "/debts/new" };
@@ -192,9 +206,16 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       return;
     }
     if (addAction.event && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("xper:add", { detail: addAction.event }));
+      if (location.pathname !== "/trading/orders" && addAction.event === "trading:orders:new") {
+        navigate("/trading/orders");
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("xper:add", { detail: addAction.event }));
+        }, 150);
+      } else {
+        window.dispatchEvent(new CustomEvent("xper:add", { detail: addAction.event }));
+      }
     }
-  }, [addAction, closeSidebar, navigate]);
+  }, [addAction, closeSidebar, navigate, location.pathname]);
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -374,11 +395,105 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
         </header>
 
         <main className="flex-1">
+          {/* Mobile Sticky Sub-navigation Pill Bar for sections with children */}
+          {activeNav?.children && activeNav.children.length > 1 && (
+            <div className="sticky top-[calc(env(safe-area-inset-top,0px)+3.25rem)] z-20 border-b border-slate-200/80 bg-white/95 px-3 py-2 backdrop-blur-md shadow-xs md:hidden">
+              <div className="mx-auto flex max-w-4xl items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+                {activeNav.children.map((child) => {
+                  const isTradingOrders = child.href === "/trading/orders";
+                  const isActive =
+                    location.pathname === child.href ||
+                    (!isTradingOrders && child.href !== "/cashflow" && child.href !== "/debts"
+                      ? location.pathname.startsWith(`${child.href}`)
+                      : location.pathname === child.href);
+                  return (
+                    <Link
+                      key={child.href}
+                      to={child.href}
+                      className={cn(
+                        "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-all active:scale-95",
+                        isActive
+                          ? "bg-emerald-600 text-white shadow-xs font-semibold"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
+                      )}
+                    >
+                      {child.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] pt-[calc(env(safe-area-inset-top,0px)+4rem)] sm:px-6 md:max-w-5xl md:pb-12 md:pt-20">
             {children}
           </div>
         </main>
       </div>
+
+      {/* Mobile Submenu Popover Floating Sheet */}
+      {bottomSubmenuItem && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setBottomSubmenuHref(null)}
+          />
+          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+4.25rem)] z-50 mx-auto max-w-sm overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 px-1">
+              <div className="flex items-center gap-1.5">
+                <bottomSubmenuItem.icon className="h-4 w-4 text-emerald-600" />
+                <span className="text-xs font-semibold text-slate-800">
+                  {bottomSubmenuItem.label}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBottomSubmenuHref(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid gap-1">
+              {bottomSubmenuItem.children?.map((child) => {
+                const isChildActive =
+                  location.pathname === child.href ||
+                  (child.href !== "/cashflow" && child.href !== "/debts" && child.href !== "/trading/orders"
+                    ? location.pathname.startsWith(`${child.href}/`)
+                    : location.pathname === child.href);
+                return (
+                  <Link
+                    key={child.href}
+                    to={child.href}
+                    onClick={() => {
+                      setBottomSubmenuHref(null);
+                      closeSidebar();
+                    }}
+                    className={cn(
+                      "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-all active:scale-[0.98]",
+                      isChildActive
+                        ? "bg-emerald-50 text-emerald-700 font-semibold"
+                        : "text-slate-700 hover:bg-slate-100"
+                    )}
+                  >
+                    <span>{child.label}</span>
+                    {child.href === "/trading/orders" && (
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-100/60 px-1.5 py-0.5 rounded">
+                        Lệnh
+                      </span>
+                    )}
+                    {isChildActive && (
+                      <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/90 backdrop-blur-md px-3 pt-1.5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.35rem))] shadow-[0_-4px_20px_rgba(0,0,0,0.04)] md:hidden">
         <div className="relative mx-auto max-w-lg">
@@ -401,15 +516,28 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
               const pathname = location.pathname;
+              const isTrading = item.href === "/trading/orders";
               const active =
+                (isTrading && pathname.startsWith("/trading")) ||
                 pathname === item.href ||
                 pathname.startsWith(`${item.href}/`) ||
                 item.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
+
+              const hasChildren = Boolean(item.children && item.children.length > 0);
+
               return (
                 <Link
                   key={item.href}
                   to={item.href}
-                  onClick={closeSidebar}
+                  onClick={(e) => {
+                    if (hasChildren && active) {
+                      e.preventDefault();
+                      setBottomSubmenuHref((prev) => (prev === item.href ? null : item.href));
+                      return;
+                    }
+                    setBottomSubmenuHref(null);
+                    closeSidebar();
+                  }}
                   className={cn(
                     "flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-1 transition-all active:scale-95 min-h-[46px]",
                     active
@@ -418,7 +546,12 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className={cn("h-5 w-5", active ? "text-emerald-600" : "text-slate-500")} />
+                  <div className="relative">
+                    <Icon className={cn("h-5 w-5", active ? "text-emerald-600" : "text-slate-500")} />
+                    {hasChildren && (
+                      <span className="absolute -top-0.5 -right-1 flex h-1.5 w-1.5 rounded-full bg-emerald-500/80 ring-1 ring-white" />
+                    )}
+                  </div>
                   <span className="text-[11px] leading-tight truncate max-w-[64px] text-center">{item.label}</span>
                 </Link>
               );

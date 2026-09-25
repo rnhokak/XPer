@@ -64,7 +64,7 @@ export const router = createBrowserRouter([
           { path: 'settings/telegram', element: <SettingsTelegramPage /> },
           
           // Trading routes
-          { path: 'trading', element: <Navigate to="trading/dashboard" replace /> },
+          { path: 'trading', element: <Navigate to="trading/orders" replace /> },
           { path: 'trading/dashboard', element: <TradingDashboardPage /> },
           { path: 'trading/accounts', element: <TradingAccountsPage /> },
           { path: 'trading/orders', element: <TradingOrdersPage /> },

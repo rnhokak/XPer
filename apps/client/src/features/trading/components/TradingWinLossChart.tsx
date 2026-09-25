@@ -105,7 +105,12 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
   const svgRef = useRef<SVGSVGElement | null>(null)
 
   // Dynamically track container width for true full-width responsiveness & 1:1 mouse tracking
-  const [containerWidth, setContainerWidth] = useState<number>(640)
+  const [containerWidth, setContainerWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Math.max(280, Math.min(window.innerWidth - 32, 640))
+    }
+    return 360
+  })
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -457,32 +462,32 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
 
   return (
     <Card className={cn('w-full overflow-hidden rounded-2xl border bg-card shadow-sm transition-all', className)}>
-      <CardHeader className="space-y-3 pb-3 pt-4 px-4 sm:px-6">
+      <CardHeader className="space-y-3 pb-3 pt-4 px-3 sm:px-6">
         {/* Top Header Controls: Title & View Modes */}
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
               <TrendingUp className="h-4 w-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold leading-none tracking-tight">
+              <CardTitle className="text-sm sm:text-base font-semibold leading-none tracking-tight">
                 Biểu đồ Win / Loss theo ngày
               </CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-[11px] sm:text-xs text-muted-foreground">
                 Tổng số tiền lời / lỗ và hiệu suất giao dịch theo từng ngày
               </p>
             </div>
           </div>
 
           {/* iOS Segmented Controls for Mode & Range */}
-          <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+          <div className="flex flex-col gap-1.5 w-full sm:w-auto sm:flex-row sm:items-center">
             {/* Range selection */}
-            <div className="flex items-center rounded-lg bg-muted/80 p-0.5 text-[11px] font-medium text-muted-foreground">
+            <div className="flex items-center overflow-x-auto no-scrollbar rounded-lg bg-muted/80 p-0.5 text-[11px] font-medium text-muted-foreground w-full sm:w-auto justify-between sm:justify-start">
               <button
                 type="button"
                 onClick={() => setRange('all')}
                 className={cn(
-                  'rounded-md px-2 py-1 transition-all active:scale-95',
+                  'rounded-md px-2 py-1 transition-all active:scale-95 whitespace-nowrap',
                   range === 'all'
                     ? 'bg-background text-foreground shadow-sm font-semibold'
                     : 'hover:text-foreground'
@@ -494,7 +499,7 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
                 type="button"
                 onClick={() => setRange('30')}
                 className={cn(
-                  'rounded-md px-2 py-1 transition-all active:scale-95',
+                  'rounded-md px-2 py-1 transition-all active:scale-95 whitespace-nowrap',
                   range === '30'
                     ? 'bg-background text-foreground shadow-sm font-semibold'
                     : 'hover:text-foreground'
@@ -506,7 +511,7 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
                 type="button"
                 onClick={() => setRange('14')}
                 className={cn(
-                  'rounded-md px-2 py-1 transition-all active:scale-95',
+                  'rounded-md px-2 py-1 transition-all active:scale-95 whitespace-nowrap',
                   range === '14'
                     ? 'bg-background text-foreground shadow-sm font-semibold'
                     : 'hover:text-foreground'
@@ -518,7 +523,7 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
                 type="button"
                 onClick={() => setRange('7')}
                 className={cn(
-                  'rounded-md px-2 py-1 transition-all active:scale-95',
+                  'rounded-md px-2 py-1 transition-all active:scale-95 whitespace-nowrap',
                   range === '7'
                     ? 'bg-background text-foreground shadow-sm font-semibold'
                     : 'hover:text-foreground'
@@ -529,12 +534,12 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
             </div>
 
             {/* View Mode selection */}
-            <div className="flex items-center rounded-lg bg-muted/80 p-0.5 text-[11px] font-medium text-muted-foreground">
+            <div className="flex items-center overflow-x-auto no-scrollbar rounded-lg bg-muted/80 p-0.5 text-[11px] font-medium text-muted-foreground w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setViewMode('cum')}
                 className={cn(
-                  'rounded-md px-2.5 py-1 transition-all active:scale-95',
+                  'rounded-md px-2.5 py-1 transition-all active:scale-95 whitespace-nowrap',
                   viewMode === 'cum'
                     ? 'bg-background text-foreground shadow-sm font-semibold'
                     : 'hover:text-foreground'
@@ -546,7 +551,7 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
                 type="button"
                 onClick={() => setViewMode('daily')}
                 className={cn(
-                  'rounded-md px-2.5 py-1 transition-all active:scale-95',
+                  'rounded-md px-2.5 py-1 transition-all active:scale-95 whitespace-nowrap',
                   viewMode === 'daily'
                     ? 'bg-background text-foreground shadow-sm font-semibold'
                     : 'hover:text-foreground'
@@ -558,7 +563,7 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
                 type="button"
                 onClick={() => setViewMode('winloss')}
                 className={cn(
-                  'rounded-md px-2.5 py-1 transition-all active:scale-95',
+                  'rounded-md px-2.5 py-1 transition-all active:scale-95 whitespace-nowrap',
                   viewMode === 'winloss'
                     ? 'bg-background text-foreground shadow-sm font-semibold'
                     : 'hover:text-foreground'
@@ -640,8 +645,8 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
             </div>
           ) : (
             // Default Overview Stats when not scrubbing
-            <div className="flex flex-wrap items-center justify-between gap-y-1 text-xs">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-y-1.5 text-xs">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <div>
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">
                     Tổng P&L ({stats.totalDays} ngày · {stats.totalOrders} lệnh)
@@ -656,15 +661,15 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
                   </span>
                 </div>
 
-                <div className="border-l pl-3 border-border/60">
+                <div className="border-l pl-2.5 sm:pl-3 border-border/60">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">
                     Ngày Thắng / Thua
                   </span>
                   <span className="text-sm font-bold font-mono">
-                    <span className="text-emerald-600 dark:text-emerald-400">{stats.runningWinDays} ngày Thắng</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">{stats.runningWinDays} Thắng</span>
                     <span className="text-muted-foreground mx-1">/</span>
-                    <span className="text-rose-600 dark:text-rose-400">{stats.runningLossDays} ngày Thua</span>
-                    <span className="ml-1.5 text-xs text-muted-foreground font-normal">({stats.winDaysRate}%)</span>
+                    <span className="text-rose-600 dark:text-rose-400">{stats.runningLossDays} Thua</span>
+                    <span className="ml-1 text-xs text-muted-foreground font-normal">({stats.winDaysRate}%)</span>
                   </span>
                 </div>
               </div>
@@ -675,7 +680,7 @@ export function TradingWinLossChart({ orders, currency = 'USD', className }: Tra
                 </span>
                 <span className="flex items-center gap-1 text-[10px] text-muted-foreground/80 italic">
                   <Crosshair className="h-3 w-3" />
-                  Chạm / rê ngón tay để xem từng ngày
+                  Chạm / rê để xem từng ngày
                 </span>
               </div>
             </div>

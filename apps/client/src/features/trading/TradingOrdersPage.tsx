@@ -14,7 +14,24 @@ import { orderFormSchema, type OrderFormValues } from '@/lib/validation/trading'
 import { useNotificationsStore } from '@/store/notifications'
 import { useOrders, useCreateOrder, useUpdateOrder, useDeleteOrder, useSyncOrdersLedger } from '@/hooks/useTradingData'
 import { useBalanceAccounts } from '@/hooks/useTradingData'
-import { Loader2, Percent, Upload } from 'lucide-react'
+import {
+  Clock,
+  LayoutGrid,
+  LayoutList,
+  Loader2,
+  Pencil,
+  Percent,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  Upload,
+  Wallet,
+  X,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { TradingOrderImportDialog } from './components/TradingOrderImportDialog'
 import { TradingWinLossChart } from './components/TradingWinLossChart'
 
@@ -106,6 +123,7 @@ export default function TradingOrdersPage() {
   const [deleteTarget, setDeleteTarget] = useState<OrderRow | null>(null)
   const [page, setPage] = useState(1)
   const [syncingLedger, setSyncingLedger] = useState(false)
+  const [viewLayout, setViewLayout] = useState<'cards' | 'table'>('cards')
 
   const tradingAccountOptions = useMemo(() => 
     tradingAccounts
@@ -326,50 +344,78 @@ export default function TradingOrdersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Top Header & Actions */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Orders</h1>
-          <p className="text-sm text-muted-foreground">Manage your trading orders</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Orders</h1>
+            <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
+              {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Quản lý và theo dõi các lệnh giao dịch Forex, Crypto, Stocks
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleLedgerSync} disabled={syncingLedger || syncLedgerMutation.isPending}>
-            {syncingLedger || syncLedgerMutation.isPending ? 'Syncing...' : 'Sync Ledger'}
-          </Button>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
+            size="sm"
+            onClick={handleLedgerSync}
+            disabled={syncingLedger || syncLedgerMutation.isPending}
+            className="h-9 px-2.5 sm:px-3 text-xs flex items-center gap-1.5 rounded-xl"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", (syncingLedger || syncLedgerMutation.isPending) && "animate-spin")} />
+            <span className="hidden sm:inline">Sync Ledger</span>
+            <span className="sm:hidden">Sync</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setImportDialogOpen(true)}
             disabled={tradingAccountOptions.length === 0}
-            className="flex items-center gap-1.5"
+            className="h-9 px-2.5 sm:px-3 text-xs flex items-center gap-1.5 rounded-xl"
           >
-            <Upload className="h-4 w-4" />
-            Import CSV
+            <Upload className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Import CSV</span>
+            <span className="sm:hidden">Import</span>
           </Button>
+
           <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
             <DialogTrigger asChild>
-              <Button size="lg" onClick={openNewDialog} disabled={tradingAccountOptions.length === 0}>
-                New order
+              <Button
+                size="sm"
+                onClick={openNewDialog}
+                disabled={tradingAccountOptions.length === 0}
+                className="h-9 px-3 text-xs font-semibold flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Thêm lệnh</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[min(600px,calc(100vw-20px))] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="w-[min(600px,calc(100vw-24px))] max-h-[85vh] p-4 sm:p-6 overflow-y-auto rounded-2xl">
               <DialogHeader>
-                <DialogTitle>{editingOrder ? 'Edit order' : 'New order'}</DialogTitle>
-                <DialogDescription>
-                  {editingOrder ? 'Update order details.' : 'Create a new trading order.'}
+                <DialogTitle>{editingOrder ? 'Sửa lệnh giao dịch' : 'Thêm lệnh giao dịch mới'}</DialogTitle>
+                <DialogDescription className="text-xs">
+                  {editingOrder ? 'Cập nhật thông tin chi tiết của lệnh.' : 'Nhập thông tin lệnh giao dịch để theo dõi.'}
                 </DialogDescription>
               </DialogHeader>
               {mounted ? (
                 <Form {...form}>
-                  <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                  <form className="space-y-3.5" onSubmit={form.handleSubmit(handleSubmit)}>
+                    <div className="grid gap-3 grid-cols-2">
                       <FormField
                         control={form.control}
                         name="symbol"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Symbol</FormLabel>
+                            <FormLabel className="text-xs">Symbol</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="e.g. EURUSD" />
+                              <Input {...field} placeholder="VD: EURUSD, XAUUSD" className="h-9 text-sm" />
                             </FormControl>
                             <FormMessage>{form.formState.errors.symbol?.message}</FormMessage>
                           </FormItem>
@@ -381,14 +427,14 @@ export default function TradingOrdersPage() {
                         name="side"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Side</FormLabel>
+                            <FormLabel className="text-xs">Loại lệnh (Side)</FormLabel>
                             <Select value={field.value} onValueChange={field.onChange}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select side" />
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue placeholder="Chọn side" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="buy">Buy</SelectItem>
-                                <SelectItem value="sell">Sell</SelectItem>
+                                <SelectItem value="buy">BUY (Mua)</SelectItem>
+                                <SelectItem value="sell">SELL (Bán)</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage>{form.formState.errors.side?.message}</FormMessage>
@@ -397,15 +443,15 @@ export default function TradingOrdersPage() {
                       />
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
                       <FormField
                         control={form.control}
                         name="entry_price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Entry Price</FormLabel>
+                            <FormLabel className="text-xs">Entry Price</FormLabel>
                             <FormControl>
-                              <Input type="number" step="0.00001" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                              <Input type="number" step="0.00001" {...field} onChange={(e) => field.onChange(Number(e.target.value))} className="h-9 text-sm font-mono" />
                             </FormControl>
                             <FormMessage>{form.formState.errors.entry_price?.message}</FormMessage>
                           </FormItem>
@@ -417,9 +463,9 @@ export default function TradingOrdersPage() {
                         name="volume"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Volume (lots)</FormLabel>
+                            <FormLabel className="text-xs">Khối lượng (Lots)</FormLabel>
                             <FormControl>
-                              <Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                              <Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(Number(e.target.value))} className="h-9 text-sm font-mono" />
                             </FormControl>
                             <FormMessage>{form.formState.errors.volume?.message}</FormMessage>
                           </FormItem>
@@ -430,11 +476,11 @@ export default function TradingOrdersPage() {
                         control={form.control}
                         name="balance_account_id"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Trading Account</FormLabel>
+                          <FormItem className="col-span-2 sm:col-span-1">
+                            <FormLabel className="text-xs">Tài khoản</FormLabel>
                             <Select value={field.value} onValueChange={field.onChange}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select account" />
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue placeholder="Chọn TK" />
                               </SelectTrigger>
                               <SelectContent>
                                 {tradingAccountOptions.map((acc) => (
@@ -450,15 +496,15 @@ export default function TradingOrdersPage() {
                       />
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 grid-cols-2">
                       <FormField
                         control={form.control}
                         name="sl_price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Stop Loss</FormLabel>
+                            <FormLabel className="text-xs">Stop Loss (SL)</FormLabel>
                             <FormControl>
-                              <Input type="number" step="0.00001" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} />
+                              <Input type="number" step="0.00001" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} className="h-9 text-sm font-mono" />
                             </FormControl>
                             <FormMessage>{form.formState.errors.sl_price?.message}</FormMessage>
                           </FormItem>
@@ -470,9 +516,9 @@ export default function TradingOrdersPage() {
                         name="tp_price"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Take Profit</FormLabel>
+                            <FormLabel className="text-xs">Take Profit (TP)</FormLabel>
                             <FormControl>
-                              <Input type="number" step="0.00001" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} />
+                              <Input type="number" step="0.00001" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} className="h-9 text-sm font-mono" />
                             </FormControl>
                             <FormMessage>{form.formState.errors.tp_price?.message}</FormMessage>
                           </FormItem>
@@ -480,21 +526,21 @@ export default function TradingOrdersPage() {
                       />
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 grid-cols-2">
                       <FormField
                         control={form.control}
                         name="status"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Status</FormLabel>
+                            <FormLabel className="text-xs">Trạng thái</FormLabel>
                             <Select value={field.value} onValueChange={field.onChange}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue placeholder="Chọn status" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="closed">Closed</SelectItem>
-                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                <SelectItem value="open">Open (Đang mở)</SelectItem>
+                                <SelectItem value="closed">Closed (Đã đóng)</SelectItem>
+                                <SelectItem value="cancelled">Cancelled (Đã hủy)</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage>{form.formState.errors.status?.message}</FormMessage>
@@ -507,9 +553,9 @@ export default function TradingOrdersPage() {
                         name="open_time"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Open Time</FormLabel>
+                            <FormLabel className="text-xs">Thời gian mở</FormLabel>
                             <FormControl>
-                              <Input type="datetime-local" {...field} />
+                              <Input type="datetime-local" {...field} className="h-9 text-xs sm:text-sm font-mono" />
                             </FormControl>
                             <FormMessage>{form.formState.errors.open_time?.message}</FormMessage>
                           </FormItem>
@@ -519,15 +565,15 @@ export default function TradingOrdersPage() {
 
                     {form.watch('status') === 'closed' && (
                       <>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-3 grid-cols-2">
                           <FormField
                             control={form.control}
                             name="close_time"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Close Time</FormLabel>
+                                <FormLabel className="text-xs">Thời gian đóng</FormLabel>
                                 <FormControl>
-                                  <Input type="datetime-local" {...field} value={field.value ?? ''} />
+                                  <Input type="datetime-local" {...field} value={field.value ?? ''} className="h-9 text-xs sm:text-sm font-mono" />
                                 </FormControl>
                                 <FormMessage>{form.formState.errors.close_time?.message}</FormMessage>
                               </FormItem>
@@ -539,9 +585,9 @@ export default function TradingOrdersPage() {
                             name="close_price"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Close Price</FormLabel>
+                                <FormLabel className="text-xs">Close Price</FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.00001" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} />
+                                  <Input type="number" step="0.00001" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} className="h-9 text-sm font-mono" />
                                 </FormControl>
                                 <FormMessage>{form.formState.errors.close_price?.message}</FormMessage>
                               </FormItem>
@@ -549,15 +595,15 @@ export default function TradingOrdersPage() {
                           />
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-3 grid-cols-2">
                           <FormField
                             control={form.control}
                             name="pnl_amount"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>P&L Amount</FormLabel>
+                                <FormLabel className="text-xs">P&L Amount ($)</FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.01" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} />
+                                  <Input type="number" step="0.01" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} className="h-9 text-sm font-mono" />
                                 </FormControl>
                                 <FormMessage>{form.formState.errors.pnl_amount?.message}</FormMessage>
                               </FormItem>
@@ -569,9 +615,9 @@ export default function TradingOrdersPage() {
                             name="commission_usd"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Commission</FormLabel>
+                                <FormLabel className="text-xs">Commission ($)</FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.01" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} />
+                                  <Input type="number" step="0.01" {...field} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)} className="h-9 text-sm font-mono" />
                                 </FormControl>
                                 <FormMessage>{form.formState.errors.commission_usd?.message}</FormMessage>
                               </FormItem>
@@ -586,21 +632,21 @@ export default function TradingOrdersPage() {
                       name="note"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Note</FormLabel>
+                          <FormLabel className="text-xs">Ghi chú (Tùy chọn)</FormLabel>
                           <FormControl>
-                            <Textarea rows={3} {...field} value={field.value ?? ''} />
+                            <Textarea rows={2} {...field} value={field.value ?? ''} placeholder="Lý do vào lệnh, setup..." className="text-sm" />
                           </FormControl>
                           <FormMessage>{form.formState.errors.note?.message}</FormMessage>
                         </FormItem>
                       )}
                     />
 
-                    <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                      <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
-                        Cancel
+                    <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
+                      <Button type="button" variant="outline" className="w-full sm:w-auto h-9 text-xs" onClick={() => handleDialogChange(false)}>
+                        Hủy
                       </Button>
-                      <Button type="submit" disabled={form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending}>
-                        {form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingOrder ? 'Update order' : 'Create order'}
+                      <Button type="submit" className="w-full sm:w-auto h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" disabled={form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending}>
+                        {form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending ? 'Đang lưu...' : editingOrder ? 'Cập nhật lệnh' : 'Tạo lệnh'}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -611,6 +657,26 @@ export default function TradingOrdersPage() {
         </div>
       </div>
 
+      {/* Account Selector if multiple exist */}
+      {tradingAccountOptions.length > 1 && (
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2.5 py-1.5 text-xs max-w-sm">
+          <Wallet className="h-3.5 w-3.5 text-slate-500" />
+          <span className="text-slate-500 font-medium">Tài khoản:</span>
+          <Select value={activeBalanceAccountId} onValueChange={setActiveBalanceAccountId}>
+            <SelectTrigger className="h-7 text-xs border-0 bg-white shadow-xs font-semibold px-2 py-0">
+              <SelectValue placeholder="Chọn tài khoản" />
+            </SelectTrigger>
+            <SelectContent>
+              {tradingAccountOptions.map((acc) => (
+                <SelectItem key={acc.balance_account_id} value={acc.balance_account_id}>
+                  {acc.name} ({acc.currency})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {error ? (
         <Card>
           <CardHeader>
@@ -620,42 +686,60 @@ export default function TradingOrdersPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Win Rate</CardDescription>
-            <CardTitle className="flex items-center gap-2">
-              <Percent className="h-4 w-4" />
-              {metrics.winRate}%
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">{metrics.closedCount} closed orders</CardContent>
+      {/* 4 Performance Metric Cards: 2x2 on Mobile, 4-col on Desktop */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
+        <Card className="p-3 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between pb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Win Rate</span>
+            <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600">
+              <Percent className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            </span>
+          </div>
+          <div className="text-lg sm:text-2xl font-bold font-mono text-slate-900">{metrics.winRate}%</div>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate mt-0.5">{metrics.closedCount} lệnh đã đóng</p>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total P&L</CardDescription>
-            <CardTitle className={metrics.totalPnl >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-              {metrics.totalPnl >= 0 ? '+' : ''}{formatNumber(metrics.totalPnl)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Net P&L including commission</CardContent>
+
+        <Card className="p-3 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between pb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Net P&L</span>
+            <span className={cn("p-1 rounded-md", metrics.totalPnl >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600")}>
+              {metrics.totalPnl >= 0 ? <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <TrendingDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
+            </span>
+          </div>
+          <div className={cn("text-lg sm:text-2xl font-bold font-mono truncate", metrics.totalPnl >= 0 ? "text-emerald-600" : "text-rose-600")}>
+            {metrics.totalPnl >= 0 ? '+' : ''}{formatNumber(metrics.totalPnl)}
+          </div>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate mt-0.5">Sau Commission & Swap</p>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Gross P&L</CardDescription>
-            <CardTitle>{formatNumber(metrics.grossPnl)}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Before commission & swap</CardContent>
+
+        <Card className="p-3 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between pb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Gross P&L</span>
+            <span className="p-1 rounded-md bg-blue-500/10 text-blue-600">
+              <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            </span>
+          </div>
+          <div className="text-lg sm:text-2xl font-bold font-mono text-slate-900 truncate">
+            {formatNumber(metrics.grossPnl)}
+          </div>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate mt-0.5">Lãi/lỗ gộp ban đầu</p>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Commission</CardDescription>
-            <CardTitle className="text-red-600">{formatNumber(metrics.totalCommission)}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Commission + Swap</CardContent>
+
+        <Card className="p-3 sm:p-4 rounded-xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between pb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Phí sàn</span>
+            <span className="p-1 rounded-md bg-rose-500/10 text-rose-600">
+              <Percent className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            </span>
+          </div>
+          <div className="text-lg sm:text-2xl font-bold font-mono text-rose-600 truncate">
+            {formatNumber(metrics.totalCommission)}
+          </div>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate mt-0.5">Commission + Swap</p>
         </Card>
       </div>
 
+      {/* Win/Loss Chart */}
       <TradingWinLossChart
         orders={initialOrders.filter((order) =>
           filters.symbol ? order.symbol.toLowerCase().includes(filters.symbol.toLowerCase()) : true
@@ -663,36 +747,258 @@ export default function TradingOrdersPage() {
         currency={tradingAccountOptions[0]?.currency ?? 'USD'}
       />
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Orders</CardTitle>
-              <CardDescription>All your trading orders</CardDescription>
+      {/* Orders List Container */}
+      <Card className="rounded-2xl border-slate-200/90 shadow-sm overflow-hidden">
+        <CardHeader className="p-3.5 sm:p-6 pb-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base sm:text-lg font-semibold">Orders</CardTitle>
+                  <Badge variant="outline" className="text-xs font-mono">
+                    {filteredOrders.length}
+                  </Badge>
+                </div>
+                <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                  {filters.symbol || filters.status !== 'all' ? 'Đang lọc kết quả' : 'Tất cả các lệnh giao dịch'}
+                </CardDescription>
+              </div>
+
+              {/* View Layout Toggle for mobile */}
+              <div className="flex items-center rounded-lg border bg-slate-100/80 p-0.5 sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setViewLayout('cards')}
+                  className={cn(
+                    "p-1.5 rounded-md text-xs transition-all",
+                    viewLayout === 'cards' ? "bg-white text-emerald-700 shadow-xs font-semibold" : "text-slate-500"
+                  )}
+                  title="Dạng thẻ (Mobile Card)"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewLayout('table')}
+                  className={cn(
+                    "p-1.5 rounded-md text-xs transition-all",
+                    viewLayout === 'table' ? "bg-white text-emerald-700 shadow-xs font-semibold" : "text-slate-500"
+                  )}
+                  title="Dạng bảng (Table)"
+                >
+                  <LayoutList className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Filter by symbol..."
-                value={filters.symbol}
-                onChange={(e) => setFilters((prev) => ({ ...prev, symbol: e.target.value }))}
-                className="w-48"
-              />
+
+            {/* Filter Bar */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-48">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Lọc theo symbol..."
+                  value={filters.symbol}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, symbol: e.target.value }))}
+                  className="pl-8 pr-7 h-9 text-xs sm:text-sm"
+                />
+                {filters.symbol && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters((prev) => ({ ...prev, symbol: '' }))}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
               <Select value={filters.status} onValueChange={(val) => setFilters((prev) => ({ ...prev, status: val as StatusFilter }))}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-28 sm:w-32 h-9 text-xs sm:text-sm">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="all">Tất cả ({initialOrders.length})</SelectItem>
+                  <SelectItem value="open">Open ({initialOrders.filter(o => o.status === 'open').length})</SelectItem>
+                  <SelectItem value="closed">Closed ({initialOrders.filter(o => o.status === 'closed').length})</SelectItem>
+                  <SelectItem value="cancelled">Cancelled ({initialOrders.filter(o => o.status === 'cancelled').length})</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+
+        <CardContent className="p-3 sm:p-6 pt-0">
+          {/* Mobile Card View (optimized for iPhone 14) */}
+          <div className={cn("space-y-2.5", viewLayout === 'table' ? "hidden sm:hidden" : "block sm:hidden")}>
+            {paginatedOrders.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                Không tìm thấy lệnh giao dịch nào phù hợp.
+              </div>
+            ) : (
+              paginatedOrders.map((order) => {
+                const commission = getOrderCommission(order)
+                const netPnl = getOrderNetPnl(order)
+                const isProfitable = netPnl >= 0
+
+                return (
+                  <div
+                    key={order.id}
+                    className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition-all active:scale-[0.99] space-y-2.5"
+                  >
+                    {/* Top Row: Symbol + Side Badge + Ticket + Status */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wider",
+                            order.side === 'buy'
+                              ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20"
+                              : "bg-rose-500/10 text-rose-700 border border-rose-500/20"
+                          )}
+                        >
+                          {order.side === 'buy' ? 'BUY ↗' : 'SELL ↘'}
+                        </span>
+                        <span className="font-bold text-base text-slate-900 tracking-tight">
+                          {order.symbol}
+                        </span>
+                        {order.ticket && (
+                          <span className="text-[11px] font-mono text-muted-foreground">
+                            #{order.ticket}
+                          </span>
+                        )}
+                        {order.is_imported && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 border-blue-200 text-blue-700 bg-blue-50">
+                            Imported
+                          </Badge>
+                        )}
+                      </div>
+
+                      <Badge
+                        variant={
+                          order.status === 'open'
+                            ? 'default'
+                            : order.status === 'closed'
+                            ? 'secondary'
+                            : 'outline'
+                        }
+                        className={cn(
+                          "text-[11px] capitalize",
+                          order.status === 'open' && "bg-blue-600 hover:bg-blue-700 text-white"
+                        )}
+                      >
+                        {order.status}
+                      </Badge>
+                    </div>
+
+                    {/* Main P&L & Volume Box */}
+                    <div className="flex items-baseline justify-between rounded-xl bg-slate-50/90 px-3 py-2 border border-slate-100">
+                      <div>
+                        <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground block">
+                          Net P&L
+                        </span>
+                        <div className="flex items-baseline gap-1.5">
+                          <span
+                            className={cn(
+                              "text-xl font-extrabold font-mono tracking-tight",
+                              isProfitable ? "text-emerald-600" : "text-rose-600"
+                            )}
+                          >
+                            {isProfitable ? '+' : ''}
+                            {formatNumber(netPnl, 2)}
+                          </span>
+                          {order.pnl_percent !== null && order.pnl_percent !== undefined && (
+                            <span className="text-xs font-medium text-muted-foreground font-mono">
+                              ({order.pnl_percent > 0 ? '+' : ''}
+                              {formatNumber(order.pnl_percent, 2)}%)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground block">
+                          Khối lượng
+                        </span>
+                        <span className="text-sm font-bold font-mono text-slate-800">
+                          {formatNumber(order.volume, 2)} lot
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Micro-grid of Prices */}
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-0.5">
+                      <div className="space-y-0.5">
+                        <div className="text-muted-foreground text-[11px]">
+                          Entry: <span className="font-mono font-semibold text-slate-800">{formatNumber(order.entry_price, 5)}</span>
+                        </div>
+                        {order.sl_price && (
+                          <div className="text-[11px] text-rose-500 font-mono">
+                            SL: {formatNumber(order.sl_price, 5)}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-0.5 text-right">
+                        <div className="text-muted-foreground text-[11px]">
+                          Close: <span className="font-mono font-semibold text-slate-800">{order.close_price ? formatNumber(order.close_price, 5) : '—'}</span>
+                        </div>
+                        {order.tp_price && (
+                          <div className="text-[11px] text-emerald-600 font-mono">
+                            TP: {formatNumber(order.tp_price, 5)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {commission !== 0 && (
+                      <div className="text-[11px] text-muted-foreground flex justify-between border-t border-slate-100 pt-1">
+                        <span>Phí / Swap:</span>
+                        <span className="font-mono text-rose-600">
+                          {formatNumber(commission, 2)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Footer: Date & Touch Action Buttons */}
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        <Clock className="h-3 w-3 text-slate-400" />
+                        <span>{formatDateTime(order.open_time)}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openEditDialog(order)}
+                          disabled={order.is_imported}
+                          className="h-8 px-2.5 text-xs text-slate-700 hover:text-slate-900 hover:bg-slate-100 gap-1 rounded-lg"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          <span>Sửa</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleteTarget(order)}
+                          disabled={order.is_imported}
+                          className={cn(
+                            "h-8 px-2.5 text-xs gap-1 rounded-lg",
+                            order.is_imported ? "text-muted-foreground" : "text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          )}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Xóa</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View (and mobile if viewLayout === 'table') */}
+          <div className={cn("overflow-x-auto", viewLayout === 'cards' ? "hidden sm:block" : "block")}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -781,14 +1087,14 @@ export default function TradingOrdersPage() {
 
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Trang {currentPage} / {totalPages}
               </p>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
                   Previous
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
                   Next
                 </Button>
               </div>
@@ -799,19 +1105,19 @@ export default function TradingOrdersPage() {
 
       {deleteTarget && (
         <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-          <DialogContent>
+          <DialogContent className="w-[min(480px,calc(100vw-24px))] p-4 sm:p-6 rounded-2xl">
             <DialogHeader>
-              <DialogTitle>Confirm Delete</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete this order? This action cannot be undone.
+              <DialogTitle>Xác nhận xóa lệnh</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
+                Bạn có chắc chắn muốn xóa lệnh {deleteTarget.symbol} {deleteTarget.ticket ? `#${deleteTarget.ticket}` : ''}? Thao tác này không thể hoàn tác.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
-                Cancel
+            <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
+              <Button variant="outline" className="w-full sm:w-auto h-9 text-xs" onClick={() => setDeleteTarget(null)}>
+                Hủy
               </Button>
-              <Button variant="destructive" onClick={confirmDelete} disabled={deleteMutation.isPending}>
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              <Button variant="destructive" className="w-full sm:w-auto h-9 text-xs" onClick={confirmDelete} disabled={deleteMutation.isPending}>
+                {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa lệnh'}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
-import { Wallet, ArrowUpRight, TrendingUp, TrendingDown, BarChart2, Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Wallet, ArrowUpRight, TrendingUp, TrendingDown, BarChart2, Loader2, ClipboardList } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { useLatestBalances, useBalanceSnapshots } from '@/hooks/useTradingData'
 
 type SnapshotRow = {
@@ -126,6 +128,12 @@ export default function TradingDashboardPage() {
           <p className="text-sm text-muted-foreground">Trading · Balance Accounts</p>
           <h1 className="text-2xl font-semibold">Balance dashboard</h1>
         </div>
+        <Button asChild variant="outline" size="sm" className="self-start sm:self-auto gap-1.5 rounded-xl border-slate-200">
+          <Link to="/trading/orders">
+            <ClipboardList className="h-4 w-4 text-emerald-600" />
+            <span>Xem Orders (Lệnh)</span>
+          </Link>
+        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
