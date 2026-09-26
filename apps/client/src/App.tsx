@@ -5,6 +5,8 @@ import { Notifications } from './components/ui/notifications'
 import { Button } from './components/ui/button'
 import { RefreshCw, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useNotificationsStore } from './store/notifications'
+import { RELOAD_FLAG_KEY } from './lib/pwa/reloadLatestVersion'
 
 type UpdateAvailableDetail = {
   update: () => Promise<void> | undefined
@@ -53,6 +55,42 @@ function UpdateAvailable() {
 }
 
 function App() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Dọn dẹp query param chống cache khỏi URL để thanh địa chỉ luôn sạch
+    const url = new URL(window.location.href)
+    let hasCleaned = false
+    for (const key of ['v_reload', '_nocache', '_t', 't']) {
+      if (url.searchParams.has(key)) {
+        url.searchParams.delete(key)
+        hasCleaned = true
+      }
+    }
+    if (hasCleaned) {
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+    }
+
+    // Hiển thị thông báo khi vừa tải lại thành công bản mới từ server
+    try {
+      const reloadedAt = localStorage.getItem(RELOAD_FLAG_KEY)
+      if (reloadedAt) {
+        localStorage.removeItem(RELOAD_FLAG_KEY)
+        const diff = Date.now() - Number(reloadedAt)
+        if (diff < 45000) {
+          useNotificationsStore.getState().notify({
+            type: 'success',
+            title: 'Đã tải phiên bản mới nhất',
+            description: 'Ứng dụng đã nạp toàn bộ mã nguồn React mới nhất từ máy chủ!',
+            duration: 6000,
+          })
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
   return (
     <>
       <MoneyVisibilityProvider />

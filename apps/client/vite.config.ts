@@ -1,14 +1,58 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Định dạng phiên bản ứng dụng theo yêu cầu: v.1.0.01
+export const APP_VERSION = 'v.1.0.01'
+const appVersion = APP_VERSION
+const appBuildTime = new Date().toISOString()
+
+function versionJsonPlugin(): Plugin {
+  return {
+    name: 'version-json-plugin',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify(
+          {
+            version: appVersion,
+            buildTime: appBuildTime,
+          },
+          null,
+          2
+        ),
+      })
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/version.json' || req.url === '/app/version.json') {
+          res.setHeader('Content-Type', 'application/json')
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+          res.end(
+            JSON.stringify({
+              version: appVersion,
+              buildTime: appBuildTime,
+            })
+          )
+          return
+        }
+        next()
+      })
+    },
+  }
+}
 
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(new Date().toISOString()),
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_TIME__: JSON.stringify(appBuildTime),
   },
   plugins: [
     react(),
+    versionJsonPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       strategies: 'injectManifest',
@@ -41,8 +85,13 @@ export default defineConfig({
           },
         ],
       },
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        globIgnores: ['**/version.json'],
+      },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        globIgnores: ['**/version.json'],
         navigateFallback: '/app/index.html',
         runtimeCaching: [
           {

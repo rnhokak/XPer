@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, Settings, Wallet, WifiOff, X } from "lucide-react";
+import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, RefreshCw, Settings, Wallet, WifiOff, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui";
 import { useMoneyVisibilityStore } from "@/store/money-visibility";
+import { reloadLatestVersion, formatAppVersionShort } from "@/lib/pwa/reloadLatestVersion";
 
 type NavItem = {
   href: string;
@@ -70,8 +71,10 @@ const navItems: NavItem[] = [
     label: "Settings",
     icon: Settings,
     children: [
-      { href: "/settings/profile", label: "Profile" },
-      { href: "/settings", label: "General" },
+      { href: "/settings", label: "Cài đặt & Bản mới" },
+      { href: "/settings/profile", label: "Hồ sơ" },
+      { href: "/settings/telegram", label: "Telegram" },
+      { href: "/settings/report-dates", label: "Bảng ngày báo cáo" },
     ],
   },
 ];
@@ -312,7 +315,18 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
           </Button>
         </div>
 
-        <p className="px-3 pt-4 text-[11px] text-slate-400">Version {__APP_VERSION__}</p>
+        <div className="flex items-center justify-between px-3 pt-4 text-[11px] text-slate-400">
+          <span title={__APP_VERSION__}>Bản: {formatAppVersionShort(__APP_VERSION__)}</span>
+          <button
+            type="button"
+            onClick={() => void reloadLatestVersion()}
+            className="flex items-center gap-1 font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
+            title="Xóa cache và tải lại mã nguồn React mới nhất từ server"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Tải bản mới
+          </button>
+        </div>
       </aside>
 
       {isSidebarOpen && (
@@ -362,10 +376,21 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
 
               {menuOpen && (
                 <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-white p-2 shadow-lg ring-1 ring-black/5">
-                  <div className="px-3 py-2 text-sm">
+                  <div className="px-3 py-2 text-sm border-b border-slate-100 mb-1">
                     <p className="font-semibold">{preferredName}</p>
                     <p className="text-xs text-muted-foreground">{userEmail ?? "Signed in"}</p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    asChild
+                    className="w-full justify-start gap-2 text-sm hover:bg-slate-100"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <Link to="/settings">
+                      <Settings className="h-4 w-4 text-slate-500" />
+                      Cài đặt hệ thống
+                    </Link>
+                  </Button>
                   <Button
                     variant="ghost"
                     className="w-full justify-start gap-2 text-sm hover:bg-slate-100"
@@ -374,12 +399,24 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                       setMenuOpen(false);
                     }}
                   >
-                    {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {hideAmounts ? <EyeOff className="h-4 w-4 text-slate-500" /> : <Eye className="h-4 w-4 text-slate-500" />}
                     {hideAmounts ? "Hiện số tiền" : "Ẩn số tiền"}
                   </Button>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start gap-2 text-sm hover:bg-emerald-50"
+                    className="w-full justify-start gap-2 text-sm hover:bg-emerald-50 text-emerald-700"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void reloadLatestVersion();
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4 text-emerald-600" />
+                    Tải bản mới nhất
+                  </Button>
+                  <div className="my-1 border-t border-slate-100" />
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700"
                     onClick={() => {
                       setMenuOpen(false);
                       handleLogout();

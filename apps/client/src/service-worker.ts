@@ -36,6 +36,12 @@ try {
   console.error('Failed to register navigation route in SW', err)
 }
 
+// Never cache version.json: always fetch directly from network
+registerRoute(
+  ({ url }) => url.pathname.endsWith('/version.json'),
+  new NetworkOnly(),
+)
+
 // Runtime caching for GET API requests (NetworkFirst with cache fallback)
 registerRoute(
   ({ url, request }) => url.pathname.startsWith('/api/') && request.method === 'GET',
@@ -106,6 +112,16 @@ self.addEventListener('message', (ev: any) => {
 
   if (data && data.type === 'xper:clear-api-cache') {
     caches.delete('xper-api-get-cache').catch(() => {})
+  }
+
+  if (data && data.type === 'xper:clear-all-caches') {
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => {})
+  }
+
+  if (data && data.type === 'SKIP_WAITING') {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    self.skipWaiting()
   }
 })
 
