@@ -27,7 +27,7 @@ export default function DebtsNewPage() {
 
   const partners = data?.partners ?? []
   const accounts = data?.accounts ?? []
-  const categories = (data?.categories ?? []).filter((c) => c.type === 'debt')
+  const categories = data?.categories ?? []
   const defaultAccount = accounts.find((a) => a.is_default) ?? accounts[0] ?? null
   const defaultCurrency = defaultAccount?.currency ?? 'VND'
 

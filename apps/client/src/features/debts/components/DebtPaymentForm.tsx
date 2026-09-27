@@ -52,7 +52,7 @@ export function DebtPaymentForm({
       principal_amount: undefined,
       interest_amount: undefined,
       account_id: defaultAccountId ?? null,
-      category_id: partnerCategoryId ?? null,
+      category_id: null,
       currency,
       payment_date: defaultDateTime(),
       note: '',
@@ -63,13 +63,6 @@ export function DebtPaymentForm({
     form.setValue('account_id', defaultAccountId ?? null)
   }, [defaultAccountId, form])
 
-  useEffect(() => {
-    const categoryTouched = form.getFieldState('category_id').isTouched
-    if (!categoryTouched) {
-      form.setValue('category_id', partnerCategoryId ?? null)
-    }
-  }, [partnerCategoryId, form])
-
   const amount = useWatch({ control: form.control, name: 'amount' })
 
   useEffect(() => {
@@ -79,8 +72,8 @@ export function DebtPaymentForm({
   }, [amount, form])
 
   const filteredCategories = useMemo(
-    () => categories.filter((c) => c.type === 'debt' && c.level !== 0),
-    [categories]
+    () => categories.filter((c) => (direction === 'borrow' ? c.type === 'expense' : c.type === 'income')),
+    [categories, direction]
   )
 
   const createPaymentMutation = useMutation({
@@ -271,7 +264,7 @@ export function DebtPaymentForm({
                   name="category_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category (debt)</FormLabel>
+                      <FormLabel>Danh mục (tuỳ chọn)</FormLabel>
                       <Select
                         value={field.value ?? EMPTY_SELECT_VALUE}
                         onValueChange={(v) => field.onChange(v === EMPTY_SELECT_VALUE ? null : v)}

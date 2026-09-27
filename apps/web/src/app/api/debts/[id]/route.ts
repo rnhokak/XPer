@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const debtPromise = supabase
     .from("debts")
     .select(
-      "id,partner_id,direction,principal_amount,currency,start_date,due_date,status,description,interest_type,interest_rate,interest_cycle,created_at,updated_at,partner:partners(id,name,type,phone,note,category_id)"
+      "id,partner_id,direction,principal_amount,currency,start_date,due_date,status,description,interest_type,interest_rate,interest_cycle,created_at,updated_at,partner:accounts(id,name,type,currency)"
     )
     .eq("id", debtId)
     .eq("user_id", user.id)
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const paymentsPromise = supabase
     .from("debt_payments")
     .select(
-      "id,payment_type,amount,principal_amount,interest_amount,payment_date,note,transaction:transactions(id,type,amount,currency,transaction_time,note,account:accounts(id,name,currency),category:categories(id,name,type))"
+      "id,payment_type,amount,principal_amount,interest_amount,payment_date,note,transaction:transactions(id,type,amount,currency,transaction_time,note,account:accounts!transactions_account_id_fkey(id,name,currency),category:categories(id,name,type))"
     )
     .eq("debt_id", debtId)
     .eq("user_id", user.id)
@@ -50,8 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const categoriesPromise = supabase
     .from("categories")
     .select("id,name,type,parent_id,level,category_focus,is_default")
-    .eq("user_id", user.id)
-    .eq("type", "debt");
+    .eq("user_id", user.id);
 
   const [{ data: debt, error: debtError }, { data: payments, error: paymentsError }, accountsRes, categoriesRes] = await Promise.all([
     debtPromise,

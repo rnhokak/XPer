@@ -128,7 +128,6 @@ export default function DebtsDetailPage() {
         accounts={accounts}
         categories={categories}
         remainingPrincipal={remainingPrincipal}
-        partnerCategoryId={debt.partner?.category_id ?? null}
       />
 
       <Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">

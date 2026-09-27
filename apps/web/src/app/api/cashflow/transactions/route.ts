@@ -36,19 +36,48 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const range = normalizeCashflowRange(searchParams.get("range"));
-  const shift = normalizeRangeShift(searchParams.get("shift"));
-  const { start, end } = rangeBounds(range, shift);
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
 
-  let query = supabase
+  let start: Date;
+  let end: Date;
+
+  if (fromParam && toParam) {
+    const fromDate = new Date(`${fromParam}T00:00:00`);
+    const toDate = new Date(`${toParam}T23:59:59.999`);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      const response = NextResponse.json({ error: "Ngày không hợp lệ" }, { status: 400 });
+      return corsResponse(response, request);
+    }
+    if (toDate < fromDate) {
+      const response = NextResponse.json({ error: "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu" }, { status: 400 });
+      return corsResponse(response, request);
+    }
+    // Limit to max 3 months (~93 days)
+    const diffDays = (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays > 93) {
+      const response = NextResponse.json({ error: "Khoảng thời gian tìm kiếm tối đa là 3 tháng" }, { status: 400 });
+      return corsResponse(response, request);
+    }
+    start = fromDate;
+    end = toDate;
+  } else {
+    const range = normalizeCashflowRange(searchParams.get("range"));
+    const shift = normalizeRangeShift(searchParams.get("shift"));
+    const bounds = rangeBounds(range, shift);
+    start = bounds.start;
+    end = bounds.end;
+  }
+
+  const query = supabase
     .from("transactions")
     .select(
-      "id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)"
+      "id,type,flow_type,transfer_peer_id,amount,currency,note,transaction_time,destination_amount,destination_currency,exchange_rate,destination_account_id,category:categories(id,name,type),account:accounts!transactions_account_id_fkey(id,name,currency,type),destination_account:accounts!transactions_destination_account_id_fkey(id,name,currency,type)"
     )
     .eq("user_id", user.id)
     .order("transaction_time", { ascending: false })
     .gte("transaction_time", start.toISOString())
-    .lt("transaction_time", end.toISOString());
+    .lte("transaction_time", end.toISOString());
 
   const { data, error } = await query;
 
@@ -78,18 +107,18 @@ export async function POST(req: Request) {
     return corsResponse(response, request);
   }
 
-  const { data: inserted, error } = await createCashflowTransaction({
+  const { data: inserted, peer, error } = await createCashflowTransaction({
     supabase,
     userId: user.id,
     values: parsed.data,
   });
 
-  if (error) {
-    const response = NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !inserted) {
+    const response = NextResponse.json({ error: error?.message ?? "Error creating transaction" }, { status: 500 });
     return corsResponse(response, request);
   }
 
-  const response = NextResponse.json(inserted);
+  const response = NextResponse.json(peer ? [inserted, peer] : inserted);
   return corsResponse(response, request);
 }
 
@@ -146,13 +175,30 @@ export async function DELETE(req: Request) {
     return corsResponse(response, request);
   }
 
-  const { error } = await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id);
+  // Check if transaction has transfer_peer_id or is peer of another
+  const { data: tx } = await supabase
+    .from("transactions")
+    .select("id, transfer_peer_id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const idsToDelete = [id];
+  if (tx?.transfer_peer_id) {
+    idsToDelete.push(tx.transfer_peer_id);
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .delete()
+    .in("id", idsToDelete)
+    .eq("user_id", user.id);
 
   if (error) {
     const response = NextResponse.json({ error: error.message }, { status: 500 });
     return corsResponse(response, request);
   }
 
-  const response = NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true, deletedIds: idsToDelete });
   return corsResponse(response, request);
 }

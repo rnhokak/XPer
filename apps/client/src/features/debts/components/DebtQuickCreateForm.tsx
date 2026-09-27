@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { useMutation, useQueryClient } from '@/lib/query'
@@ -9,14 +9,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { type Account, type Category, type Partner } from '@/hooks/useDebtsData'
+import { type Account, type Partner } from '@/hooks/useDebtsData'
 import { apiClient } from '@/lib/api/client'
 
 
 type Props = {
   partners: Partner[]
   accounts: Account[]
-  categories: Category[]
+  categories?: unknown
   defaultAccountId?: string | null
   defaultCurrency: string
 }
@@ -25,7 +25,7 @@ const defaultDate = () => new Date().toISOString().slice(0, 10)
 const defaultDateTime = () => new Date().toISOString().slice(0, 16)
 const EMPTY_SELECT_VALUE = '__none__'
 
-export function DebtQuickCreateForm({ partners, accounts, categories, defaultAccountId, defaultCurrency }: Props) {
+export function DebtQuickCreateForm({ partners, accounts, categories: _categories, defaultAccountId, defaultCurrency }: Props) {
   const queryClient = useQueryClient()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -61,27 +61,7 @@ export function DebtQuickCreateForm({ partners, accounts, categories, defaultAcc
 
   const direction = useWatch({ control: form.control, name: 'direction' }) ?? 'lend'
   const interestType = useWatch({ control: form.control, name: 'interest_type' }) ?? 'none'
-  const selectedCategoryId = useWatch({ control: form.control, name: 'category_id' })
 
-  const debtCategories = useMemo(
-    () => categories.filter((c) => c.type === 'debt'),
-    [categories]
-  )
-
-  useEffect(() => {
-    if (!selectedCategoryId && debtCategories.length > 0) {
-      form.setValue('category_id', debtCategories[0]?.id ?? null)
-    }
-  }, [selectedCategoryId, debtCategories, form])
-
-  useEffect(() => {
-    if (!selectedCategoryId) {
-      form.setValue('partner_id', '')
-      return
-    }
-    const partnerId = partners.find((p) => p.category_id === selectedCategoryId)?.id
-    form.setValue('partner_id', partnerId ?? '')
-  }, [selectedCategoryId, partners, form])
 
   useEffect(() => {
     if (interestType === 'none') {
@@ -177,29 +157,29 @@ export function DebtQuickCreateForm({ partners, accounts, categories, defaultAcc
 
                 <FormField
                   control={form.control}
-                  name="category_id"
+                  name="partner_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Đối tác (debt category)</FormLabel>
+                      <FormLabel>Đối tác</FormLabel>
                       <Select
-                        value={field.value ?? EMPTY_SELECT_VALUE}
-                        onValueChange={(v) => field.onChange(v === EMPTY_SELECT_VALUE ? null : v)}
+                        value={field.value || EMPTY_SELECT_VALUE}
+                        onValueChange={(v) => field.onChange(v === EMPTY_SELECT_VALUE ? '' : v)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Chọn đối tác" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={EMPTY_SELECT_VALUE}>Chưa chọn</SelectItem>
-                          {debtCategories.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
+                          {partners.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       <FormMessage>{form.formState.errors.partner_id?.message}</FormMessage>
-                      {debtCategories.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">Bạn cần thêm đối tác ở màn Đối tác trước.</p>
+                      {partners.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">Bạn cần thêm đối tác trước.</p>
                       ) : null}
                     </FormItem>
                   )}

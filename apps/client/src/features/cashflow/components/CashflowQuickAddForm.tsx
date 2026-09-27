@@ -32,9 +32,16 @@ import {
   formatDebtExpenseNote,
   type DebtExpenseMode,
 } from "@/lib/cashflow/debtExpenseUtils";
+import { useAuth } from "@/hooks/useAuth";
+import { useDebtPartners } from "@/hooks/useDebtsData";
+import {
+  isOtherAccount,
+  isPartnerAccount,
+} from "@/lib/cashflow/accountBalance";
 import {
   ArrowDownRight,
   ArrowLeftRight,
+  ArrowRight,
   ArrowUpRight,
   Check,
   ChevronRight,
@@ -44,6 +51,7 @@ import {
   PenLine,
   ShoppingBag,
   User,
+  Users,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -55,8 +63,16 @@ type Category = {
   parent_id: string | null;
   category_focus: CategoryFocus | null;
 };
-type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null };
-type Partner = { id: string; name: string };
+type Account = { id: string; name: string; currency: string; type?: string | null; balance?: number | null; is_default?: boolean | null };
+type Partner = { id: string; name: string; currency?: string; type?: string | null };
+
+const formatNumber = (value: number, curr?: string) => {
+  const isVnd = curr?.toUpperCase() === "VND";
+  return Number(value).toLocaleString(undefined, {
+    maximumFractionDigits: isVnd ? 0 : 2,
+    minimumFractionDigits: isVnd ? 0 : 2,
+  });
+};
 
 type Props = {
   categories: Category[];
@@ -109,12 +125,70 @@ export function CashflowQuickAddForm({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [lastTransactionTime, setLastTransactionTime] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const queryClient = useQueryClient();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [showCurrencySelect, setShowCurrencySelect] = useState(false);
   const [debtMode, setDebtMode] = useState<DebtExpenseMode>("none");
   const [debtPartnerName, setDebtPartnerName] = useState("");
+
+  const { user } = useAuth();
+  const { data: fetchedPartners = [] } = useDebtPartners(user?.id ?? "");
+  const allPartnersList = partners.length > 0 ? partners : fetchedPartners;
+
+  // Split into my accounts, other accounts, and partners
+  const { myAccountOptions, otherAccountOptions, partnerOptions, allTargetsMap } = useMemo(() => {
+    const myList: Array<{ id: string; name: string; currency: string; balance: number; type: string; isPartner: boolean; isOther: boolean }> = [];
+    const otherList: Array<{ id: string; name: string; currency: string; balance: number; type: string; isPartner: boolean; isOther: boolean }> = [];
+    const partMap = new Map<string, { id: string; name: string; currency: string; balance: number; type: string; isPartner: boolean; isOther: boolean }>();
+
+    accounts.forEach((acc) => {
+      const isPartner = isPartnerAccount(acc.type);
+      const isOther = isOtherAccount(acc.type);
+      const item = {
+        id: acc.id,
+        name: acc.name,
+        currency: acc.currency || "VND",
+        balance: Number(acc.balance ?? 0),
+        type: acc.type || "account",
+        isPartner,
+        isOther,
+      };
+      if (isPartner) {
+        partMap.set(acc.id, item);
+      } else if (isOther) {
+        otherList.push(item);
+      } else {
+        myList.push(item);
+      }
+    });
+
+    allPartnersList.forEach((p) => {
+      if (!partMap.has(p.id)) {
+        partMap.set(p.id, {
+          id: p.id,
+          name: p.name,
+          currency: p.currency || "VND",
+          balance: 0,
+          type: "partner",
+          isPartner: true,
+          isOther: false,
+        });
+      }
+    });
+
+    const partList = Array.from(partMap.values());
+    const allMap = new Map<string, { id: string; name: string; currency: string; balance: number; type: string; isPartner: boolean; isOther: boolean }>();
+    myList.forEach((a) => allMap.set(a.id, a));
+    otherList.forEach((a) => allMap.set(a.id, a));
+    partList.forEach((p) => allMap.set(p.id, p));
+
+    return {
+      myAccountOptions: myList,
+      otherAccountOptions: otherList,
+      partnerOptions: partList,
+      allTargetsMap: allMap,
+    };
+  }, [accounts, allPartnersList]);
 
   const form = useForm<CashflowQuickAddValues>({
     resolver: zodResolver(cashflowQuickAddSchema),
@@ -123,6 +197,10 @@ export function CashflowQuickAddForm({
       type: "expense",
       amount: undefined,
       account_id: defaultAccountId ?? null,
+      destination_account_id: null,
+      destination_amount: undefined,
+      destination_currency: undefined,
+      exchange_rate: undefined,
       category_id: "",
       note: "",
       transaction_time: lastTransactionTime ? lastTransactionTime : defaultDateTimeValue(),
@@ -150,26 +228,67 @@ export function CashflowQuickAddForm({
   }, [useDialog]);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  useEffect(() => {
-    form.setValue("account_id", defaultAccountId ?? null);
+    const validDefault = myAccountOptions.find((a) => a.id === defaultAccountId)
+      ? defaultAccountId
+      : myAccountOptions[0]?.id ?? null;
+    form.setValue("account_id", validDefault);
     form.setValue("currency", defaultCurrency);
-  }, [defaultAccountId, defaultCurrency, form]);
+  }, [defaultAccountId, defaultCurrency, form, myAccountOptions]);
 
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const selectedCategoryId = useWatch({ control: form.control, name: "category_id" });
   const amount = useWatch({ control: form.control, name: "amount" });
   const accountId = useWatch({ control: form.control, name: "account_id" });
+  const destinationAccountId = useWatch({ control: form.control, name: "destination_account_id" });
   const currency = useWatch({ control: form.control, name: "currency" }) ?? defaultCurrency;
+  const destinationCurrency = useWatch({ control: form.control, name: "destination_currency" });
+  const destinationAmount = useWatch({ control: form.control, name: "destination_amount" });
+  const exchangeRate = useWatch({ control: form.control, name: "exchange_rate" });
+
+  const isTransfer = selectedType === "transfer";
+  const destTarget = destinationAccountId ? allTargetsMap.get(destinationAccountId) : null;
+  const effectiveDestCurrency = destinationCurrency || destTarget?.currency || "VND";
+  const isDifferentCurrency = Boolean(
+    isTransfer &&
+    destinationAccountId &&
+    currency &&
+    effectiveDestCurrency &&
+    currency.trim().toUpperCase() !== effectiveDestCurrency.trim().toUpperCase()
+  );
+
+  const handleExchangeRateChange = (rateVal: number | undefined) => {
+    form.setValue("exchange_rate", rateVal, { shouldValidate: true, shouldDirty: true });
+    if (rateVal && rateVal > 0 && typeof amount === "number" && amount > 0) {
+      const isVnd = effectiveDestCurrency.toUpperCase() === "VND";
+      const calculatedDest = isVnd ? Math.round(amount * rateVal) : Math.round(amount * rateVal * 100) / 100;
+      form.setValue("destination_amount", calculatedDest, { shouldValidate: true, shouldDirty: true });
+    }
+  };
+
+  const handleDestinationAmountChange = (destVal: number | undefined) => {
+    form.setValue("destination_amount", destVal, { shouldValidate: true, shouldDirty: true });
+    if (destVal && destVal > 0 && typeof amount === "number" && amount > 0) {
+      const calculatedRate = Number((destVal / amount).toFixed(6));
+      form.setValue("exchange_rate", calculatedRate, { shouldValidate: true, shouldDirty: true });
+    }
+  };
+
+  // Keep conversion synced when amount changes
+  useEffect(() => {
+    if (!isTransfer || !isDifferentCurrency) return;
+    const currentRate = form.getValues("exchange_rate");
+    const currentDest = form.getValues("destination_amount");
+    if (typeof amount === "number" && amount > 0) {
+      if (currentRate && currentRate > 0) {
+        const isVnd = effectiveDestCurrency.toUpperCase() === "VND";
+        const calculatedDest = isVnd ? Math.round(amount * currentRate) : Math.round(amount * currentRate * 100) / 100;
+        form.setValue("destination_amount", calculatedDest, { shouldValidate: true });
+      } else if (currentDest && currentDest > 0) {
+        const calculatedRate = Number((currentDest / amount).toFixed(6));
+        form.setValue("exchange_rate", calculatedRate, { shouldValidate: true });
+      }
+    }
+  }, [amount, isTransfer, isDifferentCurrency, effectiveDestCurrency, form]);
 
   const categoriesByType = useMemo(
     () => categories.filter((c) => c.type === selectedType),
@@ -230,32 +349,54 @@ export function CashflowQuickAddForm({
   const createMutation = useCreateTransaction();
   const isSubmitting = createMutation.isPending;
 
-  // Validation state: Amount MUST be entered and > 0, account must be selected, and category MUST be selected
+  // Validation state: Amount MUST be entered and > 0, account must be selected, and category MUST be selected (except for transfer)
   const isValidAmount = typeof amount === "number" && Number.isFinite(amount) && amount > 0;
-  const hasAccount = accounts.length === 0 || Boolean(accountId);
-  const hasCategory = Boolean(selectedCategoryId && selectedCategoryId.trim().length > 0);
-  const canSubmit = isValidAmount && hasAccount && hasCategory && !isSubmitting;
+  const hasAccount = myAccountOptions.length === 0 || Boolean(accountId);
+  const hasCategory = isTransfer || Boolean(selectedCategoryId && selectedCategoryId.trim().length > 0);
+  const hasDestination = !isTransfer || Boolean(destinationAccountId && destinationAccountId !== accountId);
+  const isValidTransferCurrency =
+    !isTransfer ||
+    !isDifferentCurrency ||
+    (Boolean(destinationAmount && destinationAmount > 0) && Boolean(exchangeRate && exchangeRate > 0));
+  const canSubmit = isValidAmount && hasAccount && hasCategory && hasDestination && isValidTransferCurrency && !isSubmitting;
 
   const onSubmit = async (values: CashflowQuickAddValues) => {
-    if (!isValidAmount || !hasCategory) return;
+    if (!isValidAmount || !hasCategory || !hasDestination) return;
     setSubmitError(null);
     const transactionTimeIso = toIsoStringWithOffset(values.transaction_time);
 
-    // Format note with debt expense tags if expense mode is active
+    // Format note with debt expense tags or transfer destination
     const rawNote = values.note?.trim() || "";
-    const activeDebtMode = values.type === "expense" ? debtMode : "none";
-    const partnerToSave = debtPartnerName.trim() || (activeDebtMode === "borrowed_spent" ? "Người cho vay" : "Người được mua hộ");
-    const finalNote = formatDebtExpenseNote(
-      rawNote,
-      activeDebtMode,
-      partnerToSave
-    );
+    let finalNote = rawNote;
+    if (values.type === "expense") {
+      const activeDebtMode = debtMode;
+      const partnerToSave = debtPartnerName.trim() || (activeDebtMode === "borrowed_spent" ? "Người cho vay" : "Người được mua hộ");
+      finalNote = formatDebtExpenseNote(
+        rawNote,
+        activeDebtMode,
+        partnerToSave
+      );
+    } else if (values.type === "transfer" && values.destination_account_id) {
+      const destTargetObj = allTargetsMap.get(values.destination_account_id);
+      const destName = destTargetObj ? destTargetObj.name : "Đối tác / Tài khoản nhận";
+      const srcCurr = (values.currency || defaultCurrency).toUpperCase();
+      const dstCurr = (values.destination_currency || effectiveDestCurrency).toUpperCase();
+      let transferDesc = `Chuyển đến: ${destName}`;
+      if (srcCurr !== dstCurr && values.destination_amount) {
+        transferDesc += ` (Nhận: ${formatNumber(values.destination_amount, dstCurr)} ${dstCurr}, Tỷ giá: ${values.exchange_rate})`;
+      }
+      finalNote = finalNote ? `${finalNote} (${transferDesc})` : transferDesc;
+    }
 
     const payload = {
       ...values,
       note: finalNote || null,
-      category_id: values.category_id,
+      category_id: values.type === "transfer" ? null : values.category_id,
       account_id: values.account_id || defaultAccountId || null,
+      destination_account_id: values.type === "transfer" ? (values.destination_account_id || null) : null,
+      destination_amount: values.type === "transfer" ? (isDifferentCurrency ? values.destination_amount : values.amount) : null,
+      destination_currency: values.type === "transfer" ? (isDifferentCurrency ? (values.destination_currency || effectiveDestCurrency) : values.currency) : null,
+      exchange_rate: values.type === "transfer" ? (isDifferentCurrency ? values.exchange_rate : 1) : null,
       transaction_time: transactionTimeIso ?? undefined,
       currency: values.currency || defaultCurrency,
     };
@@ -264,16 +405,20 @@ export function CashflowQuickAddForm({
       onSuccess: (response) => {
         const normalizedRange = normalizeCashflowRange(range);
         const { start, end } = rangeBounds(normalizedRange, 0);
-        const transactionDate = new Date(response.transaction_time);
-        if (!Number.isNaN(transactionDate.getTime()) && transactionDate >= start && transactionDate < end) {
-          queryClient.setQueryData<CashflowTransaction[]>(cashflowTransactionsQueryKey(range, 0), (prev) => {
-            const existing = (prev ?? []).filter((tx) => tx.id !== response.id);
-            return [response, ...existing];
-          });
-          queryClient.setQueryData<CashflowTransaction[]>(cashflowReportTransactionsQueryKey, (prev) => {
-            const existing = (prev ?? []).filter((tx) => tx.id !== response.id);
-            return [response, ...existing];
-          });
+        const resList = Array.isArray(response) ? response : [response];
+        for (const item of resList) {
+          if (!item) continue;
+          const transactionDate = new Date(item.transaction_time);
+          if (!Number.isNaN(transactionDate.getTime()) && transactionDate >= start && transactionDate < end) {
+            queryClient.setQueryData<CashflowTransaction[]>(cashflowTransactionsQueryKey(range, 0), (prev) => {
+              const existing = (prev ?? []).filter((tx) => tx.id !== item.id);
+              return [item, ...existing];
+            });
+            queryClient.setQueryData<CashflowTransaction[]>(cashflowReportTransactionsQueryKey, (prev) => {
+              const existing = (prev ?? []).filter((tx) => tx.id !== item.id);
+              return [item, ...existing];
+            });
+          }
         }
         const submittedTime = values.transaction_time ? new Date(values.transaction_time) : new Date();
         submittedTime.setMilliseconds(submittedTime.getMilliseconds() + 1);
@@ -290,6 +435,10 @@ export function CashflowQuickAddForm({
           type: values.type,
           amount: undefined,
           account_id: payload.account_id,
+          destination_account_id: null,
+          destination_amount: undefined,
+          destination_currency: undefined,
+          exchange_rate: undefined,
           category_id: "",
           note: "",
           transaction_time: nextTransactionTime,
@@ -415,8 +564,9 @@ export function CashflowQuickAddForm({
             }}
           />
 
-          {/* 1-Tap Category Selector */}
-          <div className="space-y-1.5">
+          {/* 1-Tap Category Selector (Only for income & expense) */}
+          {selectedType !== "transfer" && (
+            <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                 <span>Danh mục</span>
@@ -508,61 +658,295 @@ export function CashflowQuickAddForm({
               suggestedId={null}
             />
           </div>
+          )}
 
-          {/* Account & Date in a sleek compact layout */}
+          {/* Account & Date / Destination in a sleek layout */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {/* Account Selector */}
+            {/* Account Selector - Source: Only My Accounts */}
             <FormField
               control={form.control}
               name="account_id"
-              render={({ field }) => (
-                <FormItem className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <FormLabel className="text-xs font-semibold text-slate-700">Tài khoản thanh toán</FormLabel>
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrencySelect((v) => !v)}
-                      className="text-[11px] font-medium text-slate-400 hover:text-slate-600"
+              render={({ field }) => {
+                return (
+                  <FormItem className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <FormLabel className="text-xs font-semibold text-slate-700">
+                        {selectedType === "transfer" ? "Từ tài khoản (Của tôi)" : "Tài khoản thanh toán"}
+                      </FormLabel>
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrencySelect((v) => !v)}
+                        className="text-[11px] font-medium text-slate-400 hover:text-slate-600"
+                      >
+                        {currency} ▾
+                      </button>
+                    </div>
+                    <Select
+                      value={field.value ?? undefined}
+                      onValueChange={(val) => {
+                        const nextVal = val === "none" ? null : val;
+                        field.onChange(nextVal);
+                        const found = nextVal ? allTargetsMap.get(nextVal) : null;
+                        if (found?.currency) {
+                          form.setValue("currency", found.currency);
+                        }
+                      }}
                     >
-                      {currency} ▾
-                    </button>
-                  </div>
-                  <Select
-                    value={field.value ?? undefined}
-                    onValueChange={(val) => {
-                      const nextVal = val === "none" ? null : val;
-                      field.onChange(nextVal);
-                      const found = accounts.find((a) => a.id === nextVal);
-                      if (found?.currency) {
-                        form.setValue("currency", found.currency);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm">
-                      <div className="flex items-center gap-2 truncate">
-                        <CreditCard className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                        <SelectValue placeholder="Chọn tài khoản" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
-                          <span className="font-medium">{acc.name}</span>{" "}
-                          <span className="text-xs text-muted-foreground">({acc.currency})</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage className="text-xs text-rose-500 font-medium">
-                    {form.formState.errors.account_id?.message}
-                  </FormMessage>
-                </FormItem>
-              )}
+                      <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm">
+                        <div className="flex items-center gap-2 truncate">
+                          <CreditCard className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <SelectValue placeholder={selectedType === "transfer" ? "Chọn tài khoản nguồn của tôi" : "Chọn tài khoản nguồn"} />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {myAccountOptions.length > 0 && (
+                          <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
+                            💳 Tài khoản của tôi
+                          </div>
+                        )}
+                        {myAccountOptions.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                            <div className="flex items-center justify-between gap-3 w-full">
+                              <span className="font-medium truncate">{acc.name}</span>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                ({formatNumber(acc.balance, acc.currency)} {acc.currency})
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-xs text-rose-500 font-medium">
+                      {form.formState.errors.account_id?.message}
+                    </FormMessage>
+                  </FormItem>
+                );
+              }}
             />
 
-            {/* Compact Date Picker */}
-            <CashflowDateFields control={form.control} />
+            {/* Destination Account for transfer, otherwise Compact Date Picker */}
+            {selectedType === "transfer" ? (
+              <FormField
+                control={form.control}
+                name="destination_account_id"
+                render={({ field }) => {
+                  const selectedDest = field.value ? allTargetsMap.get(field.value) : null;
+                  const availableMyAccounts = myAccountOptions.filter((acc) => acc.id !== accountId);
+                  const availableOtherAccounts = otherAccountOptions.filter((acc) => acc.id !== accountId);
+                  const availablePartners = partnerOptions.filter((p) => p.id !== accountId);
+
+                  return (
+                    <FormItem className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <FormLabel className="text-xs font-semibold text-slate-700">
+                          Đến tài khoản / Đối tác
+                        </FormLabel>
+                        {field.value && (
+                          <span className="text-[11px] font-medium text-slate-400">
+                            {effectiveDestCurrency}
+                          </span>
+                        )}
+                      </div>
+                      <Select
+                        value={field.value ?? undefined}
+                        onValueChange={(val) => {
+                          const nextVal = val === "none" ? null : val;
+                          field.onChange(nextVal);
+                          const target = nextVal ? allTargetsMap.get(nextVal) : null;
+                          const targetCurr = target?.currency || "VND";
+                          form.setValue("destination_currency", targetCurr);
+                          if (targetCurr.toUpperCase() === currency.toUpperCase()) {
+                            form.setValue("destination_amount", amount);
+                            form.setValue("exchange_rate", 1);
+                          } else {
+                            const currentRate = form.getValues("exchange_rate");
+                            if (currentRate && currentRate > 0 && typeof amount === "number" && amount > 0) {
+                              const isVnd = targetCurr.toUpperCase() === "VND";
+                              form.setValue(
+                                "destination_amount",
+                                isVnd ? Math.round(amount * currentRate) : Math.round(amount * currentRate * 100) / 100
+                              );
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm">
+                          <div className="flex items-center gap-2 truncate">
+                            {selectedDest?.isPartner ? (
+                              <Users className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                            ) : selectedDest?.isOther ? (
+                              <User className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                            ) : (
+                              <CreditCard className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            )}
+                            <SelectValue placeholder="Chọn tài khoản / đối tác nhận" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableMyAccounts.length > 0 && (
+                            <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
+                              💳 Tài khoản của tôi
+                            </div>
+                          )}
+                          {availableMyAccounts.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                              <div className="flex items-center justify-between gap-3 w-full">
+                                <span className="font-medium truncate">{acc.name}</span>
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                  ({formatNumber(acc.balance, acc.currency)} {acc.currency})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+
+                          {availableOtherAccounts.length > 0 && (
+                            <div className="mt-1 px-2 py-1 text-[11px] font-semibold text-purple-600 bg-purple-50 rounded-md">
+                              👤 Tài khoản khác (Người khác)
+                            </div>
+                          )}
+                          {availableOtherAccounts.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                              <div className="flex items-center justify-between gap-3 w-full">
+                                <span className="font-medium truncate">{acc.name}</span>
+                                <span className="text-xs text-purple-600 whitespace-nowrap">
+                                  ({formatNumber(acc.balance, acc.currency)} {acc.currency})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+
+                          {availablePartners.length > 0 && (
+                            <div className="mt-1 px-2 py-1 text-[11px] font-semibold text-sky-600 bg-sky-50 rounded-md">
+                              👥 Đối tác
+                            </div>
+                          )}
+                          {availablePartners.map((p) => (
+                            <SelectItem key={p.id} value={p.id} className="text-xs sm:text-sm">
+                              <span className="font-medium">{p.name}</span>{" "}
+                              <span className="text-xs text-sky-600 font-normal">(Đối tác · {p.currency})</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs text-rose-500 font-medium">
+                        {form.formState.errors.destination_account_id?.message}
+                      </FormMessage>
+                    </FormItem>
+                  );
+                }}
+              />
+            ) : (
+              /* Compact Date Picker */
+              <CashflowDateFields control={form.control} />
+            )}
           </div>
+
+          {/* Compact Date Picker full width if transfer mode */}
+          {selectedType === "transfer" && (
+            <div className="w-full">
+              <CashflowDateFields control={form.control} />
+            </div>
+          )}
+
+          {/* Currency Exchange Panel when currencies differ in Transfer mode */}
+          {isTransfer && destinationAccountId && isDifferentCurrency && (
+            <div className="rounded-2xl border border-blue-200/90 bg-gradient-to-br from-blue-50/80 to-indigo-50/40 p-3.5 sm:p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-600 text-white shadow-2xs">
+                    <ArrowLeftRight className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-900">Quy đổi ngoại tệ</span>
+                    <p className="text-[11px] text-slate-500">
+                      Chuyển {currency} ➔ Nhận {effectiveDestCurrency}
+                    </p>
+                  </div>
+                </div>
+                <div className="inline-flex items-center gap-1 rounded-full bg-blue-100/80 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                  <span>{currency}</span>
+                  <ArrowRight className="h-3 w-3" />
+                  <span>{effectiveDestCurrency}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Exchange Rate / Multiplier */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Hệ số nhân / Tỷ giá
+                    </Label>
+                    <span className="text-[10px] text-slate-400">
+                      1 {currency} = ? {effectiveDestCurrency}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="VD: 25400"
+                      value={exchangeRate ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                        handleExchangeRateChange(val);
+                      }}
+                      className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm font-semibold pr-16"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400 pointer-events-none">
+                      tỷ giá
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Nhập tỷ giá sẽ tự tính tiền nhận
+                  </p>
+                  {form.formState.errors.exchange_rate && (
+                    <p className="text-xs font-medium text-rose-500">
+                      {form.formState.errors.exchange_rate.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Destination Received Amount */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Tiền nhận ({effectiveDestCurrency})
+                    </Label>
+                    {destinationAmount && destinationAmount > 0 ? (
+                      <span className="text-[10px] font-bold text-emerald-600">
+                        ≈ {formatNumber(destinationAmount, effectiveDestCurrency)} {effectiveDestCurrency}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder={`Số tiền nhận (${effectiveDestCurrency})`}
+                      value={destinationAmount ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                        handleDestinationAmountChange(val);
+                      }}
+                      className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm font-semibold pr-14 text-emerald-700"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600 pointer-events-none">
+                      {effectiveDestCurrency}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Hoặc nhập tiền nhận sẽ tự tính tỷ giá
+                  </p>
+                  {form.formState.errors.destination_amount && (
+                    <p className="text-xs font-medium text-rose-500">
+                      {form.formState.errors.destination_amount.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Optional Currency Override Drawer/Selector if user clicked currency pill */}
           {showCurrencySelect && (

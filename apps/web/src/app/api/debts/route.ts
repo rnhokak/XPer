@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { debtCreateSchema } from "@/lib/validation/debts";
 import { createCashflowTransaction } from "@/features/cashflow/server/transactions";
 import { type CashflowQuickAddValues } from "@/lib/validation/cashflow";
-import { ensurePartnerCategory } from "@/features/debts/server/partner-category";
+
 
 export const dynamic = "force-dynamic";
 const debtStatuses = ["ongoing", "paid_off", "overdue", "cancelled"] as const;
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
   let debtQuery = supabase
     .from("debts")
     .select(
-      "id,partner_id,direction,principal_amount,currency,start_date,due_date,interest_type,interest_rate,interest_cycle,status,description,created_at,updated_at,partner:partners(id,name,type,phone,category_id)"
+      "id,partner_id,direction,principal_amount,currency,start_date,due_date,interest_type,interest_rate,interest_cycle,status,description,created_at,updated_at,partner:accounts(id,name,type,currency)"
     )
     .eq("user_id", user.id)
     .order("start_date", { ascending: false });
@@ -114,8 +114,8 @@ export async function POST(req: Request) {
   const now = new Date();
 
   const { data: partner, error: partnerError } = await supabase
-    .from("partners")
-    .select("id,name,category_id")
+    .from("accounts")
+    .select("id,name")
     .eq("id", data.partner_id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -125,14 +125,6 @@ export async function POST(req: Request) {
   }
   if (!partner) {
     return NextResponse.json({ error: "Partner not found" }, { status: 404 });
-  }
-
-  const { id: partnerCategoryId, error: categoryError } = await ensurePartnerCategory(supabase, user.id, {
-    name: partner.name,
-    category_id: partner.category_id,
-  });
-  if (categoryError) {
-    return NextResponse.json({ error: categoryError.message }, { status: 500 });
   }
 
   let resolvedCurrency = data.currency?.trim() || null;
@@ -174,7 +166,7 @@ export async function POST(req: Request) {
     type: transactionType,
     amount: data.principal_amount,
     account_id: data.account_id ?? null,
-    category_id: data.category_id ?? partnerCategoryId ?? null,
+    category_id: data.category_id ?? null,
     currency,
     note: data.note ?? undefined,
     transaction_time: parseDateToIso(data.transaction_time ?? data.start_date, now),

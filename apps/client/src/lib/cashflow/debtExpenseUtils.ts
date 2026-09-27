@@ -8,8 +8,8 @@ export interface DebtExpenseMeta {
   tagLabel: string | null;
 }
 
-const BORROWED_REGEX = /\[(?:Chi từ tiền vay|Vay chi tiêu|Chi vay):\s*([^\]]+)\]/i;
-const LENT_REGEX = /\[(?:Mua hộ|Chi cho vay|Cho vay|Chi hộ):\s*([^\]]+)\]/i;
+const BORROWED_REGEX = /\[(?:Chi từ tiền vay|Vay chi tiêu|Chi vay|Chi nợ|Chi ghi nợ|Ghi nợ|Vay nợ):\s*([^\]]+)\]/i;
+const LENT_REGEX = /\[(?:Mua hộ|Chi cho vay|Cho vay|Chi hộ|Cho mượn):\s*([^\]]+)\]/i;
 const SETTLED_REGEX = /\[(?:Đã trả lại|Đã thu lại|Đã thanh toán|Đã xong|Đã hoàn thành)\]/i;
 
 /**
@@ -37,11 +37,11 @@ export function parseDebtExpenseMeta(note?: string | null): DebtExpenseMeta {
   if (borrowedMatch) {
     mode = 'borrowed_spent';
     partnerName = borrowedMatch[1].trim();
-    tagLabel = `Chi từ tiền vay (${partnerName})`;
+    tagLabel = `Chi nợ (${partnerName})`;
   } else if (lentMatch) {
     mode = 'lent_spent';
     partnerName = lentMatch[1].trim();
-    tagLabel = `Mua hộ / Chi cho vay (${partnerName})`;
+    tagLabel = `Chi cho vay (${partnerName})`;
   }
 
   // Clean note by removing bracketed metadata tags

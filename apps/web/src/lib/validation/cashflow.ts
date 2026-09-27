@@ -19,6 +19,10 @@ export const cashflowQuickAddSchema = z.object({
   amount: z.preprocess(numberFromInput, z.number({ required_error: "Amount is required" }).positive("Amount must be greater than 0")),
   category_id: z.string().uuid().nullable().optional(),
   account_id: z.string().uuid().nullable().optional(),
+  destination_account_id: z.string().uuid().nullable().optional(),
+  destination_amount: z.preprocess(numberFromInput, z.number().positive().optional().nullable()),
+  destination_currency: z.string().nullable().optional(),
+  exchange_rate: z.preprocess(numberFromInput, z.number().positive().optional().nullable()),
   note: z
     .preprocess((val) => (typeof val === "string" && val.trim() === "" ? undefined : val), z.string().max(500).optional())
     .nullable(),

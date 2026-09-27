@@ -20,7 +20,7 @@ import { useCreateCategory, useUpdateCategory, useDeleteCategory } from "@/hooks
 type Category = {
   id: string;
   name: string;
-  type: "income" | "expense" | "transfer" | "debt";
+  type: "income" | "expense";
   parent_id: string | null;
   level: 0 | 1 | 2;
   category_focus: CategoryFocus | null;
@@ -36,8 +36,6 @@ type CategoryMeta = {
 const categoryTypeLabels: Record<CategoryInput["type"], string> = {
   expense: "Expense",
   income: "Income",
-  transfer: "Transfer",
-  debt: "Debt",
 };
 
 const initialCategoryMeta: CategoryMeta = {
@@ -46,7 +44,7 @@ const initialCategoryMeta: CategoryMeta = {
 };
 
 const isCategoryType = (value: unknown): value is CategoryInput["type"] =>
-  value === "expense" || value === "income" || value === "transfer" || value === "debt";
+  value === "expense" || value === "income";
 
 export function CategoriesManager({ categories }: { categories: Category[] }) {
   const createMutation = useCreateCategory();
@@ -77,7 +75,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   const selectedType = form.watch("type") ?? "expense";
   const parentId = form.watch("parent_id");
   const parentChoices = useMemo(() => {
-    if (selectedType === "transfer") return [];
     return categories.filter((c) => c.type === selectedType && c.level <= 1);
   }, [categories, selectedType]);
   const parentChildrenMap = useMemo(() => {
@@ -219,19 +216,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     );
   };
 
-  useEffect(() => {
-    if (selectedType === "transfer") {
-      if (form.getValues("parent_id") !== null) {
-        form.setValue("parent_id", null);
-      }
-      if (form.getValues("level") !== 0) {
-        form.setValue("level", 0);
-      }
-      if (parentPickerOpen) {
-        setParentPickerOpen(false);
-      }
-    }
-  }, [selectedType, form, parentPickerOpen]);
+
   useEffect(() => {
     setParentSearch("");
     setParentPickerOpen(false);
@@ -280,8 +265,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
     const map: Record<Category["type"], Category[]> = {
       expense: [],
       income: [],
-      transfer: [],
-      debt: [],
     };
     categories.forEach((category) => {
       if (!isCategoryType(category.type)) return;
@@ -386,12 +369,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
   };
 
   useEffect(() => {
-    if (selectedType === "transfer") {
-      if (form.getValues("level") !== 0) {
-        form.setValue("level", 0);
-      }
-      return;
-    }
 
     if (!parentId) {
       if (form.getValues("level") !== 0) {
@@ -428,7 +405,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Categories</p>
-            <p className="text-sm text-muted-foreground">Manage income, expense, transfer, and debt hierarchies.</p>
+            <p className="text-sm text-muted-foreground">Manage income and expense hierarchies.</p>
           </div>
           <div className="flex flex-wrap gap-2">
              <Button size="sm" variant="outline" onClick={() => openModalForType('expense')}>
@@ -559,7 +536,6 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                 control={form.control}
                 name="parent_id"
                 render={({ field }) => {
-                  const isTransfer = selectedType === "transfer";
                   const hasParentOptions = parentChoices.length > 0;
                   const hasSearchMatches = visibleParentIds
                     ? parentChoices.some((choice) => visibleParentIds.has(choice.id))
@@ -600,71 +576,65 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                   return (
                     <FormItem>
                       <FormLabel>Parent</FormLabel>
-                      {isTransfer ? (
-                        <div className="rounded-md border border-dashed border-primary/60 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
-                          Transfer categories must stay at level 0 and cannot have parents.
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="relative">
-                            <button
-                              ref={parentPickerTriggerRef}
-                              type="button"
-                              className="flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2 text-left text-sm transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                              onClick={() => setParentPickerOpen((prev) => !prev)}
-                            >
-                              <div className="min-w-0">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                  {hasParentOptions ? "Choose parent" : "No parent options"}
-                                </p>
-                                <p className="truncate font-medium text-foreground">{parentLabel}</p>
-                              </div>
-                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition ${parentPickerOpen ? "rotate-180" : ""}`} />
-                            </button>
-                            {parentPickerOpen ? (
-                              <>
-                                <div className="fixed inset-0 z-40" aria-hidden onClick={() => setParentPickerOpen(false)} />
-                                <div
-                                  ref={parentPickerPanelRef}
-                                  className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-full rounded-2xl border bg-white p-4 text-sm shadow-2xl sm:w-[min(380px,calc(100vw-2rem))]"
-                                >
-                                  <div className="space-y-3">
-                                    <div className="relative">
-                                      <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                      <Input
-                                        value={parentSearch}
-                                        onChange={(event) => setParentSearch(event.target.value)}
-                                        placeholder="Search parent..."
-                                        className="h-9 pl-8 text-sm"
-                                        autoFocus
-                                      />
-                                    </div>
-                                    <div className="rounded-lg border">
-                                      <button
-                                        type="button"
-                                        className={`flex w-full items-center justify-between rounded-t-lg px-3 py-2 text-left text-sm font-medium transition ${
-                                          field.value === null ? "bg-foreground text-white" : "hover:bg-muted"
-                                        }`}
-                                        onClick={() => {
-                                          field.onChange(null);
-                                          setParentPickerOpen(false);
-                                        }}
-                                      >
-                                        <span>No parent (root)</span>
-                                        <span className="text-xs text-muted-foreground">Level 0</span>
-                                      </button>
-                                      {renderParentTree(null)}
-                                    </div>
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <button
+                            ref={parentPickerTriggerRef}
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2 text-left text-sm transition hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            onClick={() => setParentPickerOpen((prev) => !prev)}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                {hasParentOptions ? "Choose parent" : "No parent options"}
+                              </p>
+                              <p className="truncate font-medium text-foreground">{parentLabel}</p>
+                            </div>
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground transition ${parentPickerOpen ? "rotate-180" : ""}`} />
+                          </button>
+                          {parentPickerOpen ? (
+                            <>
+                              <div className="fixed inset-0 z-40" aria-hidden onClick={() => setParentPickerOpen(false)} />
+                              <div
+                                ref={parentPickerPanelRef}
+                                className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-full rounded-2xl border bg-white p-4 text-sm shadow-2xl sm:w-[min(380px,calc(100vw-2rem))]"
+                              >
+                                <div className="space-y-3">
+                                  <div className="relative">
+                                    <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                      value={parentSearch}
+                                      onChange={(event) => setParentSearch(event.target.value)}
+                                      placeholder="Search parent..."
+                                      className="h-9 pl-8 text-sm"
+                                      autoFocus
+                                    />
+                                  </div>
+                                  <div className="rounded-lg border">
+                                    <button
+                                      type="button"
+                                      className={`flex w-full items-center justify-between rounded-t-lg px-3 py-2 text-left text-sm font-medium transition ${
+                                        field.value === null ? "bg-foreground text-white" : "hover:bg-muted"
+                                      }`}
+                                      onClick={() => {
+                                        field.onChange(null);
+                                        setParentPickerOpen(false);
+                                      }}
+                                    >
+                                      <span>No parent (root)</span>
+                                      <span className="text-xs text-muted-foreground">Level 0</span>
+                                    </button>
+                                    {renderParentTree(null)}
                                   </div>
                                 </div>
-                              </>
-                            ) : null}
-                          </div>
-                          {hasParentOptions && !hasSearchMatches ? (
-                            <p className="text-xs text-muted-foreground">No parents match your search.</p>
+                              </div>
+                            </>
                           ) : null}
                         </div>
-                      )}
+                        {hasParentOptions && !hasSearchMatches ? (
+                          <p className="text-xs text-muted-foreground">No parents match your search.</p>
+                        ) : null}
+                      </div>
                       <FormMessage>{form.formState.errors.parent_id?.message}</FormMessage>
                     </FormItem>
                   );

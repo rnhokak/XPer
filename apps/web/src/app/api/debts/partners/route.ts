@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { partnerSchema } from "@/lib/validation/debts";
-import { ensurePartnerCategory } from "@/features/debts/server/partner-category";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +19,10 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("partners")
-    .select("id,name,type,phone,note,category_id,created_at")
+    .from("accounts")
+    .select("id,name,type,currency,is_default,created_at")
     .eq("user_id", user.id)
+    .eq("type", "partner")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -39,18 +39,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
   }
 
-  const { name, type, phone, note } = parsed.data;
-  const { id: categoryId, error: categoryError } = await ensurePartnerCategory(supabase, user.id, { name });
-  if (categoryError) return NextResponse.json({ error: categoryError.message }, { status: 500 });
-
-  const { error } = await supabase.from("partners").insert({
+  const { name } = parsed.data;
+  const { error } = await supabase.from("accounts").insert({
     user_id: user.id,
     name: name.trim(),
-    type: type?.trim() || null,
-    phone: phone?.trim() || null,
-    note: note?.trim() || null,
-    category_id: categoryId,
+    type: "partner",
+    currency: "VND",
+    is_default: false,
   });
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
@@ -68,32 +65,10 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
   }
 
-  const { name, type, phone, note } = parsed.data;
-  const { data: existing, error: existingError } = await supabase
-    .from("partners")
-    .select("category_id")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
-  if (!existing) return NextResponse.json({ error: "Partner not found" }, { status: 404 });
-
-  const { id: categoryId, error: categoryError } = await ensurePartnerCategory(supabase, user.id, {
-    name,
-    category_id: existing.category_id,
-  });
-  if (categoryError) return NextResponse.json({ error: categoryError.message }, { status: 500 });
-
+  const { name } = parsed.data;
   const { error } = await supabase
-    .from("partners")
-    .update({
-      name: name.trim(),
-      type: type?.trim() || null,
-      phone: phone?.trim() || null,
-      note: note?.trim() || null,
-      category_id: categoryId,
-    })
+    .from("accounts")
+    .update({ name: name.trim() })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -109,58 +84,34 @@ export async function DELETE(req: Request) {
   const id = typeof body.id === "string" ? body.id : null;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const { data: partner, error: partnerError } = await supabase
-    .from("partners")
-    .select("id,category_id")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Check debts referencing this partner
+  const { count: debtCount, error: debtErr } = await supabase
+    .from("debts")
+    .select("id", { count: "exact", head: true })
+    .eq("partner_id", id);
 
-  if (partnerError) return NextResponse.json({ error: partnerError.message }, { status: 500 });
-  if (!partner) return NextResponse.json({ error: "Partner not found" }, { status: 404 });
-
-  const { error } = await supabase.from("partners").delete().eq("id", id).eq("user_id", user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const categoryId = partner.category_id;
-  if (categoryId) {
-    const [txCountRes, partnerCountRes, childCountRes] = await Promise.all([
-      supabase
-        .from("transactions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("category_id", categoryId),
-      supabase
-        .from("partners")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("category_id", categoryId),
-      supabase
-        .from("categories")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("parent_id", categoryId),
-    ]);
-
-    if (!txCountRes.error && !partnerCountRes.error && !childCountRes.error) {
-      const txCount = txCountRes.count ?? 0;
-      const partnerCount = partnerCountRes.count ?? 0;
-      const childCount = childCountRes.count ?? 0;
-
-      if (txCount === 0 && partnerCount === 0 && childCount === 0) {
-        const { data: category } = await supabase
-          .from("categories")
-          .select("id,type")
-          .eq("user_id", user.id)
-          .eq("id", categoryId)
-          .maybeSingle();
-
-        if (category?.type === "debt") {
-          await supabase.from("categories").delete().eq("id", categoryId).eq("user_id", user.id);
-        }
-      }
-    }
+  if (debtErr) return NextResponse.json({ error: debtErr.message }, { status: 500 });
+  if (debtCount && debtCount > 0) {
+    return NextResponse.json({ error: `Không thể xóa đối tác đang có ${debtCount} hợp đồng vay nợ.` }, { status: 400 });
   }
 
+  // Check transactions referencing this partner
+  const { count: txCount, error: txErr } = await supabase
+    .from("transactions")
+    .select("id", { count: "exact", head: true })
+    .or(`account_id.eq.${id},destination_account_id.eq.${id}`);
+
+  if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
+  if (txCount && txCount > 0) {
+    return NextResponse.json({ error: `Không thể xóa đối tác đã có ${txCount} giao dịch liên kết.` }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("accounts")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

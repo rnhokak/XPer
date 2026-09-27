@@ -11,21 +11,62 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { type DebtRow, type Partner } from "@/hooks/useDebtsData";
 import {
+  useUpdateTransaction,
+  type CashflowTransaction,
+} from "@/hooks/useCashflowTransactions";
+import { useNotificationsStore } from "@/store/notifications";
+import {
+  type DebtExpenseMeta,
+  toggleDebtExpenseSettled,
+} from "@/lib/cashflow/debtExpenseUtils";
+import {
   ArrowDownLeft,
   ArrowUpRight,
   Building2,
   Calendar,
+  CheckCircle2,
   ExternalLink,
   HandCoins,
+  Loader2,
   Percent,
   Phone,
   Plus,
+  RotateCcw,
   ShieldAlert,
-  ShoppingBag,
   User,
 } from "lucide-react";
-import { DebtExpensesTracker } from "./DebtExpensesTracker";
 import { cn } from "@/lib/utils";
+
+export type PartnerExpenseItem = {
+  tx: CashflowTransaction;
+  meta: DebtExpenseMeta;
+};
+
+export type UnifiedPartnerDebtItem = {
+  id: string;
+  source: "contract" | "expense";
+  itemType: "lend" | "borrow" | "lent_spent" | "borrowed_spent";
+  tag: "cho_vay" | "vay" | "chi_cho_vay" | "chi_no";
+  tagLabel: string;
+  tagColorClass: string;
+  title: string;
+  amount: number;
+  remainingAmount: number;
+  currency: string;
+  date: string;
+  dueDate: string | null;
+  status: string;
+  statusLabel: string;
+  isSettled: boolean;
+  isOverdue: boolean;
+  note?: string | null;
+  categoryName?: string;
+  accountName?: string;
+  interest?: string | null;
+  rawDebt?: DebtRow;
+  rawTx?: CashflowTransaction;
+  rawExpenseMeta?: DebtExpenseMeta;
+};
 
 export type PartnerDebtSummary = {
   partnerId: string;
@@ -40,8 +81,14 @@ export type PartnerDebtSummary = {
   totalLendOriginal: number;
   totalBorrowOriginal: number;
   debts: DebtRow[];
-  activeDebtsCount: number;
-  settledDebtsCount: number;
+  expenses: PartnerExpenseItem[];
+  items: UnifiedPartnerDebtItem[];
+  activeItemsCount: number;
+  settledItemsCount: number;
+  lendDebtsCount: number;
+  borrowDebtsCount: number;
+  lentExpensesCount: number;
+  borrowedExpensesCount: number;
   hasOverdue: boolean;
   lastActivityDate: string | null;
 };
@@ -59,40 +106,18 @@ const formatCurrency = (val: number) =>
 const formatDate = (val: string | null) =>
   val ? new Date(val).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 
-const statusVariant = (status: DebtRow["status"]) => {
-  switch (status) {
-    case "paid_off":
-      return "default";
-    case "overdue":
-      return "destructive";
-    case "cancelled":
-      return "outline";
-    default:
-      return "secondary";
-  }
-};
-
-const statusLabel = (status: DebtRow["status"]) => {
-  switch (status) {
-    case "paid_off":
-      return "Đã tất toán";
-    case "overdue":
-      return "Quá hạn";
-    case "cancelled":
-      return "Đã hủy";
-    default:
-      return "Đang thực hiện";
-  }
-};
-
 export function PartnerDebtsDetailDialog({
   open,
   onClose,
   partnerSummary,
   currency = "VND",
 }: Props) {
-  const [detailTab, setDetailTab] = useState<"debts" | "expenses">("debts");
   const [filterMode, setFilterMode] = useState<"all" | "active" | "settled">("all");
+  const [tagFilter, setTagFilter] = useState<"all" | "cho_vay" | "vay" | "chi_cho_vay" | "chi_no">("all");
+  const [processingTxId, setProcessingTxId] = useState<string | null>(null);
+
+  const updateTransaction = useUpdateTransaction();
+  const notify = useNotificationsStore((s) => s.notify);
 
   if (!partnerSummary) return null;
 
@@ -104,15 +129,59 @@ export function PartnerDebtsDetailDialog({
   const isNetLending = partnerSummary.netBalance > 0;
   const isNetBorrowing = partnerSummary.netBalance < 0;
 
-  const filteredDebts = partnerSummary.debts.filter((d) => {
-    if (filterMode === "active") return d.status !== "paid_off" && d.status !== "cancelled";
-    if (filterMode === "settled") return d.status === "paid_off";
+  // Filter items by status and tag
+  const filteredItems = partnerSummary.items.filter((item) => {
+    if (filterMode === "active" && item.isSettled) return false;
+    if (filterMode === "settled" && !item.isSettled) return false;
+    if (tagFilter !== "all" && item.tag !== tagFilter) return false;
     return true;
   });
 
+  const handleToggleSettled = async (item: UnifiedPartnerDebtItem) => {
+    if (item.source !== "expense" || !item.rawTx || !item.rawExpenseMeta) return;
+
+    const tx = item.rawTx;
+    const meta = item.rawExpenseMeta;
+    const nextNote = toggleDebtExpenseSettled(tx.note);
+    const willBeSettled = !meta.isSettled;
+
+    setProcessingTxId(tx.id);
+    try {
+      await updateTransaction.mutateAsync({
+        id: tx.id,
+        values: {
+          type: tx.type,
+          amount: tx.amount,
+          account_id: tx.account?.id ?? null,
+          category_id: tx.category?.id ?? "",
+          note: nextNote,
+          transaction_time: tx.transaction_time,
+          currency: tx.currency,
+        },
+      });
+
+      notify({
+        title: willBeSettled
+          ? meta.mode === "lent_spent"
+            ? "Đã đánh dấu đã thu lại tiền"
+            : "Đã đánh dấu đã trả lại tiền"
+          : "Đã chuyển về trạng thái cần thu/trả",
+        type: "success",
+      });
+    } catch {
+      notify({
+        title: "Lỗi cập nhật",
+        description: "Không thể thay đổi trạng thái, vui lòng thử lại.",
+        type: "error",
+      });
+    } finally {
+      setProcessingTxId(null);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-0 rounded-3xl border-slate-200">
+      <DialogContent className="max-h-[92vh] w-full max-w-2xl overflow-y-auto p-0 rounded-3xl border-slate-200 shadow-xl">
         {/* Header */}
         <div className="border-b border-slate-100 bg-slate-50/80 p-5 sm:p-6">
           <DialogHeader className="space-y-1 text-left">
@@ -147,7 +216,11 @@ export function PartnerDebtsDetailDialog({
                 </div>
               </div>
 
-              <Button asChild size="sm" className="h-8 gap-1 rounded-xl bg-emerald-600 text-xs hover:bg-emerald-700">
+              <Button
+                asChild
+                size="sm"
+                className="h-8 gap-1 rounded-xl bg-emerald-600 text-xs hover:bg-emerald-700 shadow-sm"
+              >
                 <Link to="/debts/new">
                   <Plus className="h-3.5 w-3.5" />
                   <span>Khoản vay mới</span>
@@ -155,16 +228,16 @@ export function PartnerDebtsDetailDialog({
               </Button>
             </div>
             <DialogDescription className="sr-only">
-              Chi tiết các khoản vay và cho vay của {partnerSummary.partnerName}
+              Chi tiết các khoản vay, cho vay, chi cho vay và chi nợ của {partnerSummary.partnerName}
             </DialogDescription>
           </DialogHeader>
 
           {/* Partner Balance Summary Box */}
-          <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {/* Vị thế bù trừ ròng */}
             <div
               className={cn(
-                "rounded-2xl border p-3.5 sm:col-span-3",
+                "rounded-2xl border p-3.5 sm:col-span-2",
                 isNetLending
                   ? "border-emerald-200 bg-emerald-50/70"
                   : isNetBorrowing
@@ -206,179 +279,215 @@ export function PartnerDebtsDetailDialog({
               </div>
               <p className="mt-0.5 text-[11px] text-slate-500">
                 {isNetLending
-                  ? `Sau khi bù trừ tất cả các khoản, ${partnerSummary.partnerName} còn nợ bạn số tiền trên.`
+                  ? `Sau khi bù trừ hợp đồng vay/nợ và các khoản chi mua hộ/chi nợ, ${partnerSummary.partnerName} còn nợ bạn số tiền trên.`
                   : isNetBorrowing
-                  ? `Sau khi bù trừ tất cả các khoản, bạn còn nợ ${partnerSummary.partnerName} số tiền trên.`
+                  ? `Sau khi bù trừ hợp đồng vay/nợ và các khoản chi mua hộ/chi nợ, bạn còn nợ ${partnerSummary.partnerName} số tiền trên.`
                   : `Không có dư nợ chưa thanh toán với ${partnerSummary.partnerName}.`}
               </p>
             </div>
 
-            {/* Chi tiết cho vay */}
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs sm:col-span-1.5">
+            {/* Chi tiết Cho vay & Chi cho vay (Phải thu) */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800 flex items-center gap-1">
-                <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" /> Cho vay (Phải thu)
+                <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" /> Cho vay & Chi cho vay (Phải thu)
               </span>
               <p className="money-blur mt-1 text-lg font-bold text-emerald-700">
                 {formatCurrency(partnerSummary.totalLendOutstanding)} {currency}
               </p>
-              <div className="mt-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>Gốc ban đầu:</span>
-                <span className="money-blur font-medium">
-                  {formatCurrency(partnerSummary.totalLendOriginal)} {currency}
+              <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  <span>Gốc ban đầu:</span>
+                  <span className="money-blur font-medium">
+                    {formatCurrency(partnerSummary.totalLendOriginal)} {currency}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  {partnerSummary.lendDebtsCount} khoản cho vay · {partnerSummary.lentExpensesCount} chi cho vay/mua hộ
                 </span>
               </div>
             </div>
 
-            {/* Chi tiết đi vay */}
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs sm:col-span-1.5">
+            {/* Chi tiết Đi vay & Chi nợ (Phải trả) */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-rose-800 flex items-center gap-1">
-                <ArrowDownLeft className="h-3.5 w-3.5 text-rose-600" /> Đi vay (Phải trả)
+                <ArrowDownLeft className="h-3.5 w-3.5 text-rose-600" /> Đi vay & Chi nợ (Phải trả)
               </span>
               <p className="money-blur mt-1 text-lg font-bold text-rose-700">
                 {formatCurrency(partnerSummary.totalBorrowOutstanding)} {currency}
               </p>
-              <div className="mt-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>Gốc ban đầu:</span>
-                <span className="money-blur font-medium">
-                  {formatCurrency(partnerSummary.totalBorrowOriginal)} {currency}
+              <div className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  <span>Gốc ban đầu:</span>
+                  <span className="money-blur font-medium">
+                    {formatCurrency(partnerSummary.totalBorrowOriginal)} {currency}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  {partnerSummary.borrowDebtsCount} khoản đi vay · {partnerSummary.borrowedExpensesCount} chi ghi nợ
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tab Navigation: Hợp đồng vay vs Chi mua hộ / Vay tiêu */}
-        <div className="flex items-center gap-4 border-b border-slate-200/80 px-5 pt-3 sm:px-6">
-          <button
-            type="button"
-            onClick={() => setDetailTab("debts")}
-            className={cn(
-              "flex items-center gap-1.5 border-b-2 pb-2.5 text-xs sm:text-sm font-semibold transition",
-              detailTab === "debts"
-                ? "border-emerald-600 text-emerald-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            )}
-          >
-            <HandCoins className="h-3.5 w-3.5" />
-            <span>Hợp đồng vay ({partnerSummary.debts.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setDetailTab("expenses")}
-            className={cn(
-              "flex items-center gap-1.5 border-b-2 pb-2.5 text-xs sm:text-sm font-semibold transition",
-              detailTab === "expenses"
-                ? "border-sky-600 text-sky-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            )}
-          >
-            <ShoppingBag className="h-3.5 w-3.5" />
-            <span>Chi mua hộ & Vay tiêu</span>
-          </button>
-        </div>
-
-        {/* Content: List of debts or DebtExpensesTracker */}
+        {/* Unified List of Items */}
         <div className="p-5 sm:p-6 space-y-4">
-          {detailTab === "expenses" ? (
-            <DebtExpensesTracker
-              currency={currency}
-              filterPartnerName={partnerSummary.partnerName}
-            />
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Danh sách hợp đồng ({partnerSummary.debts.length})
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Tất cả các hợp đồng vay và cho vay liên quan
-                  </p>
-                </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Danh sách chi tiết ({partnerSummary.items.length})
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Bao gồm hợp đồng vay/nợ và các khoản chi cho vay, chi nợ
+                </p>
+              </div>
 
-                {/* Filter mode */}
-                <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs">
+              {/* Status Filter tabs */}
+              <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("all")}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 font-semibold transition active:scale-95",
+                    filterMode === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  Tất cả ({partnerSummary.items.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("active")}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 font-semibold transition active:scale-95",
+                    filterMode === "active" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  Đang nợ ({partnerSummary.activeItemsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode("settled")}
+                  className={cn(
+                    "rounded-lg px-2.5 py-1 font-semibold transition active:scale-95",
+                    filterMode === "settled" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  Đã xong ({partnerSummary.settledItemsCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Tag Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[11px] font-medium text-slate-400 mr-1">Lọc theo tag:</span>
               <button
                 type="button"
-                onClick={() => setFilterMode("all")}
+                onClick={() => setTagFilter("all")}
                 className={cn(
-                  "rounded-lg px-2.5 py-1 font-semibold transition active:scale-95",
-                  filterMode === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  "rounded-lg px-2 py-0.5 text-[11px] font-medium transition",
+                  tagFilter === "all" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 )}
               >
-                Tất cả ({partnerSummary.debts.length})
+                Tất cả
               </button>
               <button
                 type="button"
-                onClick={() => setFilterMode("active")}
+                onClick={() => setTagFilter("cho_vay")}
                 className={cn(
-                  "rounded-lg px-2.5 py-1 font-semibold transition active:scale-95",
-                  filterMode === "active" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  "rounded-lg px-2 py-0.5 text-[11px] font-medium transition",
+                  tagFilter === "cho_vay"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                 )}
               >
-                Đang nợ ({partnerSummary.activeDebtsCount})
+                Cho vay ({partnerSummary.lendDebtsCount})
               </button>
               <button
                 type="button"
-                onClick={() => setFilterMode("settled")}
+                onClick={() => setTagFilter("vay")}
                 className={cn(
-                  "rounded-lg px-2.5 py-1 font-semibold transition active:scale-95",
-                  filterMode === "settled" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  "rounded-lg px-2 py-0.5 text-[11px] font-medium transition",
+                  tagFilter === "vay"
+                    ? "bg-rose-600 text-white"
+                    : "bg-rose-50 text-rose-700 hover:bg-rose-100"
                 )}
               >
-                Đã xong ({partnerSummary.settledDebtsCount})
+                Vay / Nợ ({partnerSummary.borrowDebtsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTagFilter("chi_cho_vay")}
+                className={cn(
+                  "rounded-lg px-2 py-0.5 text-[11px] font-medium transition",
+                  tagFilter === "chi_cho_vay"
+                    ? "bg-sky-600 text-white"
+                    : "bg-sky-50 text-sky-700 hover:bg-sky-100"
+                )}
+              >
+                Chi cho vay ({partnerSummary.lentExpensesCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTagFilter("chi_no")}
+                className={cn(
+                  "rounded-lg px-2 py-0.5 text-[11px] font-medium transition",
+                  tagFilter === "chi_no"
+                    ? "bg-amber-600 text-white"
+                    : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                )}
+              >
+                Chi nợ ({partnerSummary.borrowedExpensesCount})
               </button>
             </div>
           </div>
 
-          {filteredDebts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-8 text-center">
+          {filteredItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-10 text-center">
               <HandCoins className="h-8 w-8 text-slate-300" />
               <p className="mt-2 text-xs font-medium text-slate-500">
-                Không tìm thấy khoản vay nào theo bộ lọc đã chọn
+                Không tìm thấy khoản nào theo bộ lọc đã chọn
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredDebts.map((debt) => {
-                const isLend = debt.direction === "lend";
-                const isPaidOff = debt.status === "paid_off";
-                const remaining = debt.outstanding_principal ?? debt.principal_amount ?? 0;
-                const dueDate = debt.due_date ? new Date(debt.due_date) : null;
-                const isOverdue =
-                  dueDate && dueDate.getTime() < Date.now() && debt.status !== "paid_off";
+              {filteredItems.map((item) => {
+                const isContract = item.source === "contract";
+                const isExpense = item.source === "expense";
+                const isPositive = item.itemType === "lend" || item.itemType === "lent_spent";
 
                 return (
                   <div
-                    key={debt.id}
+                    key={`${item.source}-${item.id}`}
                     className={cn(
                       "rounded-2xl border p-4 transition-all hover:border-slate-300 shadow-2xs",
-                      isPaidOff
+                      item.isSettled
                         ? "border-slate-200 bg-slate-50/50 opacity-80"
-                        : isOverdue
+                        : item.isOverdue
                         ? "border-rose-300 bg-rose-50/30"
                         : "border-slate-200 bg-white"
                     )}
                   >
-                    {/* Top Row: Type Badge + Status + Remaining */}
+                    {/* Top Row: Tag badge + Status + Remaining */}
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* TAG BADGE */}
                         <Badge
-                          variant={isLend ? "secondary" : "outline"}
-                          className={cn(
-                            "rounded-lg text-xs font-semibold",
-                            isLend
-                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
-                              : "bg-rose-100 text-rose-800 hover:bg-rose-100 border-0"
-                          )}
+                          variant="outline"
+                          className={cn("rounded-lg px-2 py-0.5 text-xs font-bold border", item.tagColorClass)}
                         >
-                          {isLend ? "Cho vay" : "Đi vay"}
+                          {item.tagLabel}
                         </Badge>
-                        <Badge variant={statusVariant(debt.status)} className="rounded-lg text-[10px]">
-                          {statusLabel(debt.status)}
+
+                        {/* STATUS BADGE */}
+                        <Badge
+                          variant={item.isOverdue ? "destructive" : item.isSettled ? "secondary" : "outline"}
+                          className="rounded-lg text-[10px]"
+                        >
+                          {item.statusLabel}
                         </Badge>
-                        {isOverdue && (
+
+                        {item.isOverdue && (
                           <span className="flex items-center gap-0.5 text-[10px] font-bold text-rose-600">
                             <ShieldAlert className="h-3 w-3" /> Quá hạn
                           </span>
@@ -386,94 +495,155 @@ export function PartnerDebtsDetailDialog({
                       </div>
 
                       <div className="text-right">
-                        <span className="text-[11px] font-medium text-slate-500">Còn lại: </span>
+                        <span className="text-[11px] font-medium text-slate-500">
+                          {item.isSettled ? "Đã xong: " : "Còn lại: "}
+                        </span>
                         <span
                           className={cn(
                             "money-blur text-base font-bold",
-                            isLend ? "text-emerald-700" : "text-rose-700"
+                            isPositive ? "text-emerald-700" : "text-rose-700"
                           )}
                         >
-                          {formatCurrency(remaining)} {debt.currency}
+                          {formatCurrency(item.isSettled ? item.amount : item.remainingAmount)} {item.currency}
                         </span>
                       </div>
                     </div>
 
-                    {/* Middle: Principal & Details */}
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                      <div className="rounded-xl bg-slate-50 p-2.5">
-                        <span className="text-[10px] uppercase font-semibold text-slate-400">
-                          Gốc ban đầu
-                        </span>
-                        <p className="money-blur font-bold text-slate-800">
-                          {formatCurrency(debt.principal_amount)} {debt.currency}
-                        </p>
-                      </div>
+                    {/* Middle: Title, details, metadata */}
+                    <div className="mt-2.5">
+                      <h4 className="text-sm font-semibold text-slate-900">
+                        {item.title}
+                      </h4>
 
-                      <div className="rounded-xl bg-slate-50 p-2.5">
-                        <span className="text-[10px] uppercase font-semibold text-slate-400">
-                          Ngày bắt đầu
-                        </span>
-                        <p className="font-semibold text-slate-800 flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-slate-400" />
-                          <span>{formatDate(debt.start_date)}</span>
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl bg-slate-50 p-2.5">
-                        <span className="text-[10px] uppercase font-semibold text-slate-400">
-                          Hạn trả
-                        </span>
-                        <p
-                          className={cn(
-                            "font-semibold flex items-center gap-1",
-                            isOverdue ? "text-rose-600 font-bold" : "text-slate-800"
-                          )}
-                        >
-                          <Calendar className="h-3 w-3 text-slate-400" />
-                          <span>{formatDate(debt.due_date)}</span>
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl bg-slate-50 p-2.5">
-                        <span className="text-[10px] uppercase font-semibold text-slate-400">
-                          Lãi suất
-                        </span>
-                        <p className="font-semibold text-slate-800 flex items-center gap-1">
-                          <Percent className="h-3 w-3 text-slate-400" />
-                          <span>
-                            {debt.interest_type === "none" || !debt.interest_rate
-                              ? "Không lãi"
-                              : `${debt.interest_rate}% / ${debt.interest_cycle || "tháng"}`}
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <span className="text-[10px] uppercase font-semibold text-slate-400">
+                            Số tiền gốc
                           </span>
-                        </p>
+                          <p className="money-blur font-bold text-slate-800">
+                            {formatCurrency(item.amount)} {item.currency}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <span className="text-[10px] uppercase font-semibold text-slate-400">
+                            Ngày phát sinh
+                          </span>
+                          <p className="font-semibold text-slate-800 flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-slate-400" />
+                            <span>{formatDate(item.date)}</span>
+                          </p>
+                        </div>
+
+                        {item.dueDate ? (
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <span className="text-[10px] uppercase font-semibold text-slate-400">
+                              Hạn trả
+                            </span>
+                            <p
+                              className={cn(
+                                "font-semibold flex items-center gap-1",
+                                item.isOverdue ? "text-rose-600 font-bold" : "text-slate-800"
+                              )}
+                            >
+                              <Calendar className="h-3 w-3 text-slate-400" />
+                              <span>{formatDate(item.dueDate)}</span>
+                            </p>
+                          </div>
+                        ) : item.categoryName ? (
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <span className="text-[10px] uppercase font-semibold text-slate-400">
+                              Danh mục
+                            </span>
+                            <p className="font-semibold text-slate-800 truncate">
+                              {item.categoryName}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <span className="text-[10px] uppercase font-semibold text-slate-400">
+                              Hình thức
+                            </span>
+                            <p className="font-semibold text-slate-800">
+                              {isContract ? "Hợp đồng" : "Chi tiền"}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <span className="text-[10px] uppercase font-semibold text-slate-400">
+                            {item.interest ? "Lãi suất" : item.accountName ? "Tài khoản chi" : "Ghi chú"}
+                          </span>
+                          <p className="font-semibold text-slate-800 truncate flex items-center gap-1">
+                            {item.interest ? (
+                              <>
+                                <Percent className="h-3 w-3 text-slate-400" />
+                                <span>{item.interest}</span>
+                              </>
+                            ) : item.accountName ? (
+                              <span>{item.accountName}</span>
+                            ) : (
+                              <span className="text-slate-500">—</span>
+                            )}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Description if present */}
-                    {debt.description && (
-                      <p className="mt-2.5 text-xs text-slate-600 italic">
-                        &quot;{debt.description}&quot;
-                      </p>
-                    )}
-
-                    {/* Bottom Action: Link to Debt Detail page for payments */}
+                    {/* Bottom Actions */}
                     <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
                       <span className="text-[11px] text-muted-foreground">
-                        Mã khoản: #{debt.id.slice(0, 8)}
+                        {isContract ? `Mã hợp đồng: #${item.id.slice(0, 8)}` : `Giao dịch tiền mặt`}
                       </span>
-                      <Button asChild size="sm" variant="ghost" className="h-7 gap-1 rounded-xl text-xs font-semibold text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700">
-                        <Link to={`/debts/${debt.id}`}>
-                          <span>Lịch sử trả nợ & Ghi nhận</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      </Button>
+
+                      {isContract ? (
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1 rounded-xl text-xs font-semibold text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          <Link to={`/debts/${item.id}`}>
+                            <span>Lịch sử & Ghi nhận trả nợ</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                      ) : isExpense ? (
+                        <Button
+                          size="sm"
+                          variant={item.isSettled ? "outline" : "default"}
+                          disabled={processingTxId === item.id}
+                          onClick={() => handleToggleSettled(item)}
+                          className={cn(
+                            "h-7 gap-1 rounded-xl text-xs font-semibold",
+                            item.isSettled
+                              ? "text-slate-600 hover:bg-slate-100"
+                              : item.itemType === "lent_spent"
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                              : "bg-rose-600 hover:bg-rose-700 text-white"
+                          )}
+                        >
+                          {processingTxId === item.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : item.isSettled ? (
+                            <RotateCcw className="h-3 w-3" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3" />
+                          )}
+                          <span>
+                            {item.isSettled
+                              ? "Chuyển về chưa xong"
+                              : item.itemType === "lent_spent"
+                              ? "Đánh dấu đã thu"
+                              : "Đánh dấu đã trả"}
+                          </span>
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 );
               })}
             </div>
-          )}
-            </>
           )}
         </div>
       </DialogContent>

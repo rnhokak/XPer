@@ -1,26 +1,20 @@
 import { useApiQuery } from '@/lib/query'
-import { type CategoryFocus } from '@/lib/validation/categories'
 import { getAccounts, getCategories } from '@/lib/api/cashflow'
 import { getDebts, getDebtDetail, getDebtPartners } from '@/lib/api/debts'
+import { type CashflowAccount, type CashflowCategory } from '@/hooks/useCashflowTransactions'
 
 export type Partner = {
   id: string
   name: string
-  type: string | null
+  type?: string | null
+  currency?: string
+  is_default?: boolean | null
   phone?: string | null
   note?: string | null
   category_id?: string | null
 }
-export type Account = { id: string; name: string; currency: string; type?: string | null; is_default?: boolean | null }
-export type Category = {
-  id: string
-  name: string
-  type: 'income' | 'expense' | 'transfer' | 'debt'
-  parent_id?: string | null
-  level?: 0 | 1 | 2
-  category_focus: CategoryFocus | null
-  is_default?: boolean | null
-}
+export type Account = CashflowAccount
+export type Category = CashflowCategory
 export type DebtPayment = { debt_id: string; payment_type: string; principal_amount: number | null; amount: number | null }
 
 export type DebtRow = {
@@ -113,7 +107,7 @@ export function useDebtsOverviewData(userId: string) {
         return {
           partners,
           accounts,
-          categories: categories.filter((c) => c.type === 'debt'),
+          categories,
           debts,
         }
       } catch (err) {
@@ -128,7 +122,7 @@ export function useDebtsOverviewData(userId: string) {
           return {
             partners: partners as unknown as Partner[],
             accounts: accounts as unknown as Account[],
-            categories: (categories as unknown as Category[]).filter((c) => c.type === 'debt'),
+            categories: categories as unknown as Category[],
             debts: debts as unknown as DebtRow[],
           }
         }
@@ -158,7 +152,7 @@ export function useDebtsFormData(userId: string) {
           ])
         } catch {}
 
-        return { partners, accounts, categories: categories.filter((c) => c.type === 'debt') }
+        return { partners, accounts, categories }
       } catch (err) {
         const [partners, accounts, categories] = await Promise.all([
           db.debtPartners.toArray(),
@@ -170,7 +164,7 @@ export function useDebtsFormData(userId: string) {
           return {
             partners: partners as unknown as Partner[],
             accounts: accounts as unknown as Account[],
-            categories: (categories as unknown as Category[]).filter((c) => c.type === 'debt'),
+            categories: categories as unknown as Category[],
           }
         }
         throw err

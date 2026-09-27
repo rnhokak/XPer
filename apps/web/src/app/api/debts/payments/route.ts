@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { debtPaymentSchema } from "@/lib/validation/debts";
 import { type Database } from "@/lib/supabase/types";
-import { ensurePartnerCategory } from "@/features/debts/server/partner-category";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +57,7 @@ export async function POST(req: Request) {
 
   const { data: debt, error: debtError } = await supabase
     .from("debts")
-    .select("id,user_id,principal_amount,direction,currency,status,partner_id,partner:partners(id,name,category_id)")
+    .select("id,user_id,principal_amount,direction,currency,status,partner_id,partner:accounts(id,name,currency)")
     .eq("id", data.debt_id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -82,23 +81,10 @@ export async function POST(req: Request) {
   const transactionType: "income" | "expense" = debt.direction === "borrow" ? "expense" : "income";
   const transaction_time = parseDateToIso(data.payment_date, now);
 
-  const partner = (debt as typeof debt & { partner?: { name?: string | null; category_id?: string | null } }).partner;
-  if (!partner?.name) {
-    return NextResponse.json({ error: "Partner not found" }, { status: 404 });
-  }
-  const partnerName = partner.name.trim();
-  const { id: partnerCategoryId, error: categoryError } = await ensurePartnerCategory(supabase, user.id, {
-    name: partnerName,
-    category_id: partner?.category_id ?? null,
-  });
-  if (categoryError) {
-    return NextResponse.json({ error: categoryError.message }, { status: 500 });
-  }
-
   const transactionPayload: Database["public"]["Tables"]["transactions"]["Insert"] = {
     user_id: user.id,
     account_id: data.account_id ?? null,
-    category_id: data.category_id ?? partnerCategoryId ?? null,
+    category_id: data.category_id ?? null,
     type: transactionType,
     amount: data.amount,
     currency,

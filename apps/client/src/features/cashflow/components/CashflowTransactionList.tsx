@@ -1,15 +1,17 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CircleAlert, Clock3 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import {
-  cashflowTransactionTypeLabels,
-  type CashflowTransactionType,
-} from "@/lib/validation/cashflow";
 import { type CategoryFocus } from "@/lib/validation/categories";
 import { useQueryClient } from "@/lib/query";
 import db from "@/lib/db";
 import { useCashflowTransactions, type CashflowTransaction, useUpdateTransaction, useDeleteTransaction } from "@/hooks/useCashflowTransactions";
 import { CashflowTransactionDetailDialog } from "./CashflowTransactionDetailDialog";
+
+import {
+  isMyAccount,
+  isPartnerAccount,
+  isOtherAccount,
+} from "@/lib/cashflow/accountBalance";
 
 type Category = {
   id: string;
@@ -41,16 +43,31 @@ const toIsoStringWithOffset = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 
-const typeBadgeBaseClasses = "rounded-full px-2 py-1 text-xs font-semibold";
-const getTypeBadgeClasses = (type: CashflowTransactionType) => {
-  if (type === "income") return "bg-emerald-50 text-emerald-700";
-  if (type === "transfer") return "bg-slate-100 text-slate-700";
-  return "bg-red-50 text-red-700";
+const typeBadgeBaseClasses = "rounded-full px-2 py-0.5 text-xs font-semibold inline-flex items-center gap-1";
+
+export const isTxPositive = (tx: CashflowTransaction) => {
+  if (typeof tx.flow_type === "boolean") return tx.flow_type;
+  return tx.type === "income";
 };
-const getAmountTextClass = (type: CashflowTransactionType) => {
-  if (type === "income") return "text-emerald-600";
-  if (type === "transfer") return "text-slate-600";
-  return "text-red-600";
+
+export const getTxBadgeInfo = (tx: CashflowTransaction) => {
+  const isPos = isTxPositive(tx);
+  if (tx.type === "transfer") {
+    return {
+      label: isPos ? "Chuyển đến (+)" : "Chuyển đi (-)",
+      classes: isPos ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200",
+    };
+  }
+  if (tx.type === "income") {
+    return {
+      label: "Thu nhập (+)",
+      classes: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    };
+  }
+  return {
+    label: "Chi phí (-)",
+    classes: "bg-red-50 text-red-700 border border-red-200",
+  };
 };
 
 export function CashflowTransactionList({
@@ -59,15 +76,24 @@ export function CashflowTransactionList({
   accounts,
   range,
   shift,
+  customRange,
+  accountFilter = "my",
 }: {
   transactions: CashflowTransaction[];
   categories: Category[];
   accounts: Account[];
   range: string;
   shift: number;
+  customRange?: { from: string; to: string };
+  accountFilter?: string;
 }) {
   const queryClient = useQueryClient();
-  const { data: transactions = initialTransactions, isFetching } = useCashflowTransactions(range, shift, initialTransactions);
+  const { data: transactions = initialTransactions, isFetching } = useCashflowTransactions(
+    range,
+    shift,
+    initialTransactions,
+    customRange
+  );
   const updateMutation = useUpdateTransaction();
   const deleteMutation = useDeleteTransaction();
   const [selected, setSelected] = useState<CashflowTransaction | null>(null);
@@ -154,14 +180,49 @@ export function CashflowTransactionList({
     return () => window.removeEventListener("xper:sync:processed", handleSyncProcessed);
   }, [queryClient]);
 
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return [];
+    if (!accountFilter || accountFilter === "all") return transactions;
+
+    const myAccountIds = new Set(accounts.filter((a) => isMyAccount(a.type)).map((a) => a.id));
+    const partnerAccountIds = new Set(accounts.filter((a) => isPartnerAccount(a.type)).map((a) => a.id));
+    const otherAccountIds = new Set(accounts.filter((a) => isOtherAccount(a.type)).map((a) => a.id));
+
+    if (accountFilter === "my") {
+      return transactions.filter((tx) => {
+        if (tx.account_id && myAccountIds.has(tx.account_id)) return true;
+        if (!tx.account_id && tx.account?.type && isMyAccount(tx.account.type)) return true;
+        return accounts.length > 0 ? (tx.account_id ? myAccountIds.has(tx.account_id) : true) : true;
+      });
+    }
+
+    if (accountFilter === "partner") {
+      return transactions.filter((tx) => {
+        if (tx.account_id && partnerAccountIds.has(tx.account_id)) return true;
+        if (!tx.account_id && tx.account?.type && isPartnerAccount(tx.account.type)) return true;
+        return false;
+      });
+    }
+
+    if (accountFilter === "other") {
+      return transactions.filter((tx) => {
+        if (tx.account_id && otherAccountIds.has(tx.account_id)) return true;
+        if (!tx.account_id && tx.account?.type && isOtherAccount(tx.account.type)) return true;
+        return false;
+      });
+    }
+
+    return transactions.filter((tx) => tx.account_id === accountFilter);
+  }, [transactions, accountFilter, accounts]);
+
   const sorted = useMemo(() => {
-    const data = [...transactions].sort((a, b) => {
+    const data = [...filteredTransactions].sort((a, b) => {
       const aTime = new Date(a.transaction_time).getTime();
       const bTime = new Date(b.transaction_time).getTime();
       return Number.isNaN(bTime) || Number.isNaN(aTime) ? 0 : bTime - aTime;
     });
     return data;
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   const groupedByDay = useMemo(() => {
     const groups: Record<string, CashflowTransaction[]> = {};
@@ -183,10 +244,10 @@ export function CashflowTransactionList({
     const totals: Record<string, { income: number; expense: number; currency: string }> = {};
     Object.entries(groupedByDay).forEach(([dayLabel, transactions]) => {
       const income = transactions
-        .filter((tx) => tx.type === "income")
+        .filter((tx) => isTxPositive(tx))
         .reduce((sum, tx) => sum + tx.amount, 0);
       const expense = transactions
-        .filter((tx) => tx.type === "expense")
+        .filter((tx) => !isTxPositive(tx))
         .reduce((sum, tx) => sum + tx.amount, 0);
       const currency = transactions[0]?.currency ?? "VND";
       totals[dayLabel] = { income, expense, currency };
@@ -245,6 +306,7 @@ export function CashflowTransactionList({
   const handleDelete = async () => {
     if (!selected) return;
     const current = selected;
+    const peerId = current.transfer_peer_id;
     setDeleteError(null);
     setDeleting(true);
 
@@ -254,8 +316,14 @@ export function CashflowTransactionList({
         onSuccess: () => {
           setSelected(null);
           setDeleting(false);
-          queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-transactions"] }, (prev) => prev?.filter((tx) => tx.id !== current.id));
-          queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-report-transactions"] }, (prev) => prev?.filter((tx) => tx.id !== current.id));
+          queryClient.setQueriesData<CashflowTransaction[]>(
+            { queryKey: ["cashflow-transactions"] },
+            (prev) => prev?.filter((tx) => tx.id !== current.id && tx.id !== peerId)
+          );
+          queryClient.setQueriesData<CashflowTransaction[]>(
+            { queryKey: ["cashflow-report-transactions"] },
+            (prev) => prev?.filter((tx) => tx.id !== current.id && tx.id !== peerId)
+          );
         },
         onError: (error) => {
           setDeleting(false);
@@ -294,49 +362,72 @@ export function CashflowTransactionList({
                   ) : null}
                 </div>
               </div>
-              {dayTransactions.map((tx) => (
-                <button
-                  key={tx.id}
-                  type="button"
-                  onClick={() => openDetail(tx)}
-                  className="w-full text-left rounded-lg border bg-white p-3 shadow-sm transition hover:shadow"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
-                      <p className="text-sm font-semibold">{getCategoryName(tx)}</p>
-                      {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
+              {dayTransactions.map((tx) => {
+                const isPos = isTxPositive(tx);
+                const badgeInfo = getTxBadgeInfo(tx);
+                return (
+                  <button
+                    key={tx.id}
+                    type="button"
+                    onClick={() => openDetail(tx)}
+                    className="w-full text-left rounded-lg border bg-white p-3 shadow-sm transition hover:shadow"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground">{formatDateTime(tx.transaction_time)}</p>
+                        <p className="text-sm font-semibold">{getCategoryName(tx)}</p>
+                        {tx.note ? <p className="text-sm text-muted-foreground">{tx.note}</p> : null}
+                      </div>
+                      <div className={`money-blur text-base font-semibold ${isPos ? "text-emerald-600" : "text-red-600"}`}>
+                        {isPos ? "+" : "-"}{formatNumber(tx.amount, tx.currency)} {tx.currency}
+                      </div>
                     </div>
-                    <div className={`money-blur text-base font-semibold ${getAmountTextClass(tx.type)}`}>
-                      {formatNumber(tx.amount, tx.currency)} {tx.currency}
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className={`${typeBadgeBaseClasses} ${badgeInfo.classes}`}>
+                        {badgeInfo.label}
+                      </span>
+                      {tx.type === "transfer" ? (
+                        <span className="font-medium text-slate-700">
+                          {!isPos ? (
+                            <>
+                              {tx.account?.name ?? "Nguồn"} ➔ {tx.destination_account?.name ?? "Đích"}
+                            </>
+                          ) : (
+                            <>
+                              {tx.account?.name ?? "Đích"} ⬅ {tx.destination_account?.name ?? "Nguồn"}
+                            </>
+                          )}
+                          {tx.destination_amount && tx.destination_currency && tx.destination_currency !== tx.currency ? (
+                            <span className="ml-1 text-emerald-600 font-semibold">
+                              (Nhận: {formatNumber(tx.destination_amount, tx.destination_currency)} {tx.destination_currency})
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : tx.account?.name ? (
+                        <span>{tx.account.name}</span>
+                      ) : null}
+                      {tx.pending ? (
+                        <span
+                          title="Đang chờ đồng bộ"
+                          aria-label="Đang chờ đồng bộ"
+                          className="ml-2 inline-flex items-center text-yellow-700"
+                        >
+                          <Clock3 className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                      ) : null}
+                      {tx.error ? (
+                        <span
+                          title="Lỗi đồng bộ"
+                          aria-label="Lỗi đồng bộ"
+                          className="ml-2 inline-flex items-center text-red-700"
+                        >
+                          <CircleAlert className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                      ) : null}
                     </div>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
-                      {cashflowTransactionTypeLabels[tx.type]}
-                    </span>
-                    {tx.account?.name ? <span>{tx.account.name}</span> : null}
-                    {tx.pending ? (
-                      <span
-                        title="Đang chờ đồng bộ"
-                        aria-label="Đang chờ đồng bộ"
-                        className="ml-2 inline-flex items-center text-yellow-700"
-                      >
-                        <Clock3 className="h-4 w-4" aria-hidden="true" />
-                      </span>
-                    ) : null}
-                    {tx.error ? (
-                      <span
-                        title="Lỗi đồng bộ"
-                        aria-label="Lỗi đồng bộ"
-                        className="ml-2 inline-flex items-center text-red-700"
-                      >
-                        <CircleAlert className="h-4 w-4" aria-hidden="true" />
-                      </span>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           );
         })}
@@ -347,7 +438,6 @@ export function CashflowTransactionList({
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Account</TableHead>
               <TableHead>Note</TableHead>
@@ -360,7 +450,7 @@ export function CashflowTransactionList({
               return (
                 <Fragment key={dayLabel}>
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={5}>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {dayLabel}
@@ -382,42 +472,66 @@ export function CashflowTransactionList({
                       </div>
                     </TableCell>
                   </TableRow>
-                  {dayTransactions.map((tx) => (
-                    <TableRow key={tx.id} className="cursor-pointer" onClick={() => openDetail(tx)}>
-                      <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.transaction_time)}</TableCell>
-                      <TableCell>
-                        <span className={`${typeBadgeBaseClasses} ${getTypeBadgeClasses(tx.type)}`}>
-                          {cashflowTransactionTypeLabels[tx.type]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="font-medium">{getCategoryName(tx)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{tx.account?.name ?? "—"}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
-                      <TableCell className={`money-blur text-right font-semibold ${getAmountTextClass(tx.type)}`}>
-                        <div className="flex items-center justify-end gap-3">
-                          <div>{formatNumber(tx.amount, tx.currency)} {tx.currency}</div>
-                          {tx.pending ? (
-                            <span
-                              title="Đang chờ đồng bộ"
-                              aria-label="Đang chờ đồng bộ"
-                              className="inline-flex items-center text-yellow-700"
-                            >
-                              <Clock3 className="h-4 w-4" aria-hidden="true" />
-                            </span>
-                          ) : null}
-                          {tx.error ? (
-                            <span
-                              title="Lỗi đồng bộ"
-                              aria-label="Lỗi đồng bộ"
-                              className="inline-flex items-center text-red-700"
-                            >
-                              <CircleAlert className="h-4 w-4" aria-hidden="true" />
-                            </span>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {dayTransactions.map((tx) => {
+                    const isPos = isTxPositive(tx);
+                    return (
+                      <TableRow key={tx.id} className="cursor-pointer" onClick={() => openDetail(tx)}>
+                        <TableCell className="whitespace-nowrap text-sm">{formatDateTime(tx.transaction_time)}</TableCell>
+                        <TableCell className="font-medium">{getCategoryName(tx)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {tx.type === "transfer" ? (
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-800">
+                                {!isPos ? (
+                                  <>
+                                    {tx.account?.name ?? "—"} ➔ {tx.destination_account?.name ?? "—"}
+                                  </>
+                                ) : (
+                                  <>
+                                    {tx.account?.name ?? "—"} ⬅ {tx.destination_account?.name ?? "—"}
+                                  </>
+                                )}
+                              </span>
+                              {tx.destination_amount && tx.destination_currency && tx.destination_currency !== tx.currency ? (
+                                <span className="text-[11px] text-emerald-600 font-medium">
+                                  Nhận: {formatNumber(tx.destination_amount, tx.destination_currency)} {tx.destination_currency}
+                                  {tx.exchange_rate ? ` (x${tx.exchange_rate})` : ""}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            tx.account?.name ?? "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{tx.note ?? "—"}</TableCell>
+                        <TableCell className={`money-blur text-right font-semibold ${isPos ? "text-emerald-600" : "text-red-600"}`}>
+                          <div className="flex items-center justify-end gap-3">
+                            <div>
+                              {isPos ? "+" : "-"}{formatNumber(tx.amount, tx.currency)} {tx.currency}
+                            </div>
+                            {tx.pending ? (
+                              <span
+                                title="Đang chờ đồng bộ"
+                                aria-label="Đang chờ đồng bộ"
+                                className="inline-flex items-center text-yellow-700"
+                              >
+                                <Clock3 className="h-4 w-4" aria-hidden="true" />
+                              </span>
+                            ) : null}
+                            {tx.error ? (
+                              <span
+                                title="Lỗi đồng bộ"
+                                aria-label="Lỗi đồng bộ"
+                                className="inline-flex items-center text-red-700"
+                              >
+                                <CircleAlert className="h-4 w-4" aria-hidden="true" />
+                              </span>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </Fragment>
               );
             })}

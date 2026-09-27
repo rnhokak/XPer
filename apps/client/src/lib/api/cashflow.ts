@@ -1,15 +1,23 @@
 import { apiClient } from './client'
 import { type CashflowTransaction, type CashflowAccount, type CashflowCategory } from '@/hooks/useCashflowTransactions'
 import { type CashflowQuickAddValues } from '@/lib/validation/cashflow'
-import { type AccountInput } from '@/lib/validation/accounts'
+import { type AccountInput, type UpdateAccountInput } from '@/lib/validation/accounts'
 import { type CategoryInput } from '@/lib/validation/categories'
 
 // Transactions API
-export async function getTransactions(range: string, shift: number): Promise<CashflowTransaction[]> {
+export async function getTransactions(
+  range: string,
+  shift: number,
+  customRange?: { from: string; to: string }
+): Promise<CashflowTransaction[]> {
+  const params: Record<string, any> =
+    customRange?.from && customRange?.to
+      ? { from: customRange.from, to: customRange.to }
+      : { range, shift };
   const response = await apiClient.get<CashflowTransaction[]>('/cashflow/transactions', {
-    params: { range, shift }
-  })
-  return response.data
+    params,
+  });
+  return response.data;
 }
 
 export async function getReportTransactions(): Promise<CashflowTransaction[]> {
@@ -17,8 +25,8 @@ export async function getReportTransactions(): Promise<CashflowTransaction[]> {
   return response.data
 }
 
-export async function createTransaction(values: CashflowQuickAddValues): Promise<CashflowTransaction> {
-  const response = await apiClient.post<CashflowTransaction>('/cashflow/transactions', values)
+export async function createTransaction(values: CashflowQuickAddValues): Promise<CashflowTransaction | CashflowTransaction[]> {
+  const response = await apiClient.post<CashflowTransaction | CashflowTransaction[]>('/cashflow/transactions', values)
   return response.data
 }
 
@@ -27,8 +35,8 @@ export async function updateTransaction(id: string, values: CashflowQuickAddValu
   return response.data
 }
 
-export async function deleteTransaction(id: string): Promise<{ success: boolean }> {
-  const response = await apiClient.delete<{ success: boolean }>('/cashflow/transactions', {
+export async function deleteTransaction(id: string): Promise<{ success: boolean; deletedIds?: string[] }> {
+  const response = await apiClient.delete<{ success: boolean; deletedIds?: string[] }>('/cashflow/transactions', {
     data: { id }
   })
   return response.data
@@ -45,7 +53,7 @@ export async function createAccount(values: AccountInput): Promise<{ success: bo
   return response.data
 }
 
-export async function updateAccount(id: string, values: AccountInput): Promise<{ success: boolean }> {
+export async function updateAccount(id: string, values: UpdateAccountInput | Partial<AccountInput>): Promise<{ success: boolean }> {
   const response = await apiClient.put<{ success: boolean }>('/cashflow/accounts', { id, ...values })
   return response.data
 }

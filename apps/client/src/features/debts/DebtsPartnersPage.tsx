@@ -37,7 +37,7 @@ export default function DebtsPartnersPage() {
         </Button>
       </div>
 
-      <PartnersManager partners={data?.partners ?? []} categories={data?.categories ?? []} />
+      <PartnersManager partners={data?.partners ?? []} />
     </div>
   )
 }

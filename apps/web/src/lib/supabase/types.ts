@@ -11,6 +11,7 @@ export interface Database {
           name: string;
           type: string | null;
           currency: string;
+          balance: number;
           is_default: boolean;
           created_at: string | null;
         };
@@ -20,6 +21,7 @@ export interface Database {
           name: string;
           type?: string | null;
           currency?: string;
+          balance?: number;
           is_default?: boolean;
           created_at?: string | null;
         };
@@ -29,6 +31,7 @@ export interface Database {
           name?: string;
           type?: string | null;
           currency?: string;
+          balance?: number;
           is_default?: boolean;
           created_at?: string | null;
         };
@@ -144,8 +147,14 @@ export interface Database {
           id: string;
           user_id: string;
           account_id: string | null;
+          destination_account_id: string | null;
+          destination_amount: number | null;
+          destination_currency: string | null;
+          exchange_rate: number | null;
           category_id: string | null;
           type: "income" | "expense" | "transfer";
+          flow_type: boolean;
+          transfer_peer_id: string | null;
           amount: number;
           currency: string;
           note: string | null;
@@ -156,8 +165,14 @@ export interface Database {
           id?: string;
           user_id: string;
           account_id?: string | null;
+          destination_account_id?: string | null;
+          destination_amount?: number | null;
+          destination_currency?: string | null;
+          exchange_rate?: number | null;
           category_id?: string | null;
           type: "income" | "expense" | "transfer";
+          flow_type?: boolean;
+          transfer_peer_id?: string | null;
           amount: number;
           currency?: string;
           note?: string | null;
@@ -168,8 +183,14 @@ export interface Database {
           id?: string;
           user_id?: string;
           account_id?: string | null;
+          destination_account_id?: string | null;
+          destination_amount?: number | null;
+          destination_currency?: string | null;
+          exchange_rate?: number | null;
           category_id?: string | null;
           type?: "income" | "expense" | "transfer";
+          flow_type?: boolean;
+          transfer_peer_id?: string | null;
           amount?: number;
           currency?: string;
           note?: string | null;
@@ -180,6 +201,12 @@ export interface Database {
           {
             foreignKeyName: "transactions_account_id_fkey";
             columns: ["account_id"];
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "transactions_destination_account_id_fkey";
+            columns: ["destination_account_id"];
             referencedRelation: "accounts";
             referencedColumns: ["id"];
           },

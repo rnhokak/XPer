@@ -19,9 +19,10 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("partners")
-    .select("id,name,type,phone,note,created_at")
+    .from("accounts")
+    .select("id,name,type,currency,is_default,created_at")
     .eq("user_id", user.id)
+    .eq("type", "partner")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -38,13 +39,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
   }
 
-  const { name, type, phone, note } = parsed.data;
-  const { error } = await supabase.from("partners").insert({
+  const { name } = parsed.data;
+  const { error } = await supabase.from("accounts").insert({
     user_id: user.id,
     name: name.trim(),
-    type: type?.trim() || null,
-    phone: phone?.trim() || null,
-    note: note?.trim() || null,
+    type: "partner",
+    currency: "VND",
+    is_default: false,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -64,15 +65,10 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
   }
 
-  const { name, type, phone, note } = parsed.data;
+  const { name } = parsed.data;
   const { error } = await supabase
-    .from("partners")
-    .update({
-      name: name.trim(),
-      type: type?.trim() || null,
-      phone: phone?.trim() || null,
-      note: note?.trim() || null,
-    })
+    .from("accounts")
+    .update({ name: name.trim() })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -88,7 +84,7 @@ export async function DELETE(req: Request) {
   const id = typeof body.id === "string" ? body.id : null;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const { error } = await supabase.from("partners").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("accounts").delete().eq("id", id).eq("user_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

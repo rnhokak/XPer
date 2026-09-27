@@ -1,20 +1,42 @@
+import { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CashflowRangeFilter } from './components/CashflowRangeFilter';
+import { CashflowAccountFilter } from './components/CashflowAccountFilter';
 import { CashflowTransactionList } from './components/CashflowTransactionList';
 import { CashflowReport } from './components/CashflowReport';
 import { CashflowExpenseLineChart } from './components/CashflowExpenseLineChart';
 import { normalizeCashflowRange, normalizeRangeShift } from '@/lib/cashflow/utils';
+import { isMyAccount, isPartnerAccount, isOtherAccount } from '@/lib/cashflow/accountBalance';
 import { useCashflowTransactions, useCashflowAccounts, useCashflowCategories } from '@/hooks/useCashflowTransactions';
 
 export default function CashflowPage() {
-  const [searchParams] = useSearchParams();
-  const range = normalizeCashflowRange(searchParams.get('range') ?? '30');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const range = normalizeCashflowRange(searchParams.get('range') ?? 'month');
   const shift = normalizeRangeShift(searchParams.get('shift') ?? undefined);
+  const fromParam = searchParams.get('from');
+  const toParam = searchParams.get('to');
+  const customRange = fromParam && toParam ? { from: fromParam, to: toParam } : undefined;
+  const accountFilter = searchParams.get('account') ?? 'my';
 
-  const { data: transactions = [], isLoading: transactionsLoading } = useCashflowTransactions(range, shift);
+  const handleAccountFilterChange = (nextFilter: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (nextFilter === 'my') {
+      params.delete('account');
+    } else {
+      params.set('account', nextFilter);
+    }
+    setSearchParams(params, { replace: true });
+  };
+
+  const { data: transactions = [], isLoading: transactionsLoading } = useCashflowTransactions(
+    range,
+    shift,
+    undefined,
+    customRange
+  );
   const { data: monthTransactions = [] } = useCashflowTransactions('month', shift);
   const { data: accounts = [], isLoading: accountsLoading } = useCashflowAccounts();
   const { data: categories = [], isLoading: categoriesLoading } = useCashflowCategories();
@@ -23,7 +45,47 @@ export default function CashflowPage() {
   const accountsReady = accounts.length > 0 || !accountsLoading;
   const categoriesReady = categories.length > 0 || !categoriesLoading;
 
-  const chartTransactions = range === 'month' ? transactions : monthTransactions;
+  const filteredMonthTransactions = useMemo(() => {
+    if (!monthTransactions || monthTransactions.length === 0) return [];
+    if (accountFilter === 'all') return monthTransactions;
+
+    const myAccountIds = new Set(accounts.filter((a) => isMyAccount(a.type)).map((a) => a.id));
+    const partnerAccountIds = new Set(accounts.filter((a) => isPartnerAccount(a.type)).map((a) => a.id));
+    const otherAccountIds = new Set(accounts.filter((a) => isOtherAccount(a.type)).map((a) => a.id));
+
+    if (accountFilter === 'my') {
+      return monthTransactions.filter((tx) => (tx.account_id ? myAccountIds.has(tx.account_id) : true));
+    }
+    if (accountFilter === 'partner') {
+      return monthTransactions.filter((tx) => (tx.account_id ? partnerAccountIds.has(tx.account_id) : false));
+    }
+    if (accountFilter === 'other') {
+      return monthTransactions.filter((tx) => (tx.account_id ? otherAccountIds.has(tx.account_id) : false));
+    }
+    return monthTransactions.filter((tx) => tx.account_id === accountFilter);
+  }, [monthTransactions, accountFilter, accounts]);
+
+  const filteredRangeTransactions = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    if (accountFilter === 'all') return transactions;
+
+    const myAccountIds = new Set(accounts.filter((a) => isMyAccount(a.type)).map((a) => a.id));
+    const partnerAccountIds = new Set(accounts.filter((a) => isPartnerAccount(a.type)).map((a) => a.id));
+    const otherAccountIds = new Set(accounts.filter((a) => isOtherAccount(a.type)).map((a) => a.id));
+
+    if (accountFilter === 'my') {
+      return transactions.filter((tx) => (tx.account_id ? myAccountIds.has(tx.account_id) : true));
+    }
+    if (accountFilter === 'partner') {
+      return transactions.filter((tx) => (tx.account_id ? partnerAccountIds.has(tx.account_id) : false));
+    }
+    if (accountFilter === 'other') {
+      return transactions.filter((tx) => (tx.account_id ? otherAccountIds.has(tx.account_id) : false));
+    }
+    return transactions.filter((tx) => tx.account_id === accountFilter);
+  }, [transactions, accountFilter, accounts]);
+
+  const chartTransactions = range === 'month' && !customRange ? filteredRangeTransactions : filteredMonthTransactions;
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 overflow-x-hidden">
@@ -69,7 +131,17 @@ export default function CashflowPage() {
             <CardTitle>Transactions</CardTitle>
             <p className="text-sm text-muted-foreground">Latest activity</p>
           </div>
-          <CashflowRangeFilter value={range} />
+          <div className="flex flex-wrap items-center gap-2">
+            <CashflowAccountFilter
+              accounts={accounts}
+              value={accountFilter}
+              onChange={handleAccountFilterChange}
+            />
+            <CashflowRangeFilter
+              value={range}
+              customRange={customRange}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {transactionsReady ? (
@@ -79,6 +151,8 @@ export default function CashflowPage() {
               accounts={accounts}
               range={range}
               shift={shift}
+              customRange={customRange}
+              accountFilter={accountFilter}
             />
           ) : (
             <TransactionListSkeleton />

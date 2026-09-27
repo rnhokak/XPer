@@ -44,7 +44,7 @@ export async function GET(req: Request) {
   const { data, error } = await supabase
     .from("transactions")
     .select(
-      "id,type,amount,currency,note,transaction_time,category:categories(id,name,type),account:accounts(id,name,currency)"
+      "id,type,flow_type,transfer_peer_id,amount,currency,note,transaction_time,destination_amount,destination_currency,exchange_rate,destination_account_id,category:categories(id,name,type),account:accounts!transactions_account_id_fkey(id,name,currency,type),destination_account:accounts!transactions_destination_account_id_fkey(id,name,currency,type)"
     )
     .eq("user_id", user.id)
     .gte("transaction_time", start.toISOString())

@@ -21,10 +21,7 @@ const getUserAndClient = async () => {
   return { supabase, user };
 };
 
-const validateHierarchy = (type: CategoryInput["type"], level: number, parentLevel: number | null) => {
-  if (type === "transfer") {
-    return level === 0 && parentLevel === null;
-  }
+const validateHierarchy = (_type: CategoryInput["type"], level: number, parentLevel: number | null) => {
   if (level === 0) return parentLevel === null;
   if (level === 1) return parentLevel === 0;
   if (level === 2) return parentLevel === 1;

@@ -12,6 +12,15 @@ export type PendingOp = {
 export type LocalTransaction = {
   id: string
   payload?: any
+  type?: string
+  flow_type?: boolean
+  transfer_peer_id?: string | null
+  amount?: number
+  currency?: string
+  destination_account_id?: string | null
+  destination_amount?: number | null
+  destination_currency?: string | null
+  exchange_rate?: number | null
   createdAt?: number
   updatedAt?: number
   pending?: boolean
@@ -37,7 +46,7 @@ export type LocalAccount = {
   currency: string
   type?: string | null
   is_default?: boolean | null
-  balance?: number
+  balance?: number | null
   user_id?: string
   [key: string]: any
 }

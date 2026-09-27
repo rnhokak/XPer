@@ -6,26 +6,21 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   HandCoins,
-  LayoutGrid,
-  List,
   Loader2,
   Plus,
+  Receipt,
   ShieldAlert,
-  ShoppingBag,
   Users,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useDebtsOverviewData } from "@/hooks/useDebtsData";
+import { useDebtsOverviewData, type Account, type Category, type Partner } from "@/hooks/useDebtsData";
 import { useCashflowReportTransactions } from "@/hooks/useCashflowTransactions";
 import { computeDebtExpenseStats } from "@/lib/cashflow/debtExpenseUtils";
-import { PartnerDebtsList } from "./components/PartnerDebtsList";
-import {
-  PartnerDebtsDetailDialog,
-  type PartnerDebtSummary,
-} from "./components/PartnerDebtsDetailDialog";
 import { DebtsTable } from "./components/DebtsTable";
 import { DebtQuickAddDialog } from "./components/DebtQuickAddDialog";
 import { DebtExpensesTracker } from "./components/DebtExpensesTracker";
+import { PartnerDebtsList, groupDebtsByPartner } from "./components/PartnerDebtsList";
+import { PartnerDebtsDetailDialog } from "./components/PartnerDebtsDetailDialog";
 import { cn } from "@/lib/utils";
 
 const formatCurrency = (val: number) =>
@@ -36,36 +31,48 @@ export default function DebtsPage() {
   const { data, isLoading, error } = useDebtsOverviewData(user?.id ?? "");
   const { data: allTransactions = [] } = useCashflowReportTransactions();
 
-  const [selectedPartner, setSelectedPartner] = useState<PartnerDebtSummary | null>(null);
-  const [viewMode, setViewMode] = useState<"partners" | "debts" | "expenses">("partners");
+  const [viewMode, setViewMode] = useState<"partners" | "contracts" | "expenses">("partners");
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
 
   const debtExpenseStats = useMemo(
     () => computeDebtExpenseStats(allTransactions),
     [allTransactions]
   );
-  const totalSpecialExpenses = debtExpenseStats.lent.count + debtExpenseStats.borrowed.count;
   const pendingSpecialExpenses = debtExpenseStats.lent.pendingCount + debtExpenseStats.borrowed.pendingCount;
 
-  const partners = data?.partners ?? [];
-  const accounts = data?.accounts ?? [];
-  const categories = (data?.categories ?? []).filter((c) => c.type === "debt");
+  const accounts: Account[] = data?.accounts ?? [];
+  const partners: Partner[] = useMemo(
+    () => (data?.partners?.length ? data.partners : accounts.filter((a) => a.type === "partner")),
+    [data?.partners, accounts]
+  );
+  const categories: Category[] = data?.categories ?? [];
   const debts = data?.debts ?? [];
 
   const defaultAccount = accounts.find((a) => a.is_default) ?? accounts[0] ?? null;
   const defaultCurrency = defaultAccount?.currency ?? "VND";
 
-  // Summary statistics
+  // Group debts & transactions by partner
+  const partnerSummaries = useMemo(() => {
+    return groupDebtsByPartner(debts, partners, allTransactions);
+  }, [debts, partners, allTransactions]);
+
+  const selectedPartner = useMemo(() => {
+    if (!selectedPartnerId) return null;
+    return partnerSummaries.find((p) => p.partnerId === selectedPartnerId) ?? null;
+  }, [partnerSummaries, selectedPartnerId]);
+
+  // Comprehensive summary statistics (including both contracts and debt expenses)
   const { totalLendOutstanding, totalBorrowOutstanding, netDebt, lendCount, borrowCount, overdueCount } =
     useMemo(() => {
       const active = debts.filter((d) => d.status !== "paid_off" && d.status !== "cancelled");
-      const lends = active.filter((d) => d.direction === "lend");
-      const borrows = active.filter((d) => d.direction === "borrow");
+      const contractLends = active.filter((d) => d.direction === "lend");
+      const contractBorrows = active.filter((d) => d.direction === "borrow");
 
-      const lendSum = lends.reduce(
+      const contractLendSum = contractLends.reduce(
         (sum, d) => sum + (d.outstanding_principal ?? d.principal_amount ?? 0),
         0
       );
-      const borrowSum = borrows.reduce(
+      const contractBorrowSum = contractBorrows.reduce(
         (sum, d) => sum + (d.outstanding_principal ?? d.principal_amount ?? 0),
         0
       );
@@ -76,15 +83,18 @@ export default function DebtsPage() {
         return false;
       }).length;
 
+      const totalLend = contractLendSum + debtExpenseStats.lent.remaining;
+      const totalBorrow = contractBorrowSum + debtExpenseStats.borrowed.remaining;
+
       return {
-        totalLendOutstanding: lendSum,
-        totalBorrowOutstanding: borrowSum,
-        netDebt: lendSum - borrowSum,
-        lendCount: lends.length,
-        borrowCount: borrows.length,
+        totalLendOutstanding: totalLend,
+        totalBorrowOutstanding: totalBorrow,
+        netDebt: totalLend - totalBorrow,
+        lendCount: contractLends.length + debtExpenseStats.lent.pendingCount,
+        borrowCount: contractBorrows.length + debtExpenseStats.borrowed.pendingCount,
         overdueCount: overdue,
       };
-    }, [debts]);
+    }, [debts, debtExpenseStats]);
 
   if (authLoading || isLoading) {
     return (
@@ -114,19 +124,16 @@ export default function DebtsPage() {
             Quản lý Vay & Nợ
           </h1>
           <p className="text-xs text-muted-foreground sm:text-sm">
-            Theo dõi danh sách người/tổ chức vay & cho vay, tổng tiền và chi tiết từng bên
+            Theo dõi tất cả hợp đồng vay, cho vay và các khoản chi cho vay, chi ghi nợ
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 rounded-xl border-slate-200 text-xs font-medium">
-            <Link to="/debts/partners">
-              <Users className="h-3.5 w-3.5 text-slate-500" />
-              <span>Đối tác ({partners.length})</span>
-            </Link>
-          </Button>
-
-          <Button asChild size="sm" className="h-9 gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold hover:bg-emerald-700 shadow-sm shadow-emerald-600/20">
+          <Button
+            asChild
+            size="sm"
+            className="h-9 gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold hover:bg-emerald-700 shadow-sm shadow-emerald-600/20"
+          >
             <Link to="/debts/new">
               <Plus className="h-3.5 w-3.5" />
               <span>Khoản vay mới</span>
@@ -152,7 +159,7 @@ export default function DebtsPage() {
               {formatCurrency(totalLendOutstanding)} {defaultCurrency}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {lendCount} khoản nợ đang cho vay
+              {lendCount} khoản (hợp đồng & chi cho vay)
             </p>
           </CardContent>
         </Card>
@@ -172,7 +179,7 @@ export default function DebtsPage() {
               {formatCurrency(totalBorrowOutstanding)} {defaultCurrency}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {borrowCount} khoản nợ đang đi vay
+              {borrowCount} khoản (hợp đồng & chi nợ)
             </p>
           </CardContent>
         </Card>
@@ -215,9 +222,9 @@ export default function DebtsPage() {
           </CardHeader>
           <CardContent className="p-3.5 pt-0 sm:p-4 sm:pt-0">
             <div className="text-lg font-bold text-slate-900 sm:text-2xl">
-              {partners.length} đối tác
+              {partnerSummaries.length} đối tác
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+            <div className="mt-1 flex flex-col gap-0.5 text-[11px]">
               {overdueCount > 0 ? (
                 <span className="flex items-center gap-0.5 font-bold text-rose-600">
                   <ShieldAlert className="h-3 w-3" />
@@ -226,108 +233,87 @@ export default function DebtsPage() {
               ) : (
                 <span className="text-muted-foreground">Tất cả đúng hạn</span>
               )}
+              {pendingSpecialExpenses > 0 && (
+                <span className="font-medium text-amber-600">
+                  {pendingSpecialExpenses} khoản chi chưa thanh toán
+                </span>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Section Header with View Mode Switcher */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900">
-            {viewMode === "partners"
-              ? "Danh sách người / tổ chức vay nợ"
-              : viewMode === "debts"
-              ? "Tất cả các khoản nợ lẻ"
-              : "Chi tiêu mua hộ & Chi từ tiền vay"}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            {viewMode === "partners"
-              ? "Bấm vào từng người/tổ chức để xem chi tiết các khoản vay & cho vay của bên đó"
-              : viewMode === "debts"
-              ? "Danh sách chi tiết từng hợp đồng khoản vay riêng lẻ"
-              : "Theo dõi các khoản tiền mua hộ cần thu lại và các khoản chi từ tiền vay cần trả lại"}
-          </p>
-        </div>
-
-        {/* View Mode Switcher */}
-        <div className="flex flex-wrap items-center rounded-xl bg-slate-100 p-1 text-xs self-start sm:self-auto gap-1">
+      {/* View Switcher Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setViewMode("partners")}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition active:scale-95",
+              "flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition shadow-2xs active:scale-95",
               viewMode === "partners"
-                ? "bg-white text-slate-900 shadow-2xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80"
             )}
           >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            <span>Theo Người / Tổ chức</span>
+            <Users className="h-4 w-4" />
+            <span>Theo đối tác ({partnerSummaries.length})</span>
           </button>
           <button
             type="button"
-            onClick={() => setViewMode("debts")}
+            onClick={() => setViewMode("contracts")}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition active:scale-95",
-              viewMode === "debts"
-                ? "bg-white text-slate-900 shadow-2xs"
-                : "text-slate-600 hover:text-slate-900"
+              "flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition shadow-2xs active:scale-95",
+              viewMode === "contracts"
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80"
             )}
           >
-            <List className="h-3.5 w-3.5" />
-            <span>Hợp đồng vay ({debts.length})</span>
+            <HandCoins className="h-4 w-4" />
+            <span>Tất cả hợp đồng ({debts.length})</span>
           </button>
           <button
             type="button"
             onClick={() => setViewMode("expenses")}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition active:scale-95",
+              "flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition shadow-2xs active:scale-95",
               viewMode === "expenses"
-                ? "bg-white text-sky-700 shadow-2xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80"
             )}
           >
-            <ShoppingBag className="h-3.5 w-3.5 text-sky-600" />
-            <span>Chi mua hộ & Vay tiêu</span>
-            {totalSpecialExpenses > 0 && (
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.2 text-[10px] font-bold",
-                  pendingSpecialExpenses > 0
-                    ? "bg-rose-100 text-rose-700"
-                    : "bg-slate-200 text-slate-700"
-                )}
-              >
-                {totalSpecialExpenses}
-              </span>
-            )}
+            <Receipt className="h-4 w-4" />
+            <span>Chi mua hộ & Vay tiêu ({pendingSpecialExpenses})</span>
           </button>
         </div>
       </div>
 
-      {/* Dynamic Content based on View Mode */}
-      {viewMode === "partners" ? (
-        <PartnerDebtsList
-          debts={debts}
-          partners={partners}
-          onSelectPartner={(p) => setSelectedPartner(p)}
-          currency={defaultCurrency}
-        />
-      ) : viewMode === "debts" ? (
-        <DebtsTable debts={debts} />
-      ) : (
-        <DebtExpensesTracker currency={defaultCurrency} />
-      )}
+      {/* Main View Content */}
+      <div className="space-y-6">
+        {viewMode === "partners" && (
+          <PartnerDebtsList
+            debts={debts}
+            partners={partners}
+            transactions={allTransactions}
+            currency={defaultCurrency}
+            onSelectPartner={(partner) => setSelectedPartnerId(partner.partnerId)}
+          />
+        )}
 
-      {/* Partner Detail Dialog: Opens when tapping on any partner */}
+        {viewMode === "contracts" && <DebtsTable debts={debts} />}
+
+        {viewMode === "expenses" && <DebtExpensesTracker currency={defaultCurrency} />}
+      </div>
+
+      {/* Unified Partner Detail Dialog */}
       <PartnerDebtsDetailDialog
-        open={Boolean(selectedPartner)}
-        onClose={() => setSelectedPartner(null)}
+        open={Boolean(selectedPartnerId && selectedPartner)}
+        onClose={() => setSelectedPartnerId(null)}
         partnerSummary={selectedPartner}
         currency={defaultCurrency}
       />
 
+      {/* Quick Add Dialog */}
       <DebtQuickAddDialog
         partners={partners}
         accounts={accounts}

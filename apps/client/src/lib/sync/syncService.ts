@@ -74,13 +74,21 @@ export async function enqueueOperation(op: Omit<PendingOp, 'id' | 'createdAt' | 
 async function handleCashflowTransactionSync(op: PendingOp, response?: any) {
   const body = op.body || {}
   const localId = body.__localId || body.id
+  const peerLocalId = body.__peerLocalId
 
   if (op.opType === 'create') {
     if (localId) {
       await db.transactions.delete(localId)
     }
+    if (peerLocalId) {
+      await db.transactions.delete(peerLocalId)
+    }
     if (response?.data) {
-      await db.transactions.put({ ...response.data, pending: false, error: false })
+      if (Array.isArray(response.data)) {
+        await db.transactions.bulkPut(response.data.map((tx: any) => ({ ...tx, pending: false, error: false })))
+      } else {
+        await db.transactions.put({ ...response.data, pending: false, error: false })
+      }
     }
     return
   }
@@ -96,7 +104,13 @@ async function handleCashflowTransactionSync(op: PendingOp, response?: any) {
 
   if (op.opType === 'delete') {
     if (body.id) {
-      await db.transactions.delete(body.id)
+      const current = await db.transactions.get(body.id)
+      const ids = [body.id]
+      if (current?.transfer_peer_id) ids.push(current.transfer_peer_id)
+      if (response?.data?.deletedIds && Array.isArray(response.data.deletedIds)) {
+        ids.push(...response.data.deletedIds)
+      }
+      await db.transactions.bulkDelete(ids)
     }
   }
 }
