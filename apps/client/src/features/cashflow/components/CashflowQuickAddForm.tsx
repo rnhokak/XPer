@@ -91,30 +91,8 @@ const getCurrentDateTimeValue = () => {
   return local.toISOString().slice(0, 23);
 };
 
-export const getCategoryEmoji = (name: string): string => {
-  const lower = name.toLowerCase();
-  if (lower.includes("ăn") || lower.includes("uống") || lower.includes("cơm") || lower.includes("bún") || lower.includes("phở") || lower.includes("food") || lower.includes("dining")) return "🍜";
-  if (lower.includes("cafe") || lower.includes("cà phê") || lower.includes("trà") || lower.includes("coffee")) return "☕";
-  if (lower.includes("mua") || lower.includes("sắm") || lower.includes("shopping") || lower.includes("quần") || lower.includes("áo")) return "🛍️";
-  if (lower.includes("xăng") || lower.includes("xe") || lower.includes("di chuyển") || lower.includes("grab") || lower.includes("taxi") || lower.includes("transport")) return "🚗";
-  if (lower.includes("chợ") || lower.includes("siêu thị") || lower.includes("mart") || lower.includes("grocer")) return "🛒";
-  if (lower.includes("nhà") || lower.includes("thuê") || lower.includes("rent") || lower.includes("home")) return "🏠";
-  if (lower.includes("điện") || lower.includes("nước") || lower.includes("hóa đơn") || lower.includes("bill") || lower.includes("mạng") || lower.includes("internet")) return "💡";
-  if (lower.includes("thuốc") || lower.includes("y tế") || lower.includes("bệnh") || lower.includes("khám") || lower.includes("health")) return "💊";
-  if (lower.includes("học") || lower.includes("sách") || lower.includes("khóa") || lower.includes("edu")) return "📚";
-  if (lower.includes("chơi") || lower.includes("giải trí") || lower.includes("game") || lower.includes("phim") || lower.includes("movie")) return "🎮";
-  if (lower.includes("du lịch") || lower.includes("hotel") || lower.includes("vé") || lower.includes("travel")) return "✈️";
-  if (lower.includes("lương") || lower.includes("salary") || lower.includes("thưởng") || lower.includes("income")) return "💵";
-  if (lower.includes("đầu tư") || lower.includes("tiết kiệm") || lower.includes("invest") || lower.includes("stock") || lower.includes("crypto")) return "📈";
-  if (lower.includes("quà") || lower.includes("biếu") || lower.includes("tặng") || lower.includes("gift")) return "🎁";
-  if (lower.includes("làm đẹp") || lower.includes("spa") || lower.includes("cắt tóc") || lower.includes("beauty")) return "💇";
-  if (lower.includes("thể thao") || lower.includes("gym") || lower.includes("bóng") || lower.includes("sport")) return "⚽";
-  if (lower.includes("thú cưng") || lower.includes("pet") || lower.includes("chó") || lower.includes("mèo")) return "🐾";
-  if (lower.includes("bảo hiểm") || lower.includes("insurance")) return "🛡️";
-  if (lower.includes("nợ") || lower.includes("debt") || lower.includes("vay")) return "🤝";
-  if (lower.includes("chuyển") || lower.includes("transfer")) return "🔄";
-  return "🏷️";
-};
+import { getCategoryEmoji } from "@/lib/cashflow/categoryUtils";
+export { getCategoryEmoji };
 
 export function CashflowQuickAddForm({
   categories,
@@ -145,7 +123,7 @@ export function CashflowQuickAddForm({
       type: "expense",
       amount: undefined,
       account_id: defaultAccountId ?? null,
-      category_id: null,
+      category_id: "",
       note: "",
       transaction_time: lastTransactionTime ? lastTransactionTime : defaultDateTimeValue(),
       currency: defaultCurrency,
@@ -165,7 +143,6 @@ export function CashflowQuickAddForm({
     window.addEventListener("resize", updateViewportHeight);
     const viewport = window.visualViewport;
     viewport?.addEventListener("resize", updateViewportHeight);
-
     return () => {
       window.removeEventListener("resize", updateViewportHeight);
       viewport?.removeEventListener("resize", updateViewportHeight);
@@ -253,13 +230,14 @@ export function CashflowQuickAddForm({
   const createMutation = useCreateTransaction();
   const isSubmitting = createMutation.isPending && isOnline;
 
-  // Validation state: Amount MUST be entered and > 0, and account must be selected
+  // Validation state: Amount MUST be entered and > 0, account must be selected, and category MUST be selected
   const isValidAmount = typeof amount === "number" && Number.isFinite(amount) && amount > 0;
   const hasAccount = accounts.length === 0 || Boolean(accountId);
-  const canSubmit = isValidAmount && hasAccount && !isSubmitting && isOnline;
+  const hasCategory = Boolean(selectedCategoryId && selectedCategoryId.trim().length > 0);
+  const canSubmit = isValidAmount && hasAccount && hasCategory && !isSubmitting && isOnline;
 
   const onSubmit = async (values: CashflowQuickAddValues) => {
-    if (!isValidAmount) return;
+    if (!isValidAmount || !hasCategory) return;
     setSubmitError(null);
     const transactionTimeIso = toIsoStringWithOffset(values.transaction_time);
 
@@ -276,7 +254,7 @@ export function CashflowQuickAddForm({
     const payload = {
       ...values,
       note: finalNote || null,
-      category_id: values.category_id || null,
+      category_id: values.category_id,
       account_id: values.account_id || defaultAccountId || null,
       transaction_time: transactionTimeIso ?? undefined,
       currency: values.currency || defaultCurrency,
@@ -312,7 +290,7 @@ export function CashflowQuickAddForm({
           type: values.type,
           amount: undefined,
           account_id: payload.account_id,
-          category_id: null,
+          category_id: "",
           note: "",
           transaction_time: nextTransactionTime,
           currency: defaultCurrency,
@@ -426,19 +404,32 @@ export function CashflowQuickAddForm({
           </div>
 
           {/* Amount Field with Hero Input & Quick Presets */}
-          <CashflowAmountFields control={form.control} currency={currency} themeColor={currentThemeColor} />
+          <CashflowAmountFields
+            control={form.control}
+            currency={currency}
+            themeColor={currentThemeColor}
+            transactionType={selectedType}
+            categories={categoriesByType}
+            onSelectCategory={(catId) => {
+              form.setValue("category_id", catId, { shouldValidate: true, shouldDirty: true });
+            }}
+          />
 
           {/* 1-Tap Category Selector */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold text-slate-700">
-                Danh mục {selectedCategoryObj ? `(${selectedCategoryObj.name})` : "(tùy chọn)"}
+              <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                <span>Danh mục</span>
+                <span className="text-rose-500 font-bold">*</span>
+                {selectedCategoryObj && (
+                  <span className="font-normal text-slate-500">({selectedCategoryObj.name})</span>
+                )}
               </Label>
               <div className="flex items-center gap-2">
                 {selectedCategoryId && (
                   <button
                     type="button"
-                    onClick={() => form.setValue("category_id", null)}
+                    onClick={() => form.setValue("category_id", "", { shouldValidate: true, shouldDirty: true })}
                     className="text-[11px] font-medium text-rose-500 hover:text-rose-600"
                   >
                     Bỏ chọn
@@ -466,9 +457,9 @@ export function CashflowQuickAddForm({
                     type="button"
                     onClick={() => {
                       if (isSelected) {
-                        form.setValue("category_id", null);
+                        form.setValue("category_id", "", { shouldValidate: true, shouldDirty: true });
                       } else {
-                        form.setValue("category_id", cat.id);
+                        form.setValue("category_id", cat.id, { shouldValidate: true, shouldDirty: true });
                       }
                     }}
                     className={cn(
@@ -500,13 +491,19 @@ export function CashflowQuickAddForm({
               </button>
             </div>
 
+            {form.formState.errors.category_id && (
+              <p className="text-xs font-medium text-rose-500">
+                {form.formState.errors.category_id.message}
+              </p>
+            )}
+
             <CategoryTreeModal
               open={categoryModalOpen}
               onClose={() => setCategoryModalOpen(false)}
               categories={categoriesByType}
-              selected={selectedCategoryId ?? null}
+              selected={selectedCategoryId || null}
               onSelect={(next) => {
-                form.setValue("category_id", next);
+                form.setValue("category_id", next ?? "", { shouldValidate: true, shouldDirty: true });
               }}
               suggestedId={null}
             />
@@ -804,6 +801,10 @@ export function CashflowQuickAddForm({
               </span>
             ) : !isValidAmount ? (
               <span>Nhập số tiền để tiếp tục</span>
+            ) : !hasCategory ? (
+              <span>Chọn danh mục để tiếp tục</span>
+            ) : !hasAccount ? (
+              <span>Chọn tài khoản thanh toán</span>
             ) : (
               <span className="flex items-center justify-center gap-1.5">
                 <span>

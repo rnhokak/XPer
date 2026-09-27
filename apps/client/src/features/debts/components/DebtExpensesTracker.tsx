@@ -179,7 +179,7 @@ export function DebtExpensesTracker({ currency = "VND", filterPartnerName = null
           type: tx.type,
           amount: tx.amount,
           account_id: tx.account?.id ?? null,
-          category_id: tx.category?.id ?? null,
+          category_id: tx.category?.id ?? "",
           note: nextNote,
           transaction_time: tx.transaction_time,
           currency: tx.currency,

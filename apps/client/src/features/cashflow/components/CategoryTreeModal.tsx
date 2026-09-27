@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Check, ChevronRight, FolderTree, Search, Sparkles, X } from "lucide-react";
+import { getCategoryEmoji } from "@/lib/cashflow/categoryUtils";
+import { cn } from "@/lib/utils";
 
 type Category = { id: string; name: string; parent_id: string | null };
 
@@ -23,9 +25,9 @@ export function CategoryTreeModal({
   selected,
   onSelect,
   suggestedId,
-  searchPlaceholder = "Search categories",
+  searchPlaceholder = "Tìm kiếm danh mục...",
 }: CategoryTreeModalProps) {
-  const collator = useMemo(() => new Intl.Collator(undefined, { sensitivity: "base", numeric: true }), []);
+  const collator = useMemo(() => new Intl.Collator("vi-VN", { sensitivity: "base", numeric: true }), []);
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogMaxHeight, setDialogMaxHeight] = useState<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -34,7 +36,7 @@ export function CategoryTreeModal({
     if (typeof window === "undefined") return;
     const update = () => {
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const max = Math.max(360, viewportHeight - 120);
+      const max = Math.max(340, viewportHeight - 140);
       setDialogMaxHeight(max);
     };
     update();
@@ -46,14 +48,17 @@ export function CategoryTreeModal({
     };
   }, []);
 
+  // Reset search when modal closes
+  useEffect(() => {
+    if (!open) {
+      setSearchTerm("");
+    }
+  }, [open]);
+
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       onClose();
     }
-  };
-
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
   };
 
   const handleSelectAndClose = (categoryId: string | null) => {
@@ -125,30 +130,65 @@ export function CategoryTreeModal({
     const nodesToRender = visibleIds ? nodes.filter((category) => visibleIds.has(category.id)) : nodes;
     return nodesToRender.map((category) => {
       const children = groupedByParent.get(category.id) ?? [];
+      const hasChildren = children.length > 0;
       const isActive = selected === category.id;
-      const prefix = depth === 0 ? "" : `${"--".repeat(depth)} `;
-      const indent = depth === 0 ? 0 : Math.min(depth, 3) * 12;
+      const isSuggested = suggestedId === category.id && !isActive;
+      const emoji = getCategoryEmoji(category.name);
+
       return (
-        <div key={category.id} className="space-y-1">
+        <div key={category.id} className="space-y-1.5">
           <button
             type="button"
             onClick={() => handleSelectAndClose(category.id)}
-            className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition duration-150 ${
+            className={cn(
+              "group flex w-full items-center justify-between gap-2.5 rounded-xl border p-2.5 text-left text-xs sm:text-sm font-medium transition-all duration-150 active:scale-[0.99]",
               isActive
-                ? "bg-foreground text-white border-foreground hover:border-foreground"
-                : "border border-gray-200 bg-white text-foreground hover:border-primary/60"
-            }`}
-            style={indent ? { paddingLeft: `${12 + indent}px` } : undefined}
+                ? "border-emerald-500 bg-emerald-50/90 text-emerald-950 font-semibold shadow-2xs ring-2 ring-emerald-500/25"
+                : isSuggested
+                ? "border-amber-300 bg-amber-50/70 text-amber-900 hover:bg-amber-100/70"
+                : depth === 0
+                ? "border-slate-200/90 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50"
+                : "border-slate-150 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-slate-100/70"
+            )}
+            style={depth > 0 ? { marginLeft: `${Math.min(depth, 3) * 16}px`, width: `calc(100% - ${Math.min(depth, 3) * 16}px)` } : undefined}
           >
-            <span className="truncate">
-              {prefix}
-              {category.name}
-            </span>
-            {suggestedId === category.id && !isActive ? (
-              <span className="text-[10px] uppercase tracking-wide text-primary">Suggested</span>
-            ) : null}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <span className="text-base sm:text-lg shrink-0 flex items-center justify-center w-6 h-6">{emoji}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 truncate">
+                  {depth > 0 && (
+                    <ChevronRight className="h-3 w-3 text-slate-400 shrink-0" />
+                  )}
+                  <span className="truncate">{category.name}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {isSuggested && (
+                <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 uppercase tracking-wide">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  Gợi ý
+                </span>
+              )}
+              {hasChildren && depth === 0 && (
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                  {children.length} mục con
+                </span>
+              )}
+              {isActive && (
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-2xs">
+                  <Check className="h-3 w-3 stroke-[2.5]" />
+                </div>
+              )}
+            </div>
           </button>
-          {children.length ? renderNodes(children, depth + 1) : null}
+
+          {children.length > 0 && (
+            <div className="space-y-1.5 pl-1.5 border-l-2 border-slate-100 ml-3.5 my-1">
+              {renderNodes(children, depth + 1)}
+            </div>
+          )}
         </div>
       );
     });
@@ -160,53 +200,104 @@ export function CategoryTreeModal({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="sm:max-w-2xl gap-0 p-0 sm:p-6">
-        <div className="flex h-full flex-col gap-3 sm:gap-4">
-          <div className="border-b px-4 py-3 sm:border-none sm:px-0 sm:py-0">
-            <DialogHeader className="space-y-1">
-              <DialogTitle className="text-base font-semibold sm:text-lg">Chọn category</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground sm:text-sm">
-                Hiển thị cây category theo loại giao dịch
+      <DialogContent
+        onOpenAutoFocus={(e) => {
+          // CRITICAL: Prevent auto-focusing on the search input to avoid opening mobile keyboard automatically!
+          e.preventDefault();
+        }}
+        className="w-[calc(100%-2rem)] max-w-lg rounded-2xl gap-0 p-0 overflow-hidden sm:max-w-xl"
+      >
+        <div className="flex h-full flex-col">
+          {/* Header */}
+          <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
+            <DialogHeader className="space-y-1 text-left">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2 text-base font-bold sm:text-lg text-slate-900">
+                  <FolderTree className="h-4.5 w-4.5 text-emerald-600" />
+                  <span>Chọn danh mục</span>
+                </DialogTitle>
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                  {categories.length} danh mục
+                </span>
+              </div>
+              <DialogDescription className="text-xs text-slate-500">
+                Chạm để chọn danh mục tương ứng cho giao dịch
               </DialogDescription>
             </DialogHeader>
           </div>
-          <div className="px-4 sm:px-0">
+
+          {/* Search Box - strictly no autoFocus */}
+          <div className="border-b border-slate-100 bg-slate-50/60 p-3 sm:px-5">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 ref={searchInputRef}
                 placeholder={searchPlaceholder}
                 value={searchTerm}
-                onChange={(event) => handleSearchChange(event.target.value)}
-                className="h-10 rounded-xl border px-9 text-sm"
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="h-9.5 rounded-xl border-slate-200 bg-white pl-9 pr-8 text-xs sm:text-sm focus-visible:ring-emerald-500/20"
                 inputMode="search"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute right-2.5 top-2.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Category Tree Scroll Area */}
           <div
-            className="space-y-1 overflow-y-auto px-4 pb-4 pt-1 sm:px-0"
-            style={dialogMaxHeight ? { maxHeight: dialogMaxHeight } : undefined}
+            className="space-y-2 overflow-y-auto p-3.5 sm:p-5"
+            style={{ maxHeight: dialogMaxHeight ? `${dialogMaxHeight}px` : "60vh" }}
           >
             {noMatches ? (
-              <div className="px-3 py-2 text-sm text-muted-foreground">No categories match your search.</div>
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <span className="text-3xl mb-2">🔍</span>
+                <p className="text-sm font-semibold text-slate-800">Không tìm thấy danh mục</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Không có danh mục nào khớp với từ khóa "{searchTerm}"
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchTerm("")}
+                  className="mt-3 h-8 rounded-lg text-xs"
+                >
+                  Xóa tìm kiếm
+                </Button>
+              </div>
             ) : (
               renderNodes(displayRoots)
             )}
           </div>
-          <DialogFooter className="flex flex-row gap-3 border-t px-4 py-3 sm:border-none sm:px-0 sm:py-0">
-            <div className="flex flex-1 flex-row gap-3 sm:flex-initial">
-              <Button variant="outline" onClick={() => handleSelectAndClose(null)} className="flex-1">
-                Clear selection
-              </Button>
+
+          {/* Footer */}
+          <DialogFooter className="border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 sm:px-5">
+            <div className="flex w-full items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-400 truncate">
+                {selected ? "Đã chọn 1 danh mục" : "Vui lòng chọn 1 danh mục"}
+              </span>
               <Button
-                variant="ghost"
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   searchInputRef.current?.blur();
                   onClose();
                 }}
-                className="flex-1"
+                className="h-8.5 rounded-xl border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100"
               >
-                Close
+                Đóng
               </Button>
             </div>
           </DialogFooter>

@@ -1,0 +1,25 @@
+export const getCategoryEmoji = (name: string): string => {
+  if (!name) return "🏷️";
+  const lower = name.toLowerCase();
+  if (lower.includes("ăn") || lower.includes("uống") || lower.includes("cơm") || lower.includes("bún") || lower.includes("phở") || lower.includes("food") || lower.includes("dining")) return "🍜";
+  if (lower.includes("cafe") || lower.includes("cà phê") || lower.includes("trà") || lower.includes("coffee")) return "☕";
+  if (lower.includes("mua") || lower.includes("sắm") || lower.includes("shopping") || lower.includes("quần") || lower.includes("áo")) return "🛍️";
+  if (lower.includes("xăng") || lower.includes("xe") || lower.includes("di chuyển") || lower.includes("grab") || lower.includes("taxi") || lower.includes("transport")) return "🚗";
+  if (lower.includes("chợ") || lower.includes("siêu thị") || lower.includes("mart") || lower.includes("grocer")) return "🛒";
+  if (lower.includes("nhà") || lower.includes("thuê") || lower.includes("rent") || lower.includes("home")) return "🏠";
+  if (lower.includes("điện") || lower.includes("nước") || lower.includes("hóa đơn") || lower.includes("bill") || lower.includes("mạng") || lower.includes("internet")) return "💡";
+  if (lower.includes("thuốc") || lower.includes("y tế") || lower.includes("bệnh") || lower.includes("khám") || lower.includes("health")) return "💊";
+  if (lower.includes("học") || lower.includes("sách") || lower.includes("khóa") || lower.includes("edu")) return "📚";
+  if (lower.includes("chơi") || lower.includes("giải trí") || lower.includes("game") || lower.includes("phim") || lower.includes("movie")) return "🎮";
+  if (lower.includes("du lịch") || lower.includes("hotel") || lower.includes("vé") || lower.includes("travel")) return "✈️";
+  if (lower.includes("lương") || lower.includes("salary") || lower.includes("thưởng") || lower.includes("income")) return "💵";
+  if (lower.includes("đầu tư") || lower.includes("tiết kiệm") || lower.includes("invest") || lower.includes("stock") || lower.includes("crypto")) return "📈";
+  if (lower.includes("quà") || lower.includes("biếu") || lower.includes("tặng") || lower.includes("gift")) return "🎁";
+  if (lower.includes("làm đẹp") || lower.includes("spa") || lower.includes("cắt tóc") || lower.includes("beauty")) return "💇";
+  if (lower.includes("thể thao") || lower.includes("gym") || lower.includes("bóng") || lower.includes("sport")) return "⚽";
+  if (lower.includes("thú cưng") || lower.includes("pet") || lower.includes("chó") || lower.includes("mèo")) return "🐾";
+  if (lower.includes("bảo hiểm") || lower.includes("insurance")) return "🛡️";
+  if (lower.includes("nợ") || lower.includes("debt") || lower.includes("vay")) return "🤝";
+  if (lower.includes("chuyển") || lower.includes("transfer")) return "🔄";
+  return "🏷️";
+};

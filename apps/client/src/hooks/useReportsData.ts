@@ -97,9 +97,8 @@ export const getReportsDataFromLocalDb = async (range: CashflowRange, shift: num
 
   const transactions: Transaction[] = allLocalTransactions
     .filter((tx) => {
-      if (tx.type !== 'expense') return false
-      const time = new Date(tx.transaction_time).getTime()
-      return !Number.isNaN(time) && time >= bounds.start.getTime() && time < bounds.end.getTime()
+      const time = new Date(tx.transaction_time).getTime();
+      return !Number.isNaN(time) && time >= bounds.start.getTime() && time < bounds.end.getTime();
     })
     .map((tx) => ({
       id: tx.id,
@@ -110,18 +109,16 @@ export const getReportsDataFromLocalDb = async (range: CashflowRange, shift: num
       transaction_time: tx.transaction_time,
       category_id: (tx as any).category_id ?? tx.category?.id ?? null,
       account_id: (tx as any).account_id ?? tx.account?.id ?? null,
-    }))
+    }));
 
-  const categories: Category[] = localCategories
-    .filter((cat) => cat.type === 'expense')
-    .map((cat) => ({
-      id: cat.id,
-      name: cat.name,
-      type: 'expense' as const,
-      parent_id: cat.parent_id ?? null,
-      is_default: Boolean(cat.is_default),
-      category_focus: cat.category_focus ?? null,
-    }))
+  const categories: Category[] = localCategories.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    type: (cat.type as 'income' | 'expense' | 'transfer') || 'expense',
+    parent_id: cat.parent_id ?? null,
+    is_default: Boolean(cat.is_default),
+    category_focus: cat.category_focus ?? null,
+  }));
 
   return {
     accounts: localAccounts as unknown as Account[],

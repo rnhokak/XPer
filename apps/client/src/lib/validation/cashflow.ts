@@ -17,7 +17,10 @@ const numberFromInput = (val: unknown) => {
 export const cashflowQuickAddSchema = z.object({
   type: z.enum(cashflowTransactionTypes).default("expense"),
   amount: z.preprocess(numberFromInput, z.number({ required_error: "Amount is required" }).positive("Amount must be greater than 0")),
-  category_id: z.string().uuid().nullable().optional(),
+  category_id: z.preprocess(
+    (val) => (val === null || val === "" ? undefined : val),
+    z.string({ required_error: "Vui lòng chọn danh mục" }).min(1, "Vui lòng chọn danh mục")
+  ),
   account_id: z.string().uuid().nullable().optional(),
   note: z
     .preprocess((val) => (typeof val === "string" && val.trim() === "" ? undefined : val), z.string().max(500).optional())

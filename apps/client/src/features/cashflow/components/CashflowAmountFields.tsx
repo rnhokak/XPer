@@ -76,13 +76,80 @@ const formatChipLabel = (val: number, isVnd: boolean) => {
   return String(val);
 };
 
+type PresetDef = {
+  amount: number;
+  label: string;
+  emoji: string;
+  keywords: string[];
+};
+
+const EXPENSE_PRESETS_VND: PresetDef[] = [
+  { amount: 30000, label: "30k", emoji: "☕", keywords: ["cafe", "cà phê", "trà", "coffee", "uống", "nước"] },
+  { amount: 50000, label: "50k", emoji: "🍜", keywords: ["ăn", "cơm", "bún", "phở", "food", "dining", "trưa", "sáng"] },
+  { amount: 100000, label: "100k", emoji: "🛒", keywords: ["chợ", "siêu thị", "mart", "ăn uống", "tạp hóa"] },
+  { amount: 200000, label: "200k", emoji: "🛍️", keywords: ["mua", "sắm", "quần", "áo", "xăng", "xe", "di chuyển"] },
+  { amount: 500000, label: "500k", emoji: "💡", keywords: ["điện", "nước", "hóa đơn", "bill", "nhà", "mua sắm"] },
+];
+
+const INCOME_PRESETS_VND: PresetDef[] = [
+  { amount: 500000, label: "500k", emoji: "💵", keywords: ["thu", "khác", "thưởng", "lãi", "bán"] },
+  { amount: 2000000, label: "2tr", emoji: "🎁", keywords: ["thưởng", "bonus", "quà", "thu nhập"] },
+  { amount: 5000000, label: "5tr", emoji: "💰", keywords: ["lương", "salary", "thu nhập", "dự án"] },
+  { amount: 10000000, label: "10tr", emoji: "💼", keywords: ["lương", "salary", "thu nhập"] },
+  { amount: 20000000, label: "20tr", emoji: "🏦", keywords: ["lương", "salary", "thu nhập", "đầu tư"] },
+];
+
+const TRANSFER_PRESETS_VND: PresetDef[] = [
+  { amount: 100000, label: "100k", emoji: "🔄", keywords: ["chuyển", "transfer", "nạp"] },
+  { amount: 500000, label: "500k", emoji: "💳", keywords: ["chuyển", "transfer", "tiết kiệm"] },
+  { amount: 1000000, label: "1tr", emoji: "📲", keywords: ["chuyển", "transfer"] },
+  { amount: 2000000, label: "2tr", emoji: "🏦", keywords: ["chuyển", "transfer", "rút"] },
+  { amount: 5000000, label: "5tr", emoji: "🔁", keywords: ["chuyển", "transfer", "tiết kiệm"] },
+];
+
+const EXPENSE_PRESETS_OTHER: PresetDef[] = [
+  { amount: 5, label: "5", emoji: "☕", keywords: ["cafe", "coffee", "drink"] },
+  { amount: 10, label: "10", emoji: "🍔", keywords: ["food", "lunch", "dining"] },
+  { amount: 20, label: "20", emoji: "🛒", keywords: ["groceries", "market"] },
+  { amount: 50, label: "50", emoji: "🛍️", keywords: ["shopping", "clothes"] },
+  { amount: 100, label: "100", emoji: "💡", keywords: ["bills", "utilities"] },
+];
+
+const INCOME_PRESETS_OTHER: PresetDef[] = [
+  { amount: 100, label: "100", emoji: "💵", keywords: ["income", "bonus"] },
+  { amount: 500, label: "500", emoji: "🎁", keywords: ["bonus", "freelance"] },
+  { amount: 1000, label: "1k", emoji: "💰", keywords: ["salary", "income"] },
+  { amount: 2000, label: "2k", emoji: "💼", keywords: ["salary", "payroll"] },
+  { amount: 5000, label: "5k", emoji: "🏦", keywords: ["salary", "investment"] },
+];
+
+const TRANSFER_PRESETS_OTHER: PresetDef[] = [
+  { amount: 50, label: "50", emoji: "🔄", keywords: ["transfer"] },
+  { amount: 100, label: "100", emoji: "💳", keywords: ["transfer"] },
+  { amount: 200, label: "200", emoji: "📲", keywords: ["transfer"] },
+  { amount: 500, label: "500", emoji: "🏦", keywords: ["transfer"] },
+  { amount: 1000, label: "1k", emoji: "🔁", keywords: ["transfer"] },
+];
+
+type CategoryItem = { id: string; name: string; type: string };
+
 type Props = {
   control: Control<CashflowQuickAddValues>;
   currency?: string;
   themeColor?: "rose" | "emerald" | "blue";
+  transactionType?: "expense" | "income" | "transfer";
+  categories?: CategoryItem[];
+  onSelectCategory?: (categoryId: string) => void;
 };
 
-export function CashflowAmountFields({ control, currency, themeColor = "rose" }: Props) {
+export function CashflowAmountFields({
+  control,
+  currency,
+  themeColor = "rose",
+  transactionType = "expense",
+  categories = [],
+  onSelectCategory,
+}: Props) {
   const watchedCurrency = useWatch({ control, name: "currency" }) ?? currency ?? "VND";
   const amountValue = useWatch({ control, name: "amount" });
   const [amountInput, setAmountInput] = useState("");
@@ -162,14 +229,47 @@ export function CashflowAmountFields({ control, currency, themeColor = "rose" }:
     onChange(undefined);
   };
 
-  // Preset values based on currency
-  const presetAmounts = isVnd
-    ? [20000, 50000, 100000, 200000, 500000]
-    : [5, 10, 20, 50, 100];
+  // Presets tailored to transaction type
+  const activePresets: PresetDef[] = useMemo(() => {
+    if (isVnd) {
+      if (transactionType === "income") return INCOME_PRESETS_VND;
+      if (transactionType === "transfer") return TRANSFER_PRESETS_VND;
+      return EXPENSE_PRESETS_VND;
+    }
+    if (transactionType === "income") return INCOME_PRESETS_OTHER;
+    if (transactionType === "transfer") return TRANSFER_PRESETS_OTHER;
+    return EXPENSE_PRESETS_OTHER;
+  }, [isVnd, transactionType]);
 
-  const deltaAmounts = isVnd
-    ? [10000, 20000, 50000, 100000, 500000]
-    : [1, 5, 10, 20, 50];
+  const deltaAmounts = useMemo(() => {
+    if (isVnd) {
+      if (transactionType === "income") return [500000, 1000000, 2000000, 5000000, 10000000];
+      if (transactionType === "transfer") return [100000, 500000, 1000000, 2000000, 5000000];
+      return [10000, 20000, 50000, 100000, 500000];
+    }
+    if (transactionType === "income") return [100, 200, 500, 1000];
+    if (transactionType === "transfer") return [20, 50, 100, 200];
+    return [1, 5, 10, 20, 50];
+  }, [isVnd, transactionType]);
+
+  const findMatchedCategory = (keywords: string[]) => {
+    if (!categories || categories.length === 0) return null;
+    for (const kw of keywords) {
+      const found = categories.find((c) => c.name.toLowerCase().includes(kw));
+      if (found) return found;
+    }
+    return categories[0] ?? null;
+  };
+
+  const handleSelectPreset = (preset: PresetDef, onChange: (v: number | undefined) => void) => {
+    handleSetAmount(preset.amount, onChange);
+    if (onSelectCategory && categories.length > 0) {
+      const matched = findMatchedCategory(preset.keywords);
+      if (matched) {
+        onSelectCategory(matched.id);
+      }
+    }
+  };
 
   const hasAmount = typeof amountValue === "number" && amountValue > 0;
 
@@ -283,23 +383,33 @@ export function CashflowAmountFields({ control, currency, themeColor = "rose" }:
                         </button>
                       ))}
 
-                    {/* Preset chips */}
-                    {presetAmounts.map((amt) => (
-                      <button
-                        key={amt}
-                        type="button"
-                        onClick={() => handleSetAmount(amt, field.onChange)}
-                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 active:scale-95 shadow-2xs"
-                      >
-                        {formatChipLabel(amt, isVnd)}
-                      </button>
-                    ))}
+                    {/* Preset chips with auto-paired category */}
+                    {activePresets.map((preset) => {
+                      const matched = findMatchedCategory(preset.keywords);
+                      return (
+                        <button
+                          key={`${preset.amount}-${preset.label}`}
+                          type="button"
+                          onClick={() => handleSelectPreset(preset, field.onChange)}
+                          className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 active:scale-95 shadow-2xs"
+                          title={matched ? `Chọn ${preset.label} và danh mục ${matched.name}` : `Chọn ${preset.label}`}
+                        >
+                          <span>{preset.emoji}</span>
+                          <span>{preset.label}</span>
+                          {matched && (
+                            <span className="text-[10px] font-normal text-muted-foreground truncate max-w-[70px]">
+                              • {matched.name}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </>
                 ) : (
                   <>
                     <span className="text-[11px] font-medium text-slate-400 mr-0.5">Cộng thêm:</span>
 
-                    {/* Delta chips */}
+                    {/* Delta chips tailored to transactionType */}
                     {deltaAmounts.map((amt) => (
                       <button
                         key={`delta-${amt}`}

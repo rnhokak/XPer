@@ -82,7 +82,7 @@ export function CashflowTransactionDetailDialog({
       type: "expense",
       amount: 0,
       account_id: null,
-      category_id: null,
+      category_id: "",
       note: "",
       transaction_time: "",
       currency: "VND",
@@ -101,7 +101,7 @@ export function CashflowTransactionDetailDialog({
       type: transaction.type,
       amount: transaction.amount,
       account_id: transaction.account?.id ?? null,
-      category_id: transaction.category?.id ?? null,
+      category_id: transaction.category?.id ?? "",
       note: transaction.note ?? "",
       transaction_time: toLocalInputValue(transaction.transaction_time),
       currency: transaction.currency,
@@ -193,7 +193,7 @@ export function CashflowTransactionDetailDialog({
     const normalizedTime = toIsoStringWithOffset(values.transaction_time);
     await onSave({
       ...values,
-      category_id: values.category_id || null,
+      category_id: values.category_id,
       account_id: values.account_id || null,
       transaction_time: normalizedTime || undefined,
     });
@@ -284,7 +284,7 @@ export function CashflowTransactionDetailDialog({
                     categories={categoriesByType}
                     selected={selectedCategoryId ?? null}
                     onSelect={(next) => {
-                      form.setValue("category_id", next);
+                      form.setValue("category_id", next ?? "");
                       setUserTouchedCategory(true);
                       setSuggestedCategoryId(next);
                     }}
