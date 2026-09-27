@@ -11,9 +11,10 @@
     "dev:all": "concurrently -n web,client -c blue,green \"pnpm run dev:web\" \"pnpm run dev:client\"",
     "dev:web": "pnpm --filter @xper/web run dev",
     "dev:client": "pnpm --filter @xper/client run dev",
-    "build": "pnpm run build:client && pnpm run build:web",
     "build:client": "pnpm --filter @xper/client run build",
+    "copy:client": "mkdir -p apps/web/public/client && cp -r apps/client/dist/* apps/web/public/client/",
     "build:web": "pnpm --filter @xper/web run build",
+    "build": "pnpm build:client && pnpm copy:client && pnpm build:web",
     "start": "pnpm --filter @xper/web run start",
     "lint": "pnpm --filter @xper/web run lint",
     "vercel-build": "pnpm run build"
