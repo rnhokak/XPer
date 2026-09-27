@@ -29,24 +29,9 @@ export function CategoryTreeModal({
 }: CategoryTreeModalProps) {
   const collator = useMemo(() => new Intl.Collator("vi-VN", { sensitivity: "base", numeric: true }), []);
   const [searchTerm, setSearchTerm] = useState("");
-  const [dialogMaxHeight, setDialogMaxHeight] = useState<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const update = () => {
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const max = Math.max(340, viewportHeight - 140);
-      setDialogMaxHeight(max);
-    };
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("orientationchange", update);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
-    };
-  }, []);
+
 
   // Reset search when modal closes
   useEffect(() => {
@@ -121,8 +106,8 @@ export function CategoryTreeModal({
   const displayRoots = rootCategories.length
     ? rootCategories
     : implicitRoots.length
-    ? implicitRoots
-    : categories;
+      ? implicitRoots
+      : categories;
 
   const noMatches = Boolean(normalizedSearch && visibleIds && visibleIds.size === 0);
 
@@ -145,10 +130,10 @@ export function CategoryTreeModal({
               isActive
                 ? "border-emerald-500 bg-emerald-50/90 text-emerald-950 font-semibold shadow-2xs ring-2 ring-emerald-500/25"
                 : isSuggested
-                ? "border-amber-300 bg-amber-50/70 text-amber-900 hover:bg-amber-100/70"
-                : depth === 0
-                ? "border-slate-200/90 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50"
-                : "border-slate-150 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-slate-100/70"
+                  ? "border-amber-300 bg-amber-50/70 text-amber-900 hover:bg-amber-100/70"
+                  : depth === 0
+                    ? "border-slate-200/90 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50"
+                    : "border-slate-150 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-slate-100/70"
             )}
             style={depth > 0 ? { marginLeft: `${Math.min(depth, 3) * 16}px`, width: `calc(100% - ${Math.min(depth, 3) * 16}px)` } : undefined}
           >
@@ -205,9 +190,9 @@ export function CategoryTreeModal({
           // CRITICAL: Prevent auto-focusing on the search input to avoid opening mobile keyboard automatically!
           e.preventDefault();
         }}
-        className="w-[calc(100%-2rem)] max-w-lg rounded-2xl gap-0 p-0 overflow-hidden sm:max-w-xl"
+        className="w-[calc(100%-2rem)] max-w-lg rounded-2xl gap-0 p-0 overflow-hidden sm:max-w-xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[85vh] flex flex-col"
       >
-        <div className="flex h-full flex-col">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           {/* Header */}
           <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
             <DialogHeader className="space-y-1 text-left">
@@ -257,10 +242,7 @@ export function CategoryTreeModal({
           </div>
 
           {/* Category Tree Scroll Area */}
-          <div
-            className="space-y-2 overflow-y-auto p-3.5 sm:p-5"
-            style={{ maxHeight: dialogMaxHeight ? `${dialogMaxHeight}px` : "60vh" }}
-          >
+          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto p-3.5 sm:p-5 overscroll-contain">
             {noMatches ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <span className="text-3xl mb-2">🔍</span>

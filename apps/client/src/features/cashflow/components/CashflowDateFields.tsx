@@ -27,16 +27,19 @@ export function CashflowDateFields({ control }: Props) {
     !transactionTime ||
     Math.abs(new Date(transactionTime).getTime() - Date.now()) < 5 * 60 * 1000;
 
-  const isToday = Boolean(
-    transactionTime &&
-      new Date(transactionTime).toDateString() === new Date().toDateString()
-  );
 
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const isYesterday = Boolean(
     transactionTime &&
       new Date(transactionTime).toDateString() === yesterdayDate.toDateString()
+  );
+
+  const lastWeekDate = new Date();
+  lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+  const isLastWeek = Boolean(
+    transactionTime &&
+      new Date(transactionTime).toDateString() === lastWeekDate.toDateString()
   );
 
   return (
@@ -49,16 +52,18 @@ export function CashflowDateFields({ control }: Props) {
           setShowCustomPicker(false);
         };
 
-        const setToday = () => {
-          const now = new Date();
-          field.onChange(toLocalInput(now));
-          setShowCustomPicker(false);
-        };
 
         const setYesterday = () => {
           const y = new Date();
           y.setDate(y.getDate() - 1);
           field.onChange(toLocalInput(y));
+          setShowCustomPicker(false);
+        };
+
+        const setLastWeek = () => {
+          const lw = new Date();
+          lw.setDate(lw.getDate() - 7);
+          field.onChange(toLocalInput(lw));
           setShowCustomPicker(false);
         };
 
@@ -98,16 +103,16 @@ export function CashflowDateFields({ control }: Props) {
                   <Button
                     type="button"
                     size="sm"
-                    variant={isToday && !isNow && !showCustomPicker ? "default" : "outline"}
+                    variant={isLastWeek && !showCustomPicker ? "default" : "outline"}
                     className={cn(
                       "h-8 rounded-xl px-2.5 text-xs font-medium transition-all active:scale-95",
-                      isToday && !isNow && !showCustomPicker
+                      isLastWeek && !showCustomPicker
                         ? "bg-slate-900 text-white hover:bg-slate-800"
                         : "bg-white text-slate-700 hover:bg-slate-50 border-slate-200"
                     )}
-                    onClick={setToday}
+                    onClick={setLastWeek}
                   >
-                    Hôm nay
+                    Tuần trước
                   </Button>
                   <Button
                     type="button"
