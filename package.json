@@ -5,6 +5,7 @@
   "engines": {
     "node": "24.x"
   },
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "pnpm run dev:all",
     "dev:all": "concurrently -n web,client -c blue,green \"pnpm run dev:web\" \"pnpm run dev:client\"",
@@ -18,6 +19,8 @@
     "vercel-build": "pnpm run build"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.0",
+    "next": "^16.0.7",
+    "supabase": "^2.118.0"
   }
 }
