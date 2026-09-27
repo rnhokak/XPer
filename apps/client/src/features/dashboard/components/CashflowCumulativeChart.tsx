@@ -38,7 +38,7 @@ type Props = {
   isLoading?: boolean;
 };
 
-type ChartMode = "split" | "expense" | "income" | "net" | "daily";
+type ChartMode = "split" | "net" | "daily";
 
 const buildSmoothPath = (coords: Array<{ x: number; y: number }>, baselineY: number) => {
   if (!coords.length) return { line: "", area: "" };
@@ -255,11 +255,8 @@ export function CashflowCumulativeChart({ transactions, isLoading = false }: Pro
                 <GitCompare className="h-4 w-4" />
               </span>
               <div>
-                <CardTitle className="text-base font-bold text-slate-900 sm:text-lg flex items-center gap-2">
-                  <span>Lũy kế dòng tiền 30 ngày</span>
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                    Tách riêng Thu & Chi
-                  </span>
+                <CardTitle className="text-base font-bold text-slate-900 sm:text-lg">
+                  Lũy kế dòng tiền 30 ngày
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground">
                   So sánh trực quan xu hướng tích lũy thu nhập và chi tiêu theo từng ngày
@@ -268,43 +265,19 @@ export function CashflowCumulativeChart({ transactions, isLoading = false }: Pro
             </div>
           </div>
 
-          {/* Mode Switcher */}
-          <div className="flex items-center self-start rounded-xl bg-slate-200/70 p-1 sm:self-auto overflow-x-auto max-w-full">
+          {/* Mode Switcher - 3 compact responsive buttons */}
+          <div className="inline-flex self-start sm:self-auto rounded-xl bg-slate-200/70 p-1 shrink-0">
             <button
               type="button"
               onClick={() => setActiveMode("split")}
               className={cn(
                 "rounded-lg px-2.5 py-1 text-xs font-semibold transition active:scale-95 whitespace-nowrap",
                 activeMode === "split"
-                  ? "bg-white text-slate-900 shadow-2xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              )}
-            >
-              Thu & Chi riêng biệt
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMode("expense")}
-              className={cn(
-                "rounded-lg px-2.5 py-1 text-xs font-semibold transition active:scale-95 whitespace-nowrap",
-                activeMode === "expense"
-                  ? "bg-white text-rose-700 shadow-2xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              )}
-            >
-              Lũy kế Chi
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveMode("income")}
-              className={cn(
-                "rounded-lg px-2.5 py-1 text-xs font-semibold transition active:scale-95 whitespace-nowrap",
-                activeMode === "income"
                   ? "bg-white text-emerald-700 shadow-2xs font-bold"
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
-              Lũy kế Thu
+              Thu & Chi
             </button>
             <button
               type="button"
@@ -316,7 +289,7 @@ export function CashflowCumulativeChart({ transactions, isLoading = false }: Pro
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
-              Lũy kế Ròng
+              Lũy kế ròng
             </button>
             <button
               type="button"
@@ -328,7 +301,7 @@ export function CashflowCumulativeChart({ transactions, isLoading = false }: Pro
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
-              Cột ngày
+              Theo ngày
             </button>
           </div>
         </div>
@@ -661,7 +634,7 @@ export function CashflowCumulativeChart({ transactions, isLoading = false }: Pro
               })}
 
             {/* MODE 2: SPLIT VIEW (SEPARATE INCOME & EXPENSE CUMULATIVE CURVES) */}
-            {(activeMode === "split" || activeMode === "income") && (
+            {activeMode === "split" && (
               <>
                 {/* Cumulative Income Area */}
                 <path d={incomePath.area} fill={`url(#cumul-inc-grad-${gradientId})`} />
@@ -696,7 +669,7 @@ export function CashflowCumulativeChart({ transactions, isLoading = false }: Pro
               </>
             )}
 
-            {(activeMode === "split" || activeMode === "expense") && (
+            {activeMode === "split" && (
               <>
                 {/* Cumulative Expense Area */}
                 <path d={expensePath.area} fill={`url(#cumul-exp-grad-${gradientId})`} />
@@ -802,17 +775,17 @@ export function CashflowCumulativeChart({ transactions, isLoading = false }: Pro
         {/* Legend */}
         <div className="mt-4 flex flex-wrap items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
           <div className="flex flex-wrap items-center gap-4">
-            {(activeMode === "split" || activeMode === "income") && (
-              <span className="flex items-center gap-1.5 font-semibold text-emerald-700">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-2xs" />
-                Lũy kế Thu nhập
-              </span>
-            )}
-            {(activeMode === "split" || activeMode === "expense") && (
-              <span className="flex items-center gap-1.5 font-semibold text-rose-700">
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-2xs" />
-                Lũy kế Chi tiêu
-              </span>
+            {activeMode === "split" && (
+              <>
+                <span className="flex items-center gap-1.5 font-semibold text-emerald-700">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-2xs" />
+                  Lũy kế Thu nhập
+                </span>
+                <span className="flex items-center gap-1.5 font-semibold text-rose-700">
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-2xs" />
+                  Lũy kế Chi tiêu
+                </span>
+              </>
             )}
             {activeMode === "net" && (
               <span className="flex items-center gap-1.5 font-semibold text-slate-700">

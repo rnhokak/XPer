@@ -144,7 +144,7 @@ export function CategoryTreeView({
 
       {/* Mode 1: RANKING VIEW */}
       {viewMode === "ranking" && (
-        <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+        <div className="space-y-2">
           {filteredRanking.length === 0 ? (
             <p className="py-6 text-center text-xs text-slate-400">Không tìm thấy danh mục phù hợp</p>
           ) : (
@@ -207,7 +207,7 @@ export function CategoryTreeView({
 
       {/* Mode 2: HIERARCHICAL TREE VIEW */}
       {viewMode === "tree" && (
-        <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+        <div className="space-y-2">
           {filteredCategories.length === 0 ? (
             <p className="py-6 text-center text-xs text-slate-400">Không tìm thấy danh mục phù hợp</p>
           ) : (

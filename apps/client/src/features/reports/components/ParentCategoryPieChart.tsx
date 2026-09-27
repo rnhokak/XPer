@@ -225,7 +225,7 @@ export function ParentCategoryPieChart({
           <span>Số tiền & Tỷ trọng</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 gap-2">
           {slices.map((slice) => {
             const isTarget =
               (hoveredId && slice.category.id === hoveredId) ||
