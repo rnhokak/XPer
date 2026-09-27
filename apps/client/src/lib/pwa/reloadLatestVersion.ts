@@ -19,6 +19,7 @@ export interface CheckUpdateResult {
  */
 export function formatAppVersion(versionStr?: string): string {
   if (!versionStr) return 'Không xác định'
+  if (versionStr.startsWith('v')) return versionStr
   try {
     const date = new Date(versionStr)
     if (Number.isNaN(date.getTime())) {
@@ -42,10 +43,11 @@ export function formatAppVersion(versionStr?: string): string {
  */
 export function formatAppVersionShort(versionStr?: string): string {
   if (!versionStr) return 'v0.0'
+  if (versionStr.startsWith('v')) return versionStr
   try {
     const date = new Date(versionStr)
     if (Number.isNaN(date.getTime())) {
-      return versionStr.slice(0, 10)
+      return versionStr
     }
     return date.toLocaleString('vi-VN', {
       day: '2-digit',
@@ -54,7 +56,7 @@ export function formatAppVersionShort(versionStr?: string): string {
       minute: '2-digit',
     })
   } catch {
-    return versionStr.slice(0, 10)
+    return versionStr
   }
 }
 

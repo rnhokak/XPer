@@ -4,12 +4,43 @@ import path from 'path'
 import fs from 'fs'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Định dạng phiên bản ứng dụng theo yêu cầu: v.1.0.01
-export const APP_VERSION = 'v.1.0.01'
-const appVersion = APP_VERSION
-const appBuildTime = new Date().toISOString()
+const versionFilePath = path.resolve(__dirname, 'version.json')
 
-function versionJsonPlugin(): Plugin {
+function getOrBumpVersion(isBuild: boolean) {
+  let data = {
+    major: 1,
+    minor: 0,
+    build: 1,
+    version: 'v.1.0.01',
+    buildTime: new Date().toISOString(),
+  }
+
+  if (fs.existsSync(versionFilePath)) {
+    try {
+      const raw = fs.readFileSync(versionFilePath, 'utf-8')
+      data = { ...data, ...JSON.parse(raw) }
+    } catch {}
+  }
+
+  // If in build mode and hasn't been bumped yet by scripts/bump-version.js in this process
+  if (isBuild && !process.env.VITE_VERSION_BUMPED) {
+    process.env.VITE_VERSION_BUMPED = 'true'
+    data.build = typeof data.build === 'number' && Number.isFinite(data.build) ? data.build + 1 : 1
+    const buildStr = data.build < 100 ? String(data.build).padStart(2, '0') : String(data.build)
+    data.version = `v.${data.major}.${data.minor}.${buildStr}`
+    data.buildTime = new Date().toISOString()
+    try {
+      fs.writeFileSync(versionFilePath, JSON.stringify(data, null, 2) + '\n', 'utf-8')
+      console.log(`[vite] Auto-bumped version to ${data.version} (build #${data.build})`)
+    } catch {}
+  }
+
+  return data
+}
+
+export const APP_VERSION = getOrBumpVersion(false).version
+
+function versionJsonPlugin(version: string, buildTime: string): Plugin {
   return {
     name: 'version-json-plugin',
     generateBundle() {
@@ -18,8 +49,8 @@ function versionJsonPlugin(): Plugin {
         fileName: 'version.json',
         source: JSON.stringify(
           {
-            version: appVersion,
-            buildTime: appBuildTime,
+            version,
+            buildTime,
           },
           null,
           2
@@ -33,8 +64,8 @@ function versionJsonPlugin(): Plugin {
           res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
           res.end(
             JSON.stringify({
-              version: appVersion,
-              buildTime: appBuildTime,
+              version,
+              buildTime,
             })
           )
           return
@@ -45,14 +76,20 @@ function versionJsonPlugin(): Plugin {
   }
 }
 
-export default defineConfig({
-  define: {
-    __APP_VERSION__: JSON.stringify(appVersion),
-    __BUILD_TIME__: JSON.stringify(appBuildTime),
-  },
-  plugins: [
-    react(),
-    versionJsonPlugin(),
+export default defineConfig(({ command }) => {
+  const isBuild = command === 'build'
+  const versionInfo = getOrBumpVersion(isBuild)
+  const appVersion = versionInfo.version
+  const appBuildTime = versionInfo.buildTime
+
+  return {
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
+      __BUILD_TIME__: JSON.stringify(appBuildTime),
+    },
+    plugins: [
+      react(),
+      versionJsonPlugin(appVersion, appBuildTime),
     VitePWA({
       registerType: 'autoUpdate',
       strategies: 'injectManifest',
@@ -142,4 +179,5 @@ export default defineConfig({
     emptyOutDir: true,
   },
   base: '/app/',
+  }
 })
