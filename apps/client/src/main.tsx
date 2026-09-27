@@ -4,6 +4,10 @@ import App from './App'
 import './styles/globals.tailwind.css'
 import { registerSW } from 'virtual:pwa-register'
 import { startSyncListeners } from '@/lib/sync/syncService'
+import { setupIOSZoomPrevention } from '@/lib/pwa/iosZoomPrevention'
+
+// Prevent pinch-to-zoom and gesture zooming on iOS devices
+setupIOSZoomPrevention()
 
 if (!import.meta.env.DEV) {
   let updateSW: ((reloadPage?: boolean) => Promise<void>) | undefined

@@ -241,19 +241,19 @@ export default function SettingsPage() {
             <Link to="/settings/profile" className="flex flex-col justify-between h-full gap-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
                     <User className="h-5 w-5" />
                   </span>
                   <ChevronRight className="h-4 w-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
                 </div>
-                <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                <h3 className="font-semibold text-slate-900 group-hover:text-emerald-600 transition-colors">
                   Hồ sơ cá nhân
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   Quản lý tên hiển thị và ảnh đại diện xuất hiện trên thanh điều hướng.
                 </p>
               </div>
-              <span className="text-xs font-medium text-blue-600">Xem hồ sơ &rarr;</span>
+              <span className="text-xs font-medium text-emerald-600">Xem hồ sơ &rarr;</span>
             </Link>
           </Card>
 

@@ -117,7 +117,7 @@ export function CashflowExpenseChart({ transactions }: { transactions: CashflowT
   const labelStep = dayCount <= 8 ? 1 : dayCount <= 12 ? 2 : 3;
 
   return (
-    <Card className="rounded-3xl border border-slate-100 bg-gradient-to-br from-white via-slate-50 to-blue-50/30 shadow-lg">
+    <Card className="rounded-3xl border border-slate-100 bg-gradient-to-br from-white via-slate-50 to-emerald-50/30 shadow-lg">
       <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-900">
           <BarChart3 className="h-4 w-4" />

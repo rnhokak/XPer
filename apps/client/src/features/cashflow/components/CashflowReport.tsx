@@ -144,7 +144,7 @@ export function CashflowReport() {
 
           const isMonthly = key === 'month';
           const cardClasses = isMonthly
-            ? "rounded-xl border bg-gradient-to-br from-blue-50 to-white p-4 shadow-md ring-1 ring-blue-200 hover:shadow-lg transition-shadow"
+            ? "rounded-xl border bg-gradient-to-br from-emerald-50 to-white p-4 shadow-md ring-1 ring-emerald-200 hover:shadow-lg transition-shadow"
             : "rounded-xl border bg-white p-4 shadow-sm ring-1 ring-gray-100 hover:shadow-md transition-shadow";
 
           return (
@@ -152,13 +152,13 @@ export function CashflowReport() {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {periodMeta[key].icon}
-                  <p className={`text-sm font-semibold ${isMonthly ? 'text-blue-700' : 'text-gray-700'}`}>{periodMeta[key].label}</p>
+                  <p className={`text-sm font-semibold ${isMonthly ? 'text-emerald-700' : 'text-gray-700'}`}>{periodMeta[key].label}</p>
                 </div>
               </div>
 
               <div className="mt-2">
                 <div className="flex items-baseline justify-between">
-                  <span className={`money-blur text-xl font-bold ${isMonthly ? 'text-blue-600' : 'text-red-600'}`}>
+                  <span className={`money-blur text-xl font-bold ${isMonthly ? 'text-emerald-600' : 'text-red-600'}`}>
                     {formatNumber(item.expense)}
                   </span>
                 </div>
@@ -171,7 +171,7 @@ export function CashflowReport() {
                        <Minus className="h-3 w-3 mr-1" />}
                       {Math.abs(percentage).toFixed(0)}%
                     </div>
-                    <div className={`text-xs ${isMonthly ? 'text-blue-500' : 'text-gray-500'} sm:mt-1`}>
+                    <div className={`text-xs ${isMonthly ? 'text-emerald-600' : 'text-gray-500'} sm:mt-1`}>
                       {trend === 'increase' ? 'Tăng' : trend === 'decrease' ? 'Giảm' : 'Không đổi'} {formatNumber(diff)}
                     </div>
                   </div>

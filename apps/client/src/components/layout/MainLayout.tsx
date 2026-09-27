@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, Eye, EyeOff, Gauge, HandCoins, LogOut, Menu, Plus, PlusCircle, RefreshCw, Settings, Wallet, WifiOff, X } from "lucide-react";
+import {
+  BarChart3,
+  Eye,
+  EyeOff,
+  Gauge,
+  HandCoins,
+  LogOut,
+  Menu,
+  PlusCircle,
+  RefreshCw,
+  Settings,
+  TrendingUp,
+  Wallet,
+  WifiOff,
+  X,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -57,7 +72,7 @@ const navItems: NavItem[] = [
   {
     href: "/trading/orders",
     label: "Trading",
-    icon: BarChart3,
+    icon: TrendingUp,
     children: [
       { href: "/trading/orders", label: "Orders" },
       { href: "/trading/dashboard", label: "Dashboard" },
@@ -85,50 +100,17 @@ interface MainLayoutProps {
   userDisplayName?: string | null;
 }
 
-// Mobile-first layout with bottom navigation and a compact sidebar for larger screens
+// Mobile-first PWA layout with clean native-style header, bottom navigation and desktop sidebar
 export default function MainLayout({ children, userEmail, userDisplayName }: MainLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isSidebarOpen, toggleSidebar, closeSidebar } = useUIStore();
   const { hideAmounts, toggleHideAmounts } = useMoneyVisibilityStore();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [headerVisible, setHeaderVisible] = useState(true);
-  const lastScrollY = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const preferredName = userDisplayName || userEmail || "User";
   const initials = useMemo(() => preferredName.charAt(0).toUpperCase(), [preferredName]);
   const bottomNavItems = useMemo(() => navItems.filter((item) => item.href !== "/settings"), []);
-
-  // Handle header auto-hide on scroll
-  useEffect(() => {
-    let ticking = false;
-    const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          const currentScrollY = window.scrollY;
-          // Bound check for iOS pull-to-refresh / rubber band
-          if (currentScrollY <= 10) {
-            setHeaderVisible(true);
-          } else {
-            const diff = currentScrollY - lastScrollY.current;
-            // Hide on downward scroll past threshold, show on upward scroll
-            if (diff > 8 && currentScrollY > 60) {
-              setHeaderVisible(false);
-              setMenuOpen(false);
-            } else if (diff < -8) {
-              setHeaderVisible(true);
-            }
-          }
-          lastScrollY.current = Math.max(0, currentScrollY);
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   const [bottomSubmenuHref, setBottomSubmenuHref] = useState<string | null>(null);
 
@@ -164,13 +146,14 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
       return { label: "Add giao dịch", icon: PlusCircle, href: "/cashflow/new" };
     }
     if (pathname.startsWith("/trading")) {
-      return { label: "Add order", icon: PlusCircle, event: "trading:orders:new" };
+      return { label: "Thêm lệnh", icon: PlusCircle, event: "trading:orders:new" };
     }
     if (pathname.startsWith("/debts")) {
       return { label: "Khoản mới", icon: PlusCircle, href: "/debts/new" };
     }
     return null;
   }, [location.pathname]);
+
   const AddIcon = addAction?.icon ?? null;
   const { signOut, isOffline } = useAuth();
 
@@ -222,6 +205,7 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      {/* Desktop & Tablet Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-72 transform overflow-y-auto border-r border-slate-200 bg-white/95 px-3 shadow-xl backdrop-blur transition-transform duration-300 ease-in-out",
@@ -231,17 +215,17 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
         )}
       >
         <div className="flex items-center justify-between px-1 pb-4">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-base font-semibold text-white shadow-sm">
+          <Link to="/dashboard" className="flex items-center gap-2.5">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-base font-bold text-white shadow-sm">
               xP
             </span>
             <div>
-              <p className="text-sm font-semibold leading-tight">XPer Finance</p>
+              <p className="text-sm font-bold leading-tight text-slate-900">XPer Finance</p>
               <p className="text-xs text-muted-foreground">iOS-first workspace</p>
             </div>
           </Link>
           <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Đóng menu">
-            <Menu className="h-5 w-5" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
 
@@ -260,12 +244,12 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                   to={item.href}
                   onClick={closeSidebar}
                   className={cn(
-                    "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-slate-100 hover:text-foreground",
-                    active && "bg-emerald-50 text-emerald-700 shadow-sm"
+                    "group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900",
+                    active && "bg-emerald-50 text-emerald-700 font-semibold shadow-xs"
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className={cn("h-4 w-4", active && "text-emerald-600")} />
+                  <Icon className={cn("h-4 w-4", active ? "text-emerald-600" : "text-slate-500")} />
                   {item.label}
                 </Link>
 
@@ -279,11 +263,11 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                           to={child.href}
                           onClick={closeSidebar}
                           className={cn(
-                            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-slate-100 hover:text-foreground",
-                            childActive && "bg-emerald-50 text-emerald-700"
+                            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-900",
+                            childActive && "bg-emerald-50 text-emerald-700 font-semibold"
                           )}
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                          <span className={cn("h-1.5 w-1.5 rounded-full", childActive ? "bg-emerald-600" : "bg-slate-300")} />
                           {child.label}
                         </Link>
                       );
@@ -295,13 +279,13 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
           })}
         </nav>
 
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 shadow-sm">
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
               {initials}
             </div>
-            <div className="space-y-0.5">
-              <p className="text-sm font-semibold">{preferredName}</p>
+            <div className="space-y-0.5 min-w-0">
+              <p className="text-sm font-semibold truncate text-slate-900">{preferredName}</p>
               <p className="text-xs text-muted-foreground">{isOffline ? "Ngoại tuyến (Offline)" : "Đang kết nối"}</p>
             </div>
           </div>
@@ -329,157 +313,162 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
         </div>
       </aside>
 
+      {/* Backdrop for mobile drawer */}
       {isSidebarOpen && (
         <button
           type="button"
           aria-label="Đóng sidebar"
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
           onClick={closeSidebar}
         />
       )}
 
+      {/* Main App Container */}
       <div className="flex min-h-screen flex-1 flex-col md:pl-72">
-        <header
-          className={cn(
-            "fixed inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-md transition-transform duration-300 ease-in-out md:left-72",
-            !headerVisible && "-translate-y-[calc(100%+8px)]"
-          )}
-        >
-          <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-3 pb-2.5 pt-[calc(env(safe-area-inset-top,0px)+0.625rem)] sm:px-6">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar} aria-label="Mở menu">
-                <Menu className="h-5 w-5" />
+        {/* Mobile & Desktop Header */}
+        <header className="fixed inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl md:left-72">
+          <div className="mx-auto flex h-[calc(env(safe-area-inset-top,0px)+3.25rem)] w-full max-w-5xl items-center justify-between px-3 pt-[env(safe-area-inset-top,0px)] sm:px-6">
+            <div className="flex items-center gap-2.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl border border-slate-200/70 bg-white/80 shadow-xs hover:bg-slate-100 active:scale-95 md:hidden"
+                onClick={toggleSidebar}
+                aria-label="Mở menu"
+              >
+                <Menu className="h-5 w-5 text-slate-700" />
               </Button>
+
               <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">{activeNav?.label ?? "XPer"}</p>
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-xs font-bold text-white shadow-xs md:hidden">
+                  xP
+                </span>
+                <h1 className="text-sm font-bold text-slate-900 tracking-tight sm:text-base">
+                  {activeNav?.label ?? "XPer Finance"}
+                </h1>
                 {isOffline && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                    <WifiOff className="h-3 w-3" /> Offline
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                    <WifiOff className="h-2.5 w-2.5" /> Offline
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="relative" ref={menuRef}>
+            <div className="flex items-center gap-2">
+              {/* Money Visibility Toggle */}
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
+                size="icon"
+                className="h-9 w-9 rounded-xl border border-slate-200/70 bg-white/80 shadow-xs hover:bg-slate-100 active:scale-95 transition-all"
+                onClick={toggleHideAmounts}
+                title={hideAmounts ? "Hiện số tiền" : "Ẩn số tiền"}
+                aria-label={hideAmounts ? "Hiện số tiền" : "Ẩn số tiền"}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white shadow-sm">
-                  {initials}
-                </span>
-                <span className="hidden text-sm font-medium sm:inline">{preferredName}</span>
+                {hideAmounts ? (
+                  <EyeOff className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <Eye className="h-4 w-4 text-slate-600" />
+                )}
               </Button>
 
-              {menuOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-white p-2 shadow-lg ring-1 ring-black/5">
-                  <div className="px-3 py-2 text-sm border-b border-slate-100 mb-1">
-                    <p className="font-semibold">{preferredName}</p>
-                    <p className="text-xs text-muted-foreground">{userEmail ?? "Signed in"}</p>
+              {/* User Avatar & Menu */}
+              <div className="relative" ref={menuRef}>
+                <Button
+                  variant="ghost"
+                  className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/80 p-1 shadow-xs hover:bg-slate-100 active:scale-95 transition-all"
+                  onClick={() => setMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-label="Tài khoản cá nhân"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white shadow-xs">
+                    {initials}
+                  </span>
+                  <span className="hidden text-xs font-medium text-slate-700 sm:inline pr-1.5">{preferredName}</span>
+                </Button>
+
+                {menuOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-2 text-sm border-b border-slate-100 mb-1">
+                      <p className="font-semibold text-slate-900">{preferredName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{userEmail ?? "Signed in"}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      asChild
+                      className="w-full justify-start gap-2.5 rounded-xl text-xs hover:bg-slate-100"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <Link to="/settings">
+                        <Settings className="h-4 w-4 text-slate-500" />
+                        Cài đặt hệ thống
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2.5 rounded-xl text-xs hover:bg-emerald-50 text-emerald-700 font-medium"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void reloadLatestVersion();
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4 text-emerald-600" />
+                      Tải bản mới nhất
+                    </Button>
+                    <div className="my-1 border-t border-slate-100" />
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2.5 rounded-xl text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-medium"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        handleLogout();
+                      }}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Đăng xuất
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    asChild
-                    className="w-full justify-start gap-2 text-sm hover:bg-slate-100"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <Link to="/settings">
-                      <Settings className="h-4 w-4 text-slate-500" />
-                      Cài đặt hệ thống
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-2 text-sm hover:bg-slate-100"
-                    onClick={() => {
-                      toggleHideAmounts();
-                      setMenuOpen(false);
-                    }}
-                  >
-                    {hideAmounts ? <EyeOff className="h-4 w-4 text-slate-500" /> : <Eye className="h-4 w-4 text-slate-500" />}
-                    {hideAmounts ? "Hiện số tiền" : "Ẩn số tiền"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-2 text-sm hover:bg-emerald-50 text-emerald-700"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      void reloadLatestVersion();
-                    }}
-                  >
-                    <RefreshCw className="h-4 w-4 text-emerald-600" />
-                    Tải bản mới nhất
-                  </Button>
-                  <div className="my-1 border-t border-slate-100" />
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      handleLogout();
-                    }}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Đăng xuất
-                  </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </header>
 
+        {/* Content Body without sticky header submenu */}
         <main className="flex-1">
-          {/* Mobile Sticky Sub-navigation Pill Bar for sections with children */}
-          {activeNav?.children && activeNav.children.length > 1 && (
-            <div className="sticky top-[calc(env(safe-area-inset-top,0px)+3.25rem)] z-20 border-b border-slate-200/80 bg-white/95 px-3 py-2 backdrop-blur-md shadow-xs md:hidden">
-              <div className="mx-auto flex max-w-4xl items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
-                {activeNav.children.map((child) => {
-                  const isTradingOrders = child.href === "/trading/orders";
-                  const isActive =
-                    location.pathname === child.href ||
-                    (!isTradingOrders && child.href !== "/cashflow" && child.href !== "/debts"
-                      ? location.pathname.startsWith(`${child.href}`)
-                      : location.pathname === child.href);
-                  return (
-                    <Link
-                      key={child.href}
-                      to={child.href}
-                      className={cn(
-                        "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-all active:scale-95",
-                        isActive
-                          ? "bg-emerald-600 text-white shadow-xs font-semibold"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
-                      )}
-                    >
-                      {child.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] pt-[calc(env(safe-area-inset-top,0px)+4rem)] sm:px-6 md:max-w-5xl md:pb-12 md:pt-20">
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] pt-[calc(env(safe-area-inset-top,0px)+4.25rem)] sm:px-6 md:max-w-5xl md:pb-12 md:pt-20">
             {children}
           </div>
         </main>
       </div>
 
-      {/* Mobile Submenu Popover Floating Sheet */}
+      {/* Floating Action Button (FAB) on Mobile - Right-aligned to not obstruct nav tabs */}
+      {addAction && AddIcon ? (
+        <div className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom,0px)+4.75rem)] z-30 md:hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white shadow-lg shadow-emerald-600/30 px-4 py-2.5 text-xs font-semibold ring-2 ring-white/90 transition-all"
+            onClick={handleAddAction}
+            aria-label={addAction.label}
+          >
+            <AddIcon className="h-4 w-4" />
+            <span>{addAction.label}</span>
+          </button>
+        </div>
+      ) : null}
+
+      {/* Mobile Submenu Popover Floating Sheet for Active Tab Children */}
       {bottomSubmenuItem && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
             onClick={() => setBottomSubmenuHref(null)}
           />
-          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+4.25rem)] z-50 mx-auto max-w-sm overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] z-50 mx-auto max-w-sm overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 duration-200">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 px-1">
               <div className="flex items-center gap-1.5">
                 <bottomSubmenuItem.icon className="h-4 w-4 text-emerald-600" />
-                <span className="text-xs font-semibold text-slate-800">
+                <span className="text-xs font-bold text-slate-800">
                   {bottomSubmenuItem.label}
                 </span>
               </div>
@@ -532,24 +521,10 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/90 backdrop-blur-md px-3 pt-1.5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.35rem))] shadow-[0_-4px_20px_rgba(0,0,0,0.04)] md:hidden">
-        <div className="relative mx-auto max-w-lg">
-          {addAction && AddIcon ? (
-            <div className="pointer-events-none absolute -top-5 left-1/2 z-40 flex -translate-x-1/2 items-center justify-center">
-              <button
-                type="button"
-                className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-500/25 ring-2 ring-white transition hover:scale-[1.02] active:scale-[0.98]"
-                onClick={handleAddAction}
-                aria-label={addAction.label}
-              >
-                <AddIcon className="h-4 w-4" />
-                <span>{addAction.label}</span>
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-5 gap-1">
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/90 backdrop-blur-xl px-2 pt-1 pb-[calc(env(safe-area-inset-bottom,0px)+0.35rem)] shadow-[0_-4px_24px_rgba(0,0,0,0.05)] md:hidden">
+        <div className="mx-auto max-w-md">
+          <div className="grid grid-cols-5 gap-0.5">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
               const pathname = location.pathname;
@@ -576,20 +551,32 @@ export default function MainLayout({ children, userEmail, userDisplayName }: Mai
                     closeSidebar();
                   }}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-1 transition-all active:scale-95 min-h-[46px]",
+                    "flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-1 transition-all active:scale-95 min-h-[48px]",
                     active
-                      ? "bg-emerald-50 text-emerald-700 font-semibold shadow-xs"
-                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/70"
+                      ? "bg-emerald-50/90 text-emerald-700 font-semibold"
+                      : "text-slate-400 hover:text-slate-700"
                   )}
                   aria-current={active ? "page" : undefined}
                 >
                   <div className="relative">
-                    <Icon className={cn("h-5 w-5", active ? "text-emerald-600" : "text-slate-500")} />
+                    <Icon className={cn("h-5 w-5 transition-transform", active ? "text-emerald-600 scale-105" : "text-slate-400")} />
                     {hasChildren && (
-                      <span className="absolute -top-0.5 -right-1 flex h-1.5 w-1.5 rounded-full bg-emerald-500/80 ring-1 ring-white" />
+                      <span
+                        className={cn(
+                          "absolute -top-0.5 -right-1 flex h-1.5 w-1.5 rounded-full ring-1 ring-white",
+                          active ? "bg-emerald-600" : "bg-slate-300"
+                        )}
+                      />
                     )}
                   </div>
-                  <span className="text-[11px] leading-tight truncate max-w-[64px] text-center">{item.label}</span>
+                  <span
+                    className={cn(
+                      "text-[10px] leading-tight truncate max-w-[64px] text-center",
+                      active ? "text-emerald-700 font-semibold" : "text-slate-500 font-medium"
+                    )}
+                  >
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}

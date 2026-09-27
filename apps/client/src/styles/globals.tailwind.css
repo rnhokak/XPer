@@ -11,12 +11,13 @@
   --card-foreground: 240 10% 3.9%;
   --border: 240 5.9% 90%;
   --input: 240 5.9% 90%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 240 4.8% 95.9%;
   --secondary-foreground: 240 5.9% 10%;
-  --accent: 221 83% 53%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 152 76% 96%;
+  --accent-foreground: 161 94% 24%;
+  --ring: 160 84% 39%;
   --radius: 0.75rem;
   
   /* Dynamic viewport units for mobile keyboard handling */
@@ -30,13 +31,20 @@ body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Ensure gestures and pinch-zoom are allowed by default */
+/* Prevent zooming on iOS / touch devices */
 html, body {
-  touch-action: auto;
-  -ms-touch-action: auto;
-  -webkit-user-select: text;
+  touch-action: pan-x pan-y;
+  -ms-touch-action: pan-x pan-y;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Prevent iOS Safari from auto-zooming when tapping inputs */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 
 * {
