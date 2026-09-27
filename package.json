@@ -5,7 +5,6 @@
   "engines": {
     "node": "24.x"
   },
-  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "pnpm run dev:all",
     "dev:all": "concurrently -n web,client -c blue,green \"pnpm run dev:web\" \"pnpm run dev:client\"",
