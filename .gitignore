@@ -47,3 +47,6 @@ coverage
 /supabase/.temp/start-secrets
 /supabase/.temp/
 /apps/web/public/app/assets/
+
+# Bỏ qua toàn bộ thư mục đầu ra của Graphify
+graphify-out/
