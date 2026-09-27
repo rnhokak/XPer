@@ -190,7 +190,7 @@ export function CategoryTreeModal({
           // CRITICAL: Prevent auto-focusing on the search input to avoid opening mobile keyboard automatically!
           e.preventDefault();
         }}
-        className="w-[calc(100%-2rem)] max-w-lg rounded-2xl gap-0 p-0 overflow-hidden sm:max-w-xl max-h-[calc(100dvh-2.5rem)] sm:max-h-[85vh] flex flex-col"
+        className="w-[calc(100%-2rem)] max-w-lg rounded-2xl gap-0 p-0 overflow-hidden sm:max-w-xl max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] sm:max-h-[85vh] flex flex-col"
       >
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           {/* Header */}

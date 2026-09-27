@@ -228,13 +228,13 @@ export function CashflowQuickAddForm({
 
   const notify = useNotificationsStore((state) => state.notify);
   const createMutation = useCreateTransaction();
-  const isSubmitting = createMutation.isPending && isOnline;
+  const isSubmitting = createMutation.isPending;
 
   // Validation state: Amount MUST be entered and > 0, account must be selected, and category MUST be selected
   const isValidAmount = typeof amount === "number" && Number.isFinite(amount) && amount > 0;
   const hasAccount = accounts.length === 0 || Boolean(accountId);
   const hasCategory = Boolean(selectedCategoryId && selectedCategoryId.trim().length > 0);
-  const canSubmit = isValidAmount && hasAccount && hasCategory && !isSubmitting && isOnline;
+  const canSubmit = isValidAmount && hasAccount && hasCategory && !isSubmitting;
 
   const onSubmit = async (values: CashflowQuickAddValues) => {
     if (!isValidAmount || !hasCategory) return;
