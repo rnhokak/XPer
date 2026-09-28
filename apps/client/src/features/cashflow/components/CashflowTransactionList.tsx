@@ -268,8 +268,13 @@ export function CashflowTransactionList({
     const normalizedTime = toIsoStringWithOffset(values.transaction_time);
     const payload = {
       ...values,
-      category_id: values.category_id || null,
+      type: current.type,
+      category_id: current.type === "transfer" ? null : (values.category_id || null),
       account_id: values.account_id || null,
+      destination_account_id: current.type === "transfer" ? (values.destination_account_id || null) : null,
+      destination_amount: current.type === "transfer" ? (values.destination_amount ?? null) : null,
+      destination_currency: current.type === "transfer" ? (values.destination_currency ?? null) : null,
+      exchange_rate: current.type === "transfer" ? (values.exchange_rate ?? null) : null,
       transaction_time: normalizedTime || undefined,
     };
 
@@ -279,22 +284,32 @@ export function CashflowTransactionList({
         onSuccess: () => {
           const category = values.category_id ? categories.find((c) => c.id === values.category_id) : null;
           const account = values.account_id ? accounts.find((a) => a.id === values.account_id) : null;
+          const destAccount = values.destination_account_id ? accounts.find((a) => a.id === values.destination_account_id) : null;
           const normalizedTimeForState = normalizedTime ?? current.transaction_time ?? new Date().toISOString();
           const updatedTx: CashflowTransaction = {
             ...current,
-            type: payload.type ?? "expense",
+            type: current.type,
             amount: payload.amount,
             currency: payload.currency ?? current.currency,
             note: payload.note ?? null,
             transaction_time: normalizedTimeForState,
             category: category ? { id: category.id, name: category.name, type: category.type } : null,
             account: account ? { id: account.id, name: account.name, currency: account.currency } : null,
+            destination_account: destAccount ? { id: destAccount.id, name: destAccount.name, currency: destAccount.currency } : null,
+            destination_account_id: payload.destination_account_id,
+            destination_amount: payload.destination_amount,
+            destination_currency: payload.destination_currency,
+            exchange_rate: payload.exchange_rate,
             user_id: current.user_id,
             pending: true,
           };
           setSelected(null);
           queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-transactions"] }, (prev) => (prev ? prev.map((tx) => (tx.id === current.id ? updatedTx : tx)) : prev));
           queryClient.setQueriesData<CashflowTransaction[]>({ queryKey: ["cashflow-report-transactions"] }, (prev) => (prev ? prev.map((tx) => (tx.id === current.id ? updatedTx : tx)) : prev));
+          void queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
+          void queryClient.invalidateQueries({ queryKey: ["cashflow-report-transactions"] });
+          void queryClient.invalidateQueries({ queryKey: ["cashflow-accounts"] });
+          void queryClient.invalidateQueries({ queryKey: ["debts"] });
         },
         onError: (error) => {
           setSubmitError(error.message || "Cập nhật thất bại");
@@ -324,6 +339,10 @@ export function CashflowTransactionList({
             { queryKey: ["cashflow-report-transactions"] },
             (prev) => prev?.filter((tx) => tx.id !== current.id && tx.id !== peerId)
           );
+          void queryClient.invalidateQueries({ queryKey: ["cashflow-transactions"] });
+          void queryClient.invalidateQueries({ queryKey: ["cashflow-report-transactions"] });
+          void queryClient.invalidateQueries({ queryKey: ["cashflow-accounts"] });
+          void queryClient.invalidateQueries({ queryKey: ["debts"] });
         },
         onError: (error) => {
           setDeleting(false);

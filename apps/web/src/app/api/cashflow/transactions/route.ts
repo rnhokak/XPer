@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cashflowQuickAddSchema } from "@/lib/validation/cashflow";
 import { normalizeCashflowRange, normalizeRangeShift, rangeBounds } from "@/lib/cashflow/utils";
-import { createCashflowTransaction, updateCashflowTransaction } from "@/features/cashflow/server/transactions";
+import { createCashflowTransaction, updateCashflowTransaction, adjustAccountBalance } from "@/features/cashflow/server/transactions";
 import { corsResponse, handleCors } from "@/lib/cors";
 
 export const dynamic = "force-dynamic";
@@ -175,17 +175,60 @@ export async function DELETE(req: Request) {
     return corsResponse(response, request);
   }
 
-  // Check if transaction has transfer_peer_id or is peer of another
+  // Fetch target transaction
   const { data: tx } = await supabase
     .from("transactions")
-    .select("id, transfer_peer_id")
+    .select("id, transfer_peer_id, type, flow_type, amount, account_id, destination_account_id, destination_amount")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
 
+  if (!tx) {
+    const response = NextResponse.json({ success: true, deletedIds: [id] });
+    return corsResponse(response, request);
+  }
+
   const idsToDelete = [id];
-  if (tx?.transfer_peer_id) {
+  let peerTx = null;
+  if (tx.transfer_peer_id) {
     idsToDelete.push(tx.transfer_peer_id);
+    const { data: peer } = await supabase
+      .from("transactions")
+      .select("id, transfer_peer_id, type, flow_type, amount, account_id, destination_account_id, destination_amount")
+      .eq("id", tx.transfer_peer_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    peerTx = peer;
+  }
+
+  // Revert account balances before deleting
+  if (tx.type === "transfer") {
+    const outflow = tx.flow_type === false ? tx : peerTx;
+    const inflow = tx.flow_type === true ? tx : peerTx;
+
+    const sourceAccId = outflow?.account_id;
+    const sourceAmount = Number(outflow?.amount) || 0;
+    const destAccId = inflow?.account_id ?? outflow?.destination_account_id;
+    const destAmount = Number(inflow?.amount ?? outflow?.destination_amount ?? outflow?.amount ?? 0);
+
+    // Revert source (+sourceAmount)
+    if (sourceAccId) {
+      await adjustAccountBalance(supabase, user.id, sourceAccId, +sourceAmount);
+    }
+    // Revert dest (-destAmount)
+    if (destAccId) {
+      await adjustAccountBalance(supabase, user.id, destAccId, -destAmount);
+    }
+  } else if (tx.type === "expense") {
+    // Expense was debited (-), so add back (+)
+    if (tx.account_id) {
+      await adjustAccountBalance(supabase, user.id, tx.account_id, +Number(tx.amount || 0));
+    }
+  } else if (tx.type === "income") {
+    // Income was credited (+), so deduct (-)
+    if (tx.account_id) {
+      await adjustAccountBalance(supabase, user.id, tx.account_id, -Number(tx.amount || 0));
+    }
   }
 
   const { error } = await supabase

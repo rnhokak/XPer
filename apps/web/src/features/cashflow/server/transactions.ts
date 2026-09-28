@@ -208,6 +208,28 @@ export const createCashflowTransaction = async ({
   return { data: (data as TransactionWithRelations | null) ?? null, error };
 };
 
+export const adjustAccountBalance = async (
+  supabase: Supabase,
+  userId: string,
+  accountId: string | null | undefined,
+  delta: number
+) => {
+  if (!accountId || delta === 0) return;
+  const { data: acc } = await supabase
+    .from("accounts")
+    .select("balance")
+    .eq("user_id", userId)
+    .eq("id", accountId)
+    .maybeSingle();
+  if (acc) {
+    await supabase
+      .from("accounts")
+      .update({ balance: (Number(acc.balance) || 0) + delta })
+      .eq("user_id", userId)
+      .eq("id", accountId);
+  }
+};
+
 type UpdateArgs = BaseArgs & { transactionId: string };
 
 export const updateCashflowTransaction = async ({
@@ -219,63 +241,134 @@ export const updateCashflowTransaction = async ({
   const currency = await resolveCurrency(supabase, userId, values);
   const txTime = values.transaction_time ? new Date(values.transaction_time).toISOString() : new Date().toISOString();
 
-  // Fetch existing transaction to check for transfer_peer_id and current flow_type
+  // Fetch existing transaction
   const { data: existing } = await supabase
     .from("transactions")
-    .select("id, type, flow_type, transfer_peer_id")
+    .select("id, type, flow_type, transfer_peer_id, amount, account_id, destination_account_id, destination_amount, destination_currency")
     .eq("id", transactionId)
     .eq("user_id", userId)
     .maybeSingle();
 
-  const isIncome = values.type === "income";
-  const flowType = values.type === "transfer" ? (existing?.flow_type ?? false) : isIncome;
+  if (!existing) {
+    return { error: { message: "Transaction not found", details: "", hint: "", code: "404" } as PostgrestError };
+  }
 
-  const payload: Database["public"]["Tables"]["transactions"]["Update"] = {
-    type: values.type ?? "expense",
-    flow_type: flowType,
-    amount: values.amount,
-    account_id: values.account_id ?? null,
-    destination_account_id: values.type === "transfer" ? (values.destination_account_id ?? null) : null,
-    destination_amount: values.type === "transfer" ? (values.destination_amount ?? null) : null,
-    destination_currency: values.type === "transfer" ? (values.destination_currency ?? null) : null,
-    exchange_rate: values.type === "transfer" ? (values.exchange_rate ?? null) : null,
-    category_id: values.type === "transfer" ? null : (values.category_id ?? null),
-    currency,
-    note: values.note?.trim() || null,
-    transaction_time: txTime,
-  };
+  // Type cannot be changed after creation
+  const type = existing.type;
 
+  if (type === "transfer") {
+    let peer = null;
+    if (existing.transfer_peer_id) {
+      const { data: peerData } = await supabase
+        .from("transactions")
+        .select("id, type, flow_type, transfer_peer_id, amount, account_id, destination_account_id, destination_amount, destination_currency")
+        .eq("id", existing.transfer_peer_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      peer = peerData;
+    }
+
+    const outflow = existing.flow_type === false ? existing : peer;
+    const inflow = existing.flow_type === true ? existing : peer;
+
+    const oldSourceAccId = outflow?.account_id;
+    const oldSourceAmount = Number(outflow?.amount) || 0;
+    const oldDestAccId = inflow?.account_id ?? outflow?.destination_account_id;
+    const oldDestAmount = Number(inflow?.amount ?? outflow?.destination_amount ?? outflow?.amount ?? 0);
+
+    const newSourceAccId = values.account_id ?? null;
+    const newSourceAmount = Number(values.amount) || 0;
+    const newDestAccId = values.destination_account_id ?? null;
+    const newDestAmount = Number(values.destination_amount ?? values.amount ?? 0);
+    const newDestCurrency = values.destination_currency || currency;
+
+    // 1. Revert old transfer balances
+    if (oldSourceAccId) {
+      await adjustAccountBalance(supabase, userId, oldSourceAccId, +oldSourceAmount);
+    }
+    if (oldDestAccId) {
+      await adjustAccountBalance(supabase, userId, oldDestAccId, -oldDestAmount);
+    }
+
+    // 2. Apply new transfer balances
+    if (newSourceAccId) {
+      await adjustAccountBalance(supabase, userId, newSourceAccId, -newSourceAmount);
+    }
+    if (newDestAccId) {
+      await adjustAccountBalance(supabase, userId, newDestAccId, +newDestAmount);
+    }
+
+    // 3. Update outflow record
+    if (outflow) {
+      await supabase
+        .from("transactions")
+        .update({
+          amount: newSourceAmount,
+          currency,
+          account_id: newSourceAccId,
+          destination_account_id: newDestAccId,
+          destination_amount: newDestAmount,
+          destination_currency: newDestCurrency,
+          exchange_rate: values.exchange_rate ?? null,
+          note: values.note?.trim() || null,
+          transaction_time: txTime,
+        })
+        .eq("id", outflow.id)
+        .eq("user_id", userId);
+    }
+
+    // 4. Update inflow record
+    if (inflow) {
+      await supabase
+        .from("transactions")
+        .update({
+          amount: newDestAmount,
+          currency: newDestCurrency,
+          account_id: newDestAccId,
+          destination_account_id: newSourceAccId,
+          destination_amount: newSourceAmount,
+          destination_currency: currency,
+          exchange_rate: values.exchange_rate ?? null,
+          note: values.note?.trim() || null,
+          transaction_time: txTime,
+        })
+        .eq("id", inflow.id)
+        .eq("user_id", userId);
+    }
+
+    return { error: null };
+  }
+
+  // Expense or Income
+  const isIncome = type === "income";
+  const oldAccId = existing.account_id;
+  const oldAmount = Number(existing.amount) || 0;
+  const newAccId = values.account_id ?? null;
+  const newAmount = Number(values.amount) || 0;
+
+  // 1. Revert old balance
+  if (oldAccId) {
+    await adjustAccountBalance(supabase, userId, oldAccId, isIncome ? -oldAmount : +oldAmount);
+  }
+
+  // 2. Apply new balance
+  if (newAccId) {
+    await adjustAccountBalance(supabase, userId, newAccId, isIncome ? +newAmount : -newAmount);
+  }
+
+  // 3. Update transaction record
   const { error } = await supabase
     .from("transactions")
-    .update(payload)
+    .update({
+      amount: newAmount,
+      currency,
+      account_id: newAccId,
+      category_id: values.category_id ?? null,
+      note: values.note?.trim() || null,
+      transaction_time: txTime,
+    })
     .eq("id", transactionId)
     .eq("user_id", userId);
 
-  if (error) return { error };
-
-  // If this is a transfer and has a peer, synchronize peer record
-  if (existing?.transfer_peer_id && values.type === "transfer") {
-    const peerId = existing.transfer_peer_id;
-    const isThisLegOutflow = !existing.flow_type;
-
-    const peerPayload: Database["public"]["Tables"]["transactions"]["Update"] = {
-      note: values.note?.trim() || null,
-      transaction_time: txTime,
-      exchange_rate: values.exchange_rate ?? null,
-      account_id: isThisLegOutflow ? (values.destination_account_id ?? null) : (values.account_id ?? null),
-      destination_account_id: isThisLegOutflow ? (values.account_id ?? null) : (values.destination_account_id ?? null),
-      amount: isThisLegOutflow ? (values.destination_amount ?? values.amount) : values.amount,
-      currency: isThisLegOutflow ? (values.destination_currency ?? currency) : (values.currency ?? currency),
-      destination_amount: isThisLegOutflow ? values.amount : (values.destination_amount ?? values.amount),
-      destination_currency: isThisLegOutflow ? currency : (values.destination_currency ?? currency),
-    };
-
-    await supabase
-      .from("transactions")
-      .update(peerPayload)
-      .eq("id", peerId)
-      .eq("user_id", userId);
-  }
-
-  return { error: null };
+  return { error };
 };

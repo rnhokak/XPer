@@ -429,12 +429,122 @@ export function useCreateTransaction() {
   })
 }
 
+function getTransactionRevertDeltas(tx?: CashflowTransaction | null, peerTx?: CashflowTransaction | null): Map<string, number> {
+  const map = new Map<string, number>()
+  if (!tx) return map
+
+  const add = (accId: string | null | undefined, delta: number) => {
+    if (!accId || delta === 0) return
+    map.set(accId, (map.get(accId) || 0) + delta)
+  }
+
+  if (tx.type === 'transfer') {
+    const outflow = tx.flow_type === false ? tx : peerTx
+    const inflow = tx.flow_type === true ? tx : peerTx
+
+    const srcId = outflow?.account_id
+    const srcAmt = Number(outflow?.amount) || 0
+    const dstId = inflow?.account_id ?? outflow?.destination_account_id
+    const dstAmt = Number(inflow?.amount ?? outflow?.destination_amount ?? outflow?.amount ?? 0)
+
+    add(srcId, +srcAmt)
+    add(dstId, -dstAmt)
+  } else if (tx.type === 'expense') {
+    add(tx.account_id, +Number(tx.amount || 0))
+  } else if (tx.type === 'income') {
+    add(tx.account_id, -Number(tx.amount || 0))
+  }
+
+  return map
+}
+
+function getTransactionApplyDeltas(values: CashflowQuickAddValues): Map<string, number> {
+  const map = new Map<string, number>()
+
+  const add = (accId: string | null | undefined, delta: number) => {
+    if (!accId || delta === 0) return
+    map.set(accId, (map.get(accId) || 0) + delta)
+  }
+
+  if (values.type === 'transfer') {
+    const srcId = values.account_id
+    const srcAmt = Number(values.amount) || 0
+    const dstId = values.destination_account_id
+    const dstAmt = Number(values.destination_amount ?? values.amount ?? 0)
+
+    add(srcId, -srcAmt)
+    add(dstId, +dstAmt)
+  } else if (values.type === 'expense') {
+    add(values.account_id, -Number(values.amount || 0))
+  } else if (values.type === 'income') {
+    add(values.account_id, +Number(values.amount || 0))
+  }
+
+  return map
+}
+
 export function useUpdateTransaction() {
   const queryClient = useApiCache()
   return useApiMutation({
     mutationFn: async ({ id, values }: { id: string; values: CashflowQuickAddValues }) => {
-      const current = await db.transactions.get(id)
-      await db.transactions.put({ ...(current || {}), ...values, id, pending: true, error: false, updatedAt: Date.now() })
+      const current = (await db.transactions.get(id)) as unknown as CashflowTransaction | undefined
+      let peerTx: CashflowTransaction | null = null
+      if (current?.transfer_peer_id) {
+        peerTx = (await db.transactions.get(current.transfer_peer_id)) as unknown as CashflowTransaction | null
+      }
+
+      // 1. Calculate and update account balances in Dexie db.accounts
+      const deltas = new Map<string, number>()
+      const revertMap = getTransactionRevertDeltas(current, peerTx)
+      const applyMap = getTransactionApplyDeltas(values)
+
+      for (const [accId, delta] of revertMap.entries()) {
+        deltas.set(accId, (deltas.get(accId) || 0) + delta)
+      }
+      for (const [accId, delta] of applyMap.entries()) {
+        deltas.set(accId, (deltas.get(accId) || 0) + delta)
+      }
+
+      for (const [accId, delta] of deltas.entries()) {
+        const acc = await db.accounts.get(accId)
+        if (acc) {
+          await db.accounts.update(accId, { balance: (Number(acc.balance) || 0) + delta })
+        }
+      }
+
+      // 2. If transfer and has peer, synchronize peer record in Dexie
+      if (current?.type === 'transfer' && peerTx) {
+        const isOutflow = current.flow_type === false
+        const destAmt = values.destination_amount ?? values.amount
+        const destCurr = values.destination_currency ?? values.currency ?? 'VND'
+
+        await db.transactions.put({
+          ...peerTx,
+          note: values.note ?? null,
+          transaction_time: values.transaction_time ?? peerTx.transaction_time,
+          account_id: isOutflow ? (values.destination_account_id ?? null) : (values.account_id ?? null),
+          destination_account_id: isOutflow ? (values.account_id ?? null) : (values.destination_account_id ?? null),
+          amount: isOutflow ? destAmt : values.amount,
+          destination_amount: isOutflow ? values.amount : destAmt,
+          currency: isOutflow ? destCurr : (values.currency ?? 'VND'),
+          destination_currency: isOutflow ? (values.currency ?? 'VND') : destCurr,
+          exchange_rate: values.exchange_rate ?? null,
+          pending: true,
+          updatedAt: Date.now(),
+        })
+      }
+
+      // 3. Put updated transaction into Dexie
+      await db.transactions.put({
+        ...(current || {}),
+        ...values,
+        id,
+        pending: true,
+        error: false,
+        updatedAt: Date.now(),
+      })
+
+      // 4. Enqueue background sync operation
       await enqueueTransactionOperation({
         resource: 'cashflow/transactions',
         opType: 'update',
@@ -444,6 +554,12 @@ export function useUpdateTransaction() {
       return { id, ...values, pending: true }
     },
     onMutate: async ({ id, values }: { id: string; values: CashflowQuickAddValues }) => {
+      const current = (await db.transactions.get(id)) as unknown as CashflowTransaction | undefined
+      let peerTx: CashflowTransaction | null = null
+      if (current?.transfer_peer_id) {
+        peerTx = (await db.transactions.get(current.transfer_peer_id)) as unknown as CashflowTransaction | null
+      }
+
       await queryClient.cancelQueries({ queryKey: ['cashflow-transactions'] })
       queryClient.setQueriesData({ queryKey: ['cashflow-transactions'] }, (old: any) => {
         if (!Array.isArray(old)) return old
@@ -453,6 +569,29 @@ export function useUpdateTransaction() {
             : transaction,
         )
       })
+
+      // Optimistically update cashflow-accounts query data
+      const deltas = new Map<string, number>()
+      const revertMap = getTransactionRevertDeltas(current, peerTx)
+      const applyMap = getTransactionApplyDeltas(values)
+
+      for (const [accId, delta] of revertMap.entries()) {
+        deltas.set(accId, (deltas.get(accId) || 0) + delta)
+      }
+      for (const [accId, delta] of applyMap.entries()) {
+        deltas.set(accId, (deltas.get(accId) || 0) + delta)
+      }
+
+      if (deltas.size > 0) {
+        queryClient.setQueriesData({ queryKey: ['cashflow-accounts'] }, (old: any) => {
+          if (!Array.isArray(old)) return old
+          return old.map((acc: any) => {
+            const delta = deltas.get(acc.id)
+            return delta ? { ...acc, balance: (Number(acc.balance) || 0) + delta } : acc
+          })
+        })
+      }
+
       return { id }
     },
     onSuccess: () => {
@@ -476,11 +615,23 @@ export function useDeleteTransaction() {
   const queryClient = useApiCache()
   return useApiMutation({
     mutationFn: async (id: string) => {
-      const current = await db.transactions.get(id)
+      const current = (await db.transactions.get(id)) as unknown as CashflowTransaction | undefined
       const idsToDelete = [id]
+      let peerTx: CashflowTransaction | null = null
       if (current?.transfer_peer_id) {
         idsToDelete.push(current.transfer_peer_id)
+        peerTx = (await db.transactions.get(current.transfer_peer_id)) as unknown as CashflowTransaction | null
       }
+
+      // Revert account balances in Dexie db.accounts
+      const revertMap = getTransactionRevertDeltas(current, peerTx)
+      for (const [accId, delta] of revertMap.entries()) {
+        const acc = await db.accounts.get(accId)
+        if (acc) {
+          await db.accounts.update(accId, { balance: (Number(acc.balance) || 0) + delta })
+        }
+      }
+
       await db.transactions.bulkDelete(idsToDelete)
       await enqueueTransactionOperation({
         resource: 'cashflow/transactions',
@@ -491,13 +642,28 @@ export function useDeleteTransaction() {
       return { id, idsToDelete, success: true }
     },
     onMutate: async (id: string) => {
-      const current = await db.transactions.get(id)
+      const current = (await db.transactions.get(id)) as unknown as CashflowTransaction | undefined
       const peerId = current?.transfer_peer_id
+      const peerTx = peerId ? ((await db.transactions.get(peerId)) as unknown as CashflowTransaction | null) : null
+
       await queryClient.cancelQueries({ queryKey: ['cashflow-transactions'] })
       queryClient.setQueriesData({ queryKey: ['cashflow-transactions'] }, (old: any) => {
         if (!Array.isArray(old)) return old
         return old.filter((transaction) => transaction.id !== id && transaction.id !== peerId)
       })
+
+      // Optimistically revert cashflow-accounts query data
+      const revertMap = getTransactionRevertDeltas(current, peerTx)
+      if (revertMap.size > 0) {
+        queryClient.setQueriesData({ queryKey: ['cashflow-accounts'] }, (old: any) => {
+          if (!Array.isArray(old)) return old
+          return old.map((acc: any) => {
+            const delta = revertMap.get(acc.id)
+            return delta ? { ...acc, balance: (Number(acc.balance) || 0) + delta } : acc
+          })
+        })
+      }
+
       return { id }
     },
     onSuccess: () => {
