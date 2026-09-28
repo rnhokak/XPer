@@ -4,20 +4,67 @@ import { useCashflowAccounts, useCashflowReportTransactions } from '@/hooks/useC
 import { useAuth } from '@/hooks/useAuth';
 import { useDebtsOverviewData } from '@/hooks/useDebtsData';
 import { PartnersManager } from '../debts/components/PartnersManager';
-import { Loader2, CreditCard, Users, Layers } from 'lucide-react';
+import { Loader2, CreditCard, Users, Layers, RotateCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { isMyAccount, isOtherAccount } from '@/lib/cashflow/accountBalance';
+import { processQueue } from '@/lib/sync/syncService';
+import { useApiCache } from '@/lib/query';
 
 type Tab = 'accounts' | 'other' | 'partners';
 
 export default function CashflowAccountsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('accounts');
-  const { data: accounts = [], isLoading: accountsLoading } = useCashflowAccounts();
-  const { data: transactions = [], isLoading: txLoading } = useCashflowReportTransactions();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useApiCache();
+
+  const {
+    data: accounts = [],
+    isLoading: accountsLoading,
+    isFetching: accountsFetching,
+    refetch: refetchAccounts,
+  } = useCashflowAccounts();
+  const {
+    data: transactions = [],
+    isLoading: txLoading,
+    isFetching: txFetching,
+    refetch: refetchTransactions,
+  } = useCashflowReportTransactions();
   const { user, loading: authLoading } = useAuth();
-  const { data: debtsData, isLoading: debtsLoading } = useDebtsOverviewData(user?.id ?? '');
+  const {
+    data: debtsData,
+    isLoading: debtsLoading,
+    isFetching: debtsFetching,
+    refetch: refetchDebts,
+  } = useDebtsOverviewData(user?.id ?? '');
 
   const isLoading = accountsLoading || authLoading || txLoading;
+  const isBusy = isRefreshing || accountsFetching || txFetching || debtsFetching;
+
+  const handleRefresh = async () => {
+    if (isBusy) return;
+    setIsRefreshing(true);
+    try {
+      // 1. Flush any pending operations first
+      if (navigator.onLine) {
+        await processQueue().catch(() => {});
+      }
+
+      // 2. Refetch queries in parallel
+      await Promise.allSettled([
+        refetchAccounts(),
+        refetchTransactions(),
+        refetchDebts(),
+        queryClient.invalidateQueries({ queryKey: ['cashflow-accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['debts'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const myAccounts = useMemo(
     () => accounts.filter((a) => isMyAccount(a.type)),
@@ -49,13 +96,30 @@ export default function CashflowAccountsPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-          Tài khoản & Đối tác
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quản lý tài khoản cá nhân, tài khoản khác và đối tác vay nợ
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Tài khoản & Đối tác
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quản lý tài khoản cá nhân, tài khoản khác và đối tác vay nợ
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isBusy}
+            className="inline-flex items-center gap-2 rounded-xl border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all"
+            title="Làm mới số dư và dữ liệu giao dịch"
+          >
+            <RotateCw className={cn("h-4 w-4", isBusy && "animate-spin text-primary")} />
+            <span>{isBusy ? "Đang làm mới..." : "Làm mới"}</span>
+          </Button>
+        </div>
       </div>
 
       {/* Tab Switcher */}
@@ -97,7 +161,13 @@ export default function CashflowAccountsPage() {
           <p className="text-xs text-muted-foreground">
             Danh sách tài khoản và số dư thực tế theo giao dịch thu/chi/chuyển khoản. Đối với thẻ tín dụng, hệ thống tự động hiển thị dư nợ hoặc số tiền dư trong thẻ.
           </p>
-          <AccountsManager accounts={accounts} transactions={transactions} scope="my" />
+          <AccountsManager
+            accounts={accounts}
+            transactions={transactions}
+            scope="my"
+            onRefresh={handleRefresh}
+            isRefreshing={isBusy}
+          />
         </div>
       )}
 
@@ -106,7 +176,13 @@ export default function CashflowAccountsPage() {
           <p className="text-xs text-muted-foreground">
             Tài khoản của người khác (ví dụ: tài khoản của Vợ, người thân) dùng để thực hiện chuyển khoản luân chuyển dòng tiền, không tính vào số dư thanh toán cá nhân.
           </p>
-          <AccountsManager accounts={accounts} transactions={transactions} scope="other" />
+          <AccountsManager
+            accounts={accounts}
+            transactions={transactions}
+            scope="other"
+            onRefresh={handleRefresh}
+            isRefreshing={isBusy}
+          />
         </div>
       )}
 
@@ -124,6 +200,8 @@ export default function CashflowAccountsPage() {
               partners={partners}
               debts={debts}
               transactions={transactions}
+              onRefresh={handleRefresh}
+              isRefreshing={isBusy}
             />
           )}
         </div>

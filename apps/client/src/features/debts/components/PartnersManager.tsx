@@ -51,6 +51,7 @@ import {
   Trash2,
   User,
   Users,
+  RotateCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -73,12 +74,16 @@ interface PartnersManagerProps {
   debts?: DebtRow[];
   transactions?: CashflowTransaction[];
   categories?: Category[];
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export function PartnersManager({
   partners,
   debts = [],
   transactions = [],
+  onRefresh,
+  isRefreshing,
 }: PartnersManagerProps) {
   const queryClient = useQueryClient();
 
@@ -221,13 +226,29 @@ export function PartnersManager({
           </p>
         </div>
 
-        <Button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-95 transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Thêm đối tác</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {onRefresh && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 rounded-xl border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition-all"
+              title="Làm mới đối tác và dư nợ"
+            >
+              <RotateCw className={cn("h-4 w-4", isRefreshing && "animate-spin text-primary")} />
+              <span className="hidden sm:inline">{isRefreshing ? "Đang tải..." : "Làm mới"}</span>
+            </Button>
+          )}
+          <Button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-95 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Thêm đối tác</span>
+          </Button>
+        </div>
       </div>
 
       {/* Partners List */}

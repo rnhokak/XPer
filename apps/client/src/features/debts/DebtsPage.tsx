@@ -11,11 +11,13 @@ import {
   Receipt,
   ShieldAlert,
   Users,
+  RotateCw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useDebtsOverviewData, type Account, type Category, type Partner } from "@/hooks/useDebtsData";
 import { useCashflowReportTransactions } from "@/hooks/useCashflowTransactions";
 import { computeDebtExpenseStats } from "@/lib/cashflow/debtExpenseUtils";
+import { processQueue } from "@/lib/sync/syncService";
 import { DebtsTable } from "./components/DebtsTable";
 import { DebtQuickAddDialog } from "./components/DebtQuickAddDialog";
 import { DebtExpensesTracker } from "./components/DebtExpensesTracker";
@@ -28,11 +30,27 @@ const formatCurrency = (val: number) =>
 
 export default function DebtsPage() {
   const { user, loading: authLoading } = useAuth();
-  const { data, isLoading, error } = useDebtsOverviewData(user?.id ?? "");
-  const { data: allTransactions = [] } = useCashflowReportTransactions();
+  const { data, isLoading, error, refetch: refetchDebts, isFetching: debtsFetching } = useDebtsOverviewData(user?.id ?? "");
+  const { data: allTransactions = [], refetch: refetchTransactions, isFetching: txFetching } = useCashflowReportTransactions();
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<"partners" | "contracts" | "expenses">("partners");
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+
+  const isBusy = isRefreshing || debtsFetching || txFetching;
+
+  const handleRefresh = async () => {
+    if (isBusy) return;
+    setIsRefreshing(true);
+    try {
+      if (navigator.onLine) {
+        await processQueue().catch(() => {});
+      }
+      await Promise.allSettled([refetchDebts(), refetchTransactions()]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const debtExpenseStats = useMemo(
     () => computeDebtExpenseStats(allTransactions),
@@ -129,6 +147,19 @@ export default function DebtsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isBusy}
+            className="h-9 gap-1.5 rounded-xl border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all"
+            title="Làm mới dữ liệu vay nợ"
+          >
+            <RotateCw className={cn("h-3.5 w-3.5", isBusy && "animate-spin text-primary")} />
+            <span>{isBusy ? "Đang làm mới..." : "Làm mới"}</span>
+          </Button>
+
           <Button
             asChild
             size="sm"

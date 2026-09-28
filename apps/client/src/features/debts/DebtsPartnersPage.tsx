@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
+import { Loader2, RotateCw } from 'lucide-react'
 import { PartnersManager } from './components/PartnersManager'
 import { useAuth } from '@/hooks/useAuth'
 import { useDebtsFormData } from '@/hooks/useDebtsData'
+import { cn } from '@/lib/utils'
 
 export default function DebtsPartnersPage() {
   const { user, loading: authLoading } = useAuth()
-  const { data, isLoading, error } = useDebtsFormData(user?.id ?? '')
+  const { data, isLoading, error, refetch, isFetching } = useDebtsFormData(user?.id ?? '')
 
   if (authLoading || isLoading) {
     return (
@@ -32,12 +33,30 @@ export default function DebtsPartnersPage() {
           <p className="text-sm text-muted-foreground">Quản lý người/đơn vị liên quan tới khoản vay</p>
           <h1 className="text-2xl font-semibold">Đối tác</h1>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/debts">Quay lại Debts</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="inline-flex items-center gap-1.5 rounded-xl border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all"
+            title="Làm mới danh sách đối tác"
+          >
+            <RotateCw className={cn("h-4 w-4", isFetching && "animate-spin text-primary")} />
+            <span>{isFetching ? "Đang làm mới..." : "Làm mới"}</span>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/debts">Quay lại Debts</Link>
+          </Button>
+        </div>
       </div>
 
-      <PartnersManager partners={data?.partners ?? []} />
+      <PartnersManager
+        partners={data?.partners ?? []}
+        onRefresh={() => refetch()}
+        isRefreshing={isFetching}
+      />
     </div>
   )
 }

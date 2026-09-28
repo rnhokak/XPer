@@ -424,6 +424,7 @@ export function useCreateTransaction() {
       queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['cashflow-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['debts'] })
     },
   })
 }
@@ -458,6 +459,8 @@ export function useUpdateTransaction() {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['debts'] })
     },
     onError: async (_err, _vars, context: any) => {
       if (context?.id) {
@@ -501,6 +504,8 @@ export function useDeleteTransaction() {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       queryClient.invalidateQueries({ queryKey: ['cashflow-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['cashflow-report-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['cashflow-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['debts'] })
     },
   })
 }

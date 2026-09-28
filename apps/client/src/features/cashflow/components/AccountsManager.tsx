@@ -62,6 +62,7 @@ import {
   TrendingUp,
   User,
   Wallet,
+  RotateCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -69,9 +70,17 @@ interface AccountsManagerProps {
   accounts: CashflowAccount[];
   transactions?: CashflowTransaction[];
   scope?: "my" | "other";
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
-export function AccountsManager({ accounts, transactions = [], scope = "my" }: AccountsManagerProps) {
+export function AccountsManager({
+  accounts,
+  transactions = [],
+  scope = "my",
+  onRefresh,
+  isRefreshing,
+}: AccountsManagerProps) {
   const createMutation = useCreateAccount();
   const updateMutation = useUpdateAccount();
   const deleteMutation = useDeleteAccount();
@@ -315,13 +324,29 @@ export function AccountsManager({ accounts, transactions = [], scope = "my" }: A
             </div>
           </div>
 
-          <Button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-800 active:scale-95 transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Thêm tài khoản khác</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {onRefresh && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-1.5 rounded-xl border-purple-200 bg-white px-3 py-2 text-sm font-semibold text-purple-700 shadow-2xs hover:bg-purple-50 active:scale-95 transition-all"
+                title="Làm mới số dư tài khoản"
+              >
+                <RotateCw className={cn("h-4 w-4", isRefreshing && "animate-spin text-purple-700")} />
+                <span className="hidden sm:inline">{isRefreshing ? "Đang tải..." : "Làm mới"}</span>
+              </Button>
+            )}
+            <Button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-800 active:scale-95 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Thêm tài khoản khác</span>
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
@@ -342,13 +367,29 @@ export function AccountsManager({ accounts, transactions = [], scope = "my" }: A
             )}
           </div>
 
-          <Button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-95 transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Thêm tài khoản</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {onRefresh && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-1.5 rounded-xl border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition-all"
+                title="Làm mới số dư tài khoản"
+              >
+                <RotateCw className={cn("h-4 w-4", isRefreshing && "animate-spin text-primary")} />
+                <span className="hidden sm:inline">{isRefreshing ? "Đang tải..." : "Làm mới"}</span>
+              </Button>
+            )}
+            <Button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-95 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Thêm tài khoản</span>
+            </Button>
+          </div>
         </div>
       )}
 
