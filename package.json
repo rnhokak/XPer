@@ -5,7 +5,6 @@
   "engines": {
     "node": "24.x"
   },
-  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:web\"",
     "dev:client": "npm run dev --prefix apps/client",

@@ -202,5 +202,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: paymentError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, debt_id: insertedDebt.id });
+  return NextResponse.json({ success: true, debt_id: insertedDebt.id, transaction: insertedTx });
 }

@@ -35,9 +35,13 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useDebtPartners } from "@/hooks/useDebtsData";
 import {
+  isCreditCardAccount,
   isOtherAccount,
   isPartnerAccount,
 } from "@/lib/cashflow/accountBalance";
+import { apiClient } from "@/lib/api/client";
+import db from "@/lib/db";
+import { type DebtCreateInput } from "@/lib/validation/debts";
 import {
   ArrowDownRight,
   ArrowLeftRight,
@@ -46,12 +50,14 @@ import {
   Check,
   ChevronRight,
   CreditCard,
-  HandCoins,
   Layers,
+  Loader2,
   PenLine,
+  Plus,
   ShoppingBag,
   User,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -130,6 +136,11 @@ export function CashflowQuickAddForm({
   const [showCurrencySelect, setShowCurrencySelect] = useState(false);
   const [debtMode, setDebtMode] = useState<DebtExpenseMode>("none");
   const [debtPartnerName, setDebtPartnerName] = useState("");
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string>("");
+  const [isCreatingPartner, setIsCreatingPartner] = useState(false);
+  const [showNewPartnerInput, setShowNewPartnerInput] = useState(false);
+  const [newPartnerName, setNewPartnerName] = useState("");
+  const [isCustomSubmitting, setIsCustomSubmitting] = useState(false);
 
   const { user } = useAuth();
   const { data: fetchedPartners = [] } = useDebtPartners(user?.id ?? "");
@@ -190,6 +201,18 @@ export function CashflowQuickAddForm({
     };
   }, [accounts, allPartnersList]);
 
+  // Tab Cá nhân: only my accounts EXCLUDING credit card types
+  const personalAccounts = useMemo(
+    () => myAccountOptions.filter((acc) => !isCreditCardAccount(acc.type)),
+    [myAccountOptions]
+  );
+
+  // Tab Chi vay từ: accounts with type is credit card
+  const creditCardAccounts = useMemo(
+    () => myAccountOptions.filter((acc) => isCreditCardAccount(acc.type)),
+    [myAccountOptions]
+  );
+
   const form = useForm<CashflowQuickAddValues>({
     resolver: zodResolver(cashflowQuickAddSchema),
     mode: "onChange",
@@ -207,6 +230,16 @@ export function CashflowQuickAddForm({
       currency: defaultCurrency,
     },
   });
+
+  const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
+  const selectedCategoryId = useWatch({ control: form.control, name: "category_id" });
+  const amount = useWatch({ control: form.control, name: "amount" });
+  const accountId = useWatch({ control: form.control, name: "account_id" });
+  const destinationAccountId = useWatch({ control: form.control, name: "destination_account_id" });
+  const currency = useWatch({ control: form.control, name: "currency" }) ?? defaultCurrency;
+  const destinationCurrency = useWatch({ control: form.control, name: "destination_currency" });
+  const destinationAmount = useWatch({ control: form.control, name: "destination_amount" });
+  const exchangeRate = useWatch({ control: form.control, name: "exchange_rate" });
 
   useEffect(() => {
     if (!useDialog) return;
@@ -228,22 +261,85 @@ export function CashflowQuickAddForm({
   }, [useDialog]);
 
   useEffect(() => {
-    const validDefault = myAccountOptions.find((a) => a.id === defaultAccountId)
-      ? defaultAccountId
-      : myAccountOptions[0]?.id ?? null;
-    form.setValue("account_id", validDefault);
-    form.setValue("currency", defaultCurrency);
-  }, [defaultAccountId, defaultCurrency, form, myAccountOptions]);
+    const current = form.getValues("account_id");
+    const targetList =
+      selectedType === "expense" && debtMode === "borrowed_spent"
+        ? creditCardAccounts
+        : selectedType === "expense" && debtMode === "none"
+          ? personalAccounts
+          : myAccountOptions;
 
-  const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
-  const selectedCategoryId = useWatch({ control: form.control, name: "category_id" });
-  const amount = useWatch({ control: form.control, name: "amount" });
-  const accountId = useWatch({ control: form.control, name: "account_id" });
-  const destinationAccountId = useWatch({ control: form.control, name: "destination_account_id" });
-  const currency = useWatch({ control: form.control, name: "currency" }) ?? defaultCurrency;
-  const destinationCurrency = useWatch({ control: form.control, name: "destination_currency" });
-  const destinationAmount = useWatch({ control: form.control, name: "destination_amount" });
-  const exchangeRate = useWatch({ control: form.control, name: "exchange_rate" });
+    const isCurrentValid = targetList.some((a) => a.id === current);
+    if (!isCurrentValid) {
+      const validDefault = targetList.find((a) => a.id === defaultAccountId)?.id ?? targetList[0]?.id ?? null;
+      form.setValue("account_id", validDefault);
+      const chosenAcc = targetList.find((a) => a.id === validDefault);
+      if (chosenAcc?.currency) {
+        form.setValue("currency", chosenAcc.currency);
+      }
+    }
+  }, [defaultAccountId, defaultCurrency, form, myAccountOptions, personalAccounts, creditCardAccounts, selectedType, debtMode]);
+
+  const handleDebtModeChange = (nextMode: DebtExpenseMode) => {
+    setDebtMode(nextMode);
+    const currentAccId = form.getValues("account_id");
+    if (nextMode === "none") {
+      const isStillValid = personalAccounts.some((a) => a.id === currentAccId);
+      if (!isStillValid) {
+        const nextAcc = personalAccounts.find((a) => a.id === defaultAccountId) ?? personalAccounts[0];
+        form.setValue("account_id", nextAcc?.id ?? null, { shouldValidate: true });
+        if (nextAcc?.currency) form.setValue("currency", nextAcc.currency);
+      }
+    } else if (nextMode === "borrowed_spent") {
+      const isStillValid = creditCardAccounts.some((a) => a.id === currentAccId);
+      if (!isStillValid) {
+        const nextAcc = creditCardAccounts.find((a) => a.id === defaultAccountId) ?? creditCardAccounts[0];
+        form.setValue("account_id", nextAcc?.id ?? null, { shouldValidate: true });
+        if (nextAcc?.currency) form.setValue("currency", nextAcc.currency);
+      }
+    } else if (nextMode === "lent_spent") {
+      const isStillValid = myAccountOptions.some((a) => a.id === currentAccId);
+      if (!isStillValid) {
+        const nextAcc = personalAccounts[0] ?? myAccountOptions[0];
+        form.setValue("account_id", nextAcc?.id ?? null, { shouldValidate: true });
+        if (nextAcc?.currency) form.setValue("currency", nextAcc.currency);
+      }
+      if (!selectedPartnerId && allPartnersList.length > 0) {
+        setSelectedPartnerId(allPartnersList[0].id);
+      }
+    }
+  };
+
+  const handleQuickCreatePartner = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setIsCreatingPartner(true);
+    try {
+      const res = await apiClient.post("/debts/partners", { name: trimmed });
+      const newPartner = res.data?.partner;
+      queryClient.invalidateQueries({ queryKey: ["debts", "partners"] });
+      queryClient.invalidateQueries({ queryKey: ["debts"] });
+      queryClient.invalidateQueries({ queryKey: ["cashflow-accounts"] });
+      if (newPartner?.id) {
+        setSelectedPartnerId(newPartner.id);
+      }
+      setNewPartnerName("");
+      setShowNewPartnerInput(false);
+      notify({
+        title: "Đã tạo đối tác",
+        description: `Đã thêm "${trimmed}" vào danh sách đối tác`,
+        type: "success",
+      });
+    } catch (err: any) {
+      notify({
+        title: "Lỗi tạo đối tác",
+        description: err?.response?.data?.error || err?.message || "Không thể tạo đối tác",
+        type: "error",
+      });
+    } finally {
+      setIsCreatingPartner(false);
+    }
+  };
 
   const isTransfer = selectedType === "transfer";
   const destTarget = destinationAccountId ? allTargetsMap.get(destinationAccountId) : null;
@@ -348,34 +444,164 @@ export function CashflowQuickAddForm({
   const notify = useNotificationsStore((state) => state.notify);
   const createMutation = useCreateTransaction();
   const isSubmitting = createMutation.isPending;
+  const isFormSubmitting = isSubmitting || isCustomSubmitting;
 
   // Validation state: Amount MUST be entered and > 0, account must be selected, and category MUST be selected (except for transfer)
   const isValidAmount = typeof amount === "number" && Number.isFinite(amount) && amount > 0;
-  const hasAccount = myAccountOptions.length === 0 || Boolean(accountId);
+  const hasAccount =
+    selectedType === "expense" && debtMode === "borrowed_spent" && creditCardAccounts.length === 0
+      ? true
+      : selectedType === "expense" && debtMode === "none"
+        ? personalAccounts.length === 0 || Boolean(accountId)
+        : myAccountOptions.length === 0 || Boolean(accountId);
   const hasCategory = isTransfer || Boolean(selectedCategoryId && selectedCategoryId.trim().length > 0);
   const hasDestination = !isTransfer || Boolean(destinationAccountId && destinationAccountId !== accountId);
   const isValidTransferCurrency =
     !isTransfer ||
     !isDifferentCurrency ||
     (Boolean(destinationAmount && destinationAmount > 0) && Boolean(exchangeRate && exchangeRate > 0));
-  const canSubmit = isValidAmount && hasAccount && hasCategory && hasDestination && isValidTransferCurrency && !isSubmitting;
+  const hasLentPartner =
+    selectedType !== "expense" || debtMode !== "lent_spent" || Boolean(selectedPartnerId);
+  const canSubmit =
+    isValidAmount && hasAccount && hasCategory && hasDestination && isValidTransferCurrency && hasLentPartner && !isFormSubmitting;
 
   const onSubmit = async (values: CashflowQuickAddValues) => {
-    if (!isValidAmount || !hasCategory || !hasDestination) return;
+    if (!isValidAmount || !hasCategory || !hasDestination || !hasLentPartner) return;
     setSubmitError(null);
     const transactionTimeIso = toIsoStringWithOffset(values.transaction_time);
+    const rawNote = values.note?.trim() || "";
+
+    // Mua hộ cho vay: create debt in Debts and corresponding transaction
+    if (values.type === "expense" && debtMode === "lent_spent") {
+      const selectedPartner = allPartnersList.find((p) => p.id === selectedPartnerId);
+      const partnerName = selectedPartner?.name || "Đối tác";
+      const finalNote = formatDebtExpenseNote(rawNote, "lent_spent", partnerName);
+
+      const debtPayload: DebtCreateInput = {
+        partner_id: selectedPartnerId,
+        direction: "lend",
+        principal_amount: values.amount!,
+        currency: values.currency || defaultCurrency,
+        start_date: values.transaction_time ? values.transaction_time.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        due_date: null,
+        interest_type: "none",
+        account_id: values.account_id || defaultAccountId || null,
+        category_id: values.category_id || null,
+        transaction_time: transactionTimeIso,
+        note: finalNote,
+        description: finalNote || `Mua hộ cho ${partnerName}`,
+      };
+
+      try {
+        setIsCustomSubmitting(true);
+        const debtRes = await apiClient.post("/debts", debtPayload);
+        const createdTx = debtRes.data?.transaction;
+
+        queryClient.invalidateQueries({ queryKey: ["debts"] });
+        queryClient.invalidateQueries({ queryKey: ["cashflow"] });
+        queryClient.invalidateQueries({ queryKey: ["cashflow-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["accounts"] });
+
+        if (createdTx) {
+          try {
+            await db.transactions.put(createdTx);
+            if (debtPayload.account_id) {
+              const acc = await db.accounts.get(debtPayload.account_id);
+              if (acc) {
+                await db.accounts.update(debtPayload.account_id, {
+                  balance: (Number(acc.balance) || 0) - debtPayload.principal_amount,
+                });
+              }
+            }
+          } catch {
+            // ignore local storage errors
+          }
+
+          const normalizedRange = normalizeCashflowRange(range);
+          const { start, end } = rangeBounds(normalizedRange, 0);
+          const txDate = new Date(createdTx.transaction_time);
+          if (!Number.isNaN(txDate.getTime()) && txDate >= start && txDate < end) {
+            queryClient.setQueryData<CashflowTransaction[]>(cashflowTransactionsQueryKey(range, 0), (prev) => {
+              const existing = (prev ?? []).filter((tx) => tx.id !== createdTx.id);
+              return [createdTx, ...existing];
+            });
+            queryClient.setQueryData<CashflowTransaction[]>(cashflowReportTransactionsQueryKey, (prev) => {
+              const existing = (prev ?? []).filter((tx) => tx.id !== createdTx.id);
+              return [createdTx, ...existing];
+            });
+          }
+        }
+
+        const submittedTime = values.transaction_time ? new Date(values.transaction_time) : new Date();
+        submittedTime.setMilliseconds(submittedTime.getMilliseconds() + 1);
+        const nextTransactionTime = Number.isNaN(submittedTime.getTime())
+          ? getCurrentDateTimeValue()
+          : (() => {
+            const local = new Date(submittedTime.getTime() - submittedTime.getTimezoneOffset() * 60000);
+            return local.toISOString().slice(0, 23);
+          })();
+
+        setLastTransactionTime(nextTransactionTime);
+
+        form.reset({
+          type: values.type,
+          amount: undefined,
+          account_id: values.account_id,
+          destination_account_id: null,
+          destination_amount: undefined,
+          destination_currency: undefined,
+          exchange_rate: undefined,
+          category_id: "",
+          note: "",
+          transaction_time: nextTransactionTime,
+          currency: defaultCurrency,
+        });
+
+        setDebtMode("none");
+        setSelectedPartnerId("");
+        setDebtPartnerName("");
+
+        try {
+          if (values.category_id) {
+            localStorage.setItem(lastCategoryKey("expense"), values.category_id);
+          }
+        } catch { }
+
+        if (useDialog) {
+          setDialogOpen(false);
+        }
+        persistRecentAmount(values.amount ?? 0, values.currency ?? defaultCurrency);
+
+        notify({
+          title: "Thành công",
+          description: `Đã ghi nhận chi mua hộ và tạo khoản cho vay với ${partnerName} vào Debts!`,
+          type: "success",
+        });
+        return;
+      } catch (err: any) {
+        const message = err?.response?.data?.error || err?.message || "Không thể tạo khoản mua hộ/cho vay";
+        setSubmitError(message);
+        notify({
+          title: "Lỗi",
+          description: message,
+          type: "error",
+        });
+        return;
+      } finally {
+        setIsCustomSubmitting(false);
+      }
+    }
 
     // Format note with debt expense tags or transfer destination
-    const rawNote = values.note?.trim() || "";
     let finalNote = rawNote;
     if (values.type === "expense") {
-      const activeDebtMode = debtMode;
-      const partnerToSave = debtPartnerName.trim() || (activeDebtMode === "borrowed_spent" ? "Người cho vay" : "Người được mua hộ");
-      finalNote = formatDebtExpenseNote(
-        rawNote,
-        activeDebtMode,
-        partnerToSave
-      );
+      if (debtMode === "borrowed_spent") {
+        const chosenCard = creditCardAccounts.find((a) => a.id === values.account_id);
+        const partnerToSave = debtPartnerName.trim() || chosenCard?.name || "Thẻ tín dụng";
+        finalNote = formatDebtExpenseNote(rawNote, "borrowed_spent", partnerToSave);
+      } else {
+        finalNote = formatDebtExpenseNote(rawNote, "none");
+      }
     } else if (values.type === "transfer" && values.destination_account_id) {
       const destTargetObj = allTargetsMap.get(values.destination_account_id);
       const destName = destTargetObj ? destTargetObj.name : "Đối tác / Tài khoản nhận";
@@ -425,9 +651,9 @@ export function CashflowQuickAddForm({
         const nextTransactionTime = Number.isNaN(submittedTime.getTime())
           ? getCurrentDateTimeValue()
           : (() => {
-              const local = new Date(submittedTime.getTime() - submittedTime.getTimezoneOffset() * 60000);
-              return local.toISOString().slice(0, 23);
-            })();
+            const local = new Date(submittedTime.getTime() - submittedTime.getTimezoneOffset() * 60000);
+            return local.toISOString().slice(0, 23);
+          })();
 
         setLastTransactionTime(nextTransactionTime);
 
@@ -567,111 +793,485 @@ export function CashflowQuickAddForm({
           {/* 1-Tap Category Selector (Only for income & expense) */}
           {selectedType !== "transfer" && (
             <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                <span>Danh mục</span>
-                <span className="text-rose-500 font-bold">*</span>
-                {selectedCategoryObj && (
-                  <span className="font-normal text-slate-500">({selectedCategoryObj.name})</span>
-                )}
-              </Label>
-              <div className="flex items-center gap-2">
-                {selectedCategoryId && (
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                  <span>Danh mục</span>
+                  <span className="text-rose-500 font-bold">*</span>
+                  {selectedCategoryObj && (
+                    <span className="font-normal text-slate-500">({selectedCategoryObj.name})</span>
+                  )}
+                </Label>
+                <div className="flex items-center gap-2">
+                  {selectedCategoryId && (
+                    <button
+                      type="button"
+                      onClick={() => form.setValue("category_id", "", { shouldValidate: true, shouldDirty: true })}
+                      className="text-[11px] font-medium text-rose-500 hover:text-rose-600"
+                    >
+                      Bỏ chọn
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => form.setValue("category_id", "", { shouldValidate: true, shouldDirty: true })}
-                    className="text-[11px] font-medium text-rose-500 hover:text-rose-600"
+                    onClick={() => setCategoryModalOpen(true)}
+                    className="flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700"
                   >
-                    Bỏ chọn
+                    <span>Tất cả ({categoriesByType.length})</span>
+                    <ChevronRight className="h-3 w-3" />
                   </button>
-                )}
+                </div>
+              </div>
+
+              {/* Direct Category Chips */}
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                {displayCategoryChips.map((cat) => {
+                  const isSelected = selectedCategoryId === cat.id;
+                  const emoji = getCategoryEmoji(cat.name);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          form.setValue("category_id", "", { shouldValidate: true, shouldDirty: true });
+                        } else {
+                          form.setValue("category_id", cat.id, { shouldValidate: true, shouldDirty: true });
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-xl border p-2 text-left text-xs font-medium transition-all active:scale-[0.98]",
+                        isSelected
+                          ? selectedType === "expense"
+                            ? "border-rose-400 bg-rose-50 text-rose-800 shadow-2xs ring-2 ring-rose-400/30 font-semibold"
+                            : selectedType === "income"
+                              ? "border-emerald-400 bg-emerald-50 text-emerald-800 shadow-2xs ring-2 ring-emerald-400/30 font-semibold"
+                              : "border-blue-400 bg-blue-50 text-blue-800 shadow-2xs ring-2 ring-blue-400/30 font-semibold"
+                          : "border-slate-200/90 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/80"
+                      )}
+                    >
+                      <span className="shrink-0 text-sm sm:text-base">{emoji}</span>
+                      <span className="truncate flex-1">{cat.name}</span>
+                      {isSelected && <Check className="h-3 w-3 shrink-0 text-current" />}
+                    </button>
+                  );
+                })}
+
+                {/* View all categories trigger chip */}
                 <button
                   type="button"
                   onClick={() => setCategoryModalOpen(true)}
-                  className="flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700"
+                  className="flex items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-2 text-xs font-medium text-slate-500 transition-all hover:border-slate-400 hover:bg-slate-100/70 active:scale-[0.98]"
                 >
-                  <span>Tất cả ({categoriesByType.length})</span>
-                  <ChevronRight className="h-3 w-3" />
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>Khác...</span>
                 </button>
               </div>
+
+              {form.formState.errors.category_id && (
+                <p className="text-xs font-medium text-rose-500">
+                  {form.formState.errors.category_id.message}
+                </p>
+              )}
+
+              <CategoryTreeModal
+                open={categoryModalOpen}
+                onClose={() => setCategoryModalOpen(false)}
+                categories={categoriesByType}
+                selected={selectedCategoryId || null}
+                onSelect={(next) => {
+                  form.setValue("category_id", next ?? "", { shouldValidate: true, shouldDirty: true });
+                }}
+                suggestedId={null}
+              />
             </div>
-
-            {/* Direct Category Chips */}
-            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
-              {displayCategoryChips.map((cat) => {
-                const isSelected = selectedCategoryId === cat.id;
-                const emoji = getCategoryEmoji(cat.name);
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => {
-                      if (isSelected) {
-                        form.setValue("category_id", "", { shouldValidate: true, shouldDirty: true });
-                      } else {
-                        form.setValue("category_id", cat.id, { shouldValidate: true, shouldDirty: true });
-                      }
-                    }}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-xl border p-2 text-left text-xs font-medium transition-all active:scale-[0.98]",
-                      isSelected
-                        ? selectedType === "expense"
-                          ? "border-rose-400 bg-rose-50 text-rose-800 shadow-2xs ring-2 ring-rose-400/30 font-semibold"
-                          : selectedType === "income"
-                          ? "border-emerald-400 bg-emerald-50 text-emerald-800 shadow-2xs ring-2 ring-emerald-400/30 font-semibold"
-                          : "border-blue-400 bg-blue-50 text-blue-800 shadow-2xs ring-2 ring-blue-400/30 font-semibold"
-                        : "border-slate-200/90 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/80"
-                    )}
-                  >
-                    <span className="shrink-0 text-sm sm:text-base">{emoji}</span>
-                    <span className="truncate flex-1">{cat.name}</span>
-                    {isSelected && <Check className="h-3 w-3 shrink-0 text-current" />}
-                  </button>
-                );
-              })}
-
-              {/* View all categories trigger chip */}
-              <button
-                type="button"
-                onClick={() => setCategoryModalOpen(true)}
-                className="flex items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-2 text-xs font-medium text-slate-500 transition-all hover:border-slate-400 hover:bg-slate-100/70 active:scale-[0.98]"
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span>Khác...</span>
-              </button>
-            </div>
-
-            {form.formState.errors.category_id && (
-              <p className="text-xs font-medium text-rose-500">
-                {form.formState.errors.category_id.message}
-              </p>
-            )}
-
-            <CategoryTreeModal
-              open={categoryModalOpen}
-              onClose={() => setCategoryModalOpen(false)}
-              categories={categoriesByType}
-              selected={selectedCategoryId || null}
-              onSelect={(next) => {
-                form.setValue("category_id", next ?? "", { shouldValidate: true, shouldDirty: true });
-              }}
-              suggestedId={null}
-            />
-          </div>
           )}
 
-          {/* Account & Date / Destination in a sleek layout */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {/* Account Selector - Source: Only My Accounts */}
-            <FormField
-              control={form.control}
-              name="account_id"
-              render={({ field }) => {
-                return (
+          {/* Debt Expense Mode Selector (Mục đích / Nguồn chi) & Full-width Date Picker for Expense */}
+          {selectedType === "expense" && (
+            <>
+              {/* Date Picker full width for Expense */}
+              <div className="w-full">
+                <CashflowDateFields control={form.control} />
+              </div>
+              <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3 sm:p-3.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700">Mục đích / Nguồn chi</Label>
+                  {debtMode !== "none" && (
+                    <span
+                      className={cn(
+                        "text-[11px] font-bold",
+                        debtMode === "borrowed_spent" ? "text-amber-700" : "text-sky-700"
+                      )}
+                    >
+                      {debtMode === "borrowed_spent" ? "⚡ Nợ thẻ / Cần trả lại" : "⚡ Khoản vay / Cần thu lại"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Segmented Option Control */}
+                <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-slate-200/70 p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleDebtModeChange("none")}
+                    className={cn(
+                      "flex items-center justify-center gap-1 rounded-lg py-1.5 font-medium transition active:scale-95",
+                      debtMode === "none"
+                        ? "bg-white text-slate-800 shadow-2xs font-semibold"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    <User className="h-3 w-3" />
+                    <span>Cá nhân</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDebtModeChange("borrowed_spent")}
+                    className={cn(
+                      "flex items-center justify-center gap-1 rounded-lg py-1.5 font-medium transition active:scale-95",
+                      debtMode === "borrowed_spent"
+                        ? "bg-amber-600 text-white shadow-2xs font-semibold"
+                        : "text-slate-600 hover:text-amber-800"
+                    )}
+                  >
+                    <CreditCard className="h-3 w-3" />
+                    <span className="truncate">Chi vay từ</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDebtModeChange("lent_spent")}
+                    className={cn(
+                      "flex items-center justify-center gap-1 rounded-lg py-1.5 font-medium transition active:scale-95",
+                      debtMode === "lent_spent"
+                        ? "bg-sky-600 text-white shadow-2xs font-semibold"
+                        : "text-slate-600 hover:text-sky-800"
+                    )}
+                  >
+                    <ShoppingBag className="h-3 w-3" />
+                    <span className="truncate">Mua hộ cho vay</span>
+                  </button>
+                </div>
+
+                {/* Tab 1: Cá nhân (Chỉ tài khoản của tôi ngoại trừ thẻ tín dụng) */}
+                {debtMode === "none" && (
+                  <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white/90 p-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <FormField
+                      control={form.control}
+                      name="account_id"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <FormLabel className="text-xs font-semibold text-slate-700">
+                              Tài khoản thanh toán (Cá nhân)
+                            </FormLabel>
+                            <button
+                              type="button"
+                              onClick={() => setShowCurrencySelect((v) => !v)}
+                              className="text-[11px] font-medium text-slate-400 hover:text-slate-600"
+                            >
+                              {currency} ▾
+                            </button>
+                          </div>
+                          <Select
+                            value={field.value ?? undefined}
+                            onValueChange={(val) => {
+                              const nextVal = val === "none" ? null : val;
+                              field.onChange(nextVal);
+                              const found = nextVal ? allTargetsMap.get(nextVal) : null;
+                              if (found?.currency) {
+                                form.setValue("currency", found.currency);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm">
+                              <div className="flex items-center gap-2 truncate">
+                                <Wallet className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                <SelectValue placeholder="Chọn tài khoản cá nhân..." />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {personalAccounts.length > 0 ? (
+                                <>
+                                  <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
+                                    💳 Tài khoản cá nhân của tôi
+                                  </div>
+                                  {personalAccounts.map((acc) => (
+                                    <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                                      <div className="flex items-center justify-between gap-3 w-full">
+                                        <span className="font-medium truncate">{acc.name}</span>
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                          ({formatNumber(acc.balance, acc.currency)} {acc.currency})
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </>
+                              ) : (
+                                <div className="p-2 text-center text-xs text-slate-500">
+                                  Không có tài khoản phù hợp (ngoại trừ thẻ tín dụng)
+                                </div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage className="text-xs text-rose-500 font-medium">
+                            {form.formState.errors.account_id?.message}
+                          </FormMessage>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
+                {/* Tab 2: Chi vay từ (Thẻ tín dụng) */}
+                {debtMode === "borrowed_spent" && (
+                  <div className="space-y-2.5 rounded-xl border border-amber-200/90 bg-amber-50/80 p-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-amber-950 flex items-center gap-1.5">
+                        <CreditCard className="h-3.5 w-3.5 text-amber-600" />
+                        <span>Nguồn vay: Thẻ tín dụng</span>
+                      </span>
+                      <span className="rounded bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-900">
+                        Chi nợ
+                      </span>
+                    </div>
+
+                    {creditCardAccounts.length > 0 ? (
+                      <FormField
+                        control={form.control}
+                        name="account_id"
+                        render={({ field }) => (
+                          <FormItem className="space-y-1.5">
+                            <FormLabel className="text-xs font-semibold text-slate-700">
+                              Tài khoản thẻ tín dụng (Chi vay)
+                            </FormLabel>
+                            <Select
+                              value={field.value ?? undefined}
+                              onValueChange={(val) => {
+                                const nextVal = val === "none" ? null : val;
+                                field.onChange(nextVal);
+                                const found = nextVal ? allTargetsMap.get(nextVal) : null;
+                                if (found?.currency) {
+                                  form.setValue("currency", found.currency);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-10 rounded-xl border-amber-300 bg-white text-xs sm:text-sm">
+                                <div className="flex items-center gap-2 truncate">
+                                  <CreditCard className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                  <SelectValue placeholder="Chọn thẻ tín dụng chi trả..." />
+                                </div>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <div className="px-2 py-1 text-[11px] font-semibold text-amber-800 bg-amber-100/70 rounded-md">
+                                  💳 Thẻ tín dụng của tôi
+                                </div>
+                                {creditCardAccounts.map((acc) => (
+                                  <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                                    <div className="flex items-center justify-between gap-3 w-full">
+                                      <span className="font-medium truncate">{acc.name}</span>
+                                      <span className="text-xs text-amber-700 whitespace-nowrap">
+                                        (Dư nợ: {formatNumber(acc.balance, acc.currency)} {acc.currency})
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage className="text-xs text-rose-500 font-medium">
+                              {form.formState.errors.account_id?.message}
+                            </FormMessage>
+                          </FormItem>
+                        )}
+                      />
+                    ) : (
+                      <div className="space-y-1.5 rounded-lg border border-amber-300 bg-white/90 p-2.5 text-xs text-amber-900">
+                        <p className="font-semibold text-amber-900">⚠️ Bạn chưa có tài khoản Thẻ tín dụng nào</p>
+                        <p className="text-[11px] text-slate-600">
+                          Hãy tạo tài khoản loại <em>"Thẻ tín dụng"</em> trong mục Tài khoản, hoặc nhập tên bên cho vay dưới đây:
+                        </p>
+                        <Input
+                          value={debtPartnerName}
+                          onChange={(e) => setDebtPartnerName(e.target.value)}
+                          placeholder="Nhập tên người/ngân hàng cho vay (vd: VPBank, Nam...)"
+                          className="h-8.5 rounded-lg border-slate-200 bg-white text-xs"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab 3: Mua hộ cho vay details (Đối tác & Debts) */}
+                {debtMode === "lent_spent" && (
+                  <div className="space-y-2.5 rounded-xl border border-sky-200/90 bg-sky-50/80 p-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-sky-950 flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-sky-600" />
+                        <span>Chọn đối tác mua hộ / cho vay</span>
+                        <span className="text-rose-500 font-bold">*</span>
+                      </span>
+                      <span className="rounded bg-sky-200/80 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-900">
+                        Tạo khoản nợ
+                      </span>
+                    </div>
+
+                    {/* Suggestion Chips */}
+                    {allPartnersList.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-[10px] text-slate-400 font-medium">Gợi ý:</span>
+                        {allPartnersList.slice(0, 6).map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setSelectedPartnerId(p.id)}
+                            className={cn(
+                              "rounded-md px-2 py-0.5 text-[11px] font-medium transition active:scale-95",
+                              selectedPartnerId === p.id
+                                ? "bg-sky-600 text-white font-semibold shadow-2xs"
+                                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            )}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Partner Select Dropdown */}
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Select value={selectedPartnerId} onValueChange={setSelectedPartnerId}>
+                          <SelectTrigger className="h-9 rounded-xl border-slate-200 bg-white text-xs">
+                            <div className="flex items-center gap-2 truncate">
+                              <Users className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                              <SelectValue placeholder="Chọn đối tác cần thu lại tiền..." />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allPartnersList.map((p) => (
+                              <SelectItem key={p.id} value={p.id} className="text-xs">
+                                <span className="font-medium">{p.name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowNewPartnerInput((v) => !v)}
+                        className="h-9 px-2.5 rounded-xl border-slate-200 bg-white text-xs text-sky-700 hover:bg-sky-50 hover:text-sky-800"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        <span>Thêm</span>
+                      </Button>
+                    </div>
+
+                    {/* Inline Create Partner Form */}
+                    {showNewPartnerInput && (
+                      <div className="flex items-center gap-2 pt-1 animate-in fade-in duration-150">
+                        <Input
+                          value={newPartnerName}
+                          onChange={(e) => setNewPartnerName(e.target.value)}
+                          placeholder="Nhập tên đối tác mới..."
+                          className="h-8.5 rounded-lg border-sky-300 bg-white text-xs flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleQuickCreatePartner(newPartnerName);
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!newPartnerName.trim() || isCreatingPartner}
+                          onClick={() => handleQuickCreatePartner(newPartnerName)}
+                          className="h-8.5 rounded-lg bg-sky-600 px-3 text-xs text-white hover:bg-sky-700"
+                        >
+                          {isCreatingPartner ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Lưu"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Account selector for paying money in lent_spent */}
+                    <FormField
+                      control={form.control}
+                      name="account_id"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5 pt-1">
+                          <FormLabel className="text-xs font-semibold text-slate-700">
+                            Tài khoản chi tiền mua hộ
+                          </FormLabel>
+                          <Select
+                            value={field.value ?? undefined}
+                            onValueChange={(val) => {
+                              const nextVal = val === "none" ? null : val;
+                              field.onChange(nextVal);
+                              const found = nextVal ? allTargetsMap.get(nextVal) : null;
+                              if (found?.currency) {
+                                form.setValue("currency", found.currency);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-9 rounded-xl border-sky-200 bg-white text-xs sm:text-sm">
+                              <div className="flex items-center gap-2 truncate">
+                                <CreditCard className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                                <SelectValue placeholder="Chọn tài khoản chi tiền..." />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
+                                💳 Tài khoản của tôi
+                              </div>
+                              {myAccountOptions.map((acc) => (
+                                <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                                  <div className="flex items-center justify-between gap-3 w-full">
+                                    <span className="font-medium truncate">{acc.name}</span>
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                      ({formatNumber(acc.balance, acc.currency)} {acc.currency})
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage className="text-xs text-rose-500 font-medium">
+                            {form.formState.errors.account_id?.message}
+                          </FormMessage>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="rounded-lg bg-sky-100/70 p-2 text-[11px] text-sky-900 leading-relaxed flex items-start gap-1.5">
+                      <span className="text-xs shrink-0">💡</span>
+                      <span>
+                        Khoản chi này sẽ tự động ghi nhận vào mục <strong>Chi tiêu</strong> và tạo 1 khoản cho vay trong <strong>Debts</strong> để theo dõi thu hồi từ đối tác.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
+            </>
+          )}
+
+          {/* Income Mode: Account & Full-width Date Picker */}
+          {selectedType === "income" && (
+            <div className="space-y-3">
+              <div className="w-full">
+                <CashflowDateFields control={form.control} />
+              </div>
+              <FormField
+                control={form.control}
+                name="account_id"
+                render={({ field }) => (
                   <FormItem className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <FormLabel className="text-xs font-semibold text-slate-700">
-                        {selectedType === "transfer" ? "Từ tài khoản (Của tôi)" : "Tài khoản thanh toán"}
+                        Tài khoản nhận tiền
                       </FormLabel>
                       <button
                         type="button"
@@ -695,15 +1295,13 @@ export function CashflowQuickAddForm({
                       <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm">
                         <div className="flex items-center gap-2 truncate">
                           <CreditCard className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <SelectValue placeholder={selectedType === "transfer" ? "Chọn tài khoản nguồn của tôi" : "Chọn tài khoản nguồn"} />
+                          <SelectValue placeholder="Chọn tài khoản nhận..." />
                         </div>
                       </SelectTrigger>
                       <SelectContent>
-                        {myAccountOptions.length > 0 && (
-                          <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
-                            💳 Tài khoản của tôi
-                          </div>
-                        )}
+                        <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
+                          💳 Tài khoản của tôi
+                        </div>
                         {myAccountOptions.map((acc) => (
                           <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
                             <div className="flex items-center justify-between gap-3 w-full">
@@ -720,75 +1318,60 @@ export function CashflowQuickAddForm({
                       {form.formState.errors.account_id?.message}
                     </FormMessage>
                   </FormItem>
-                );
-              }}
-            />
+                )}
+              />
 
-            {/* Destination Account for transfer, otherwise Compact Date Picker */}
-            {selectedType === "transfer" ? (
-              <FormField
-                control={form.control}
-                name="destination_account_id"
-                render={({ field }) => {
-                  const selectedDest = field.value ? allTargetsMap.get(field.value) : null;
-                  const availableMyAccounts = myAccountOptions.filter((acc) => acc.id !== accountId);
-                  const availableOtherAccounts = otherAccountOptions.filter((acc) => acc.id !== accountId);
-                  const availablePartners = partnerOptions.filter((p) => p.id !== accountId);
+            </div>
+          )}
 
-                  return (
+          {/* Transfer Mode: Source & Destination Accounts, and Full-width Date Picker */}
+          {selectedType === "transfer" && (
+            <div className="space-y-3">
+              {/* Date Picker full width for transfer */}
+              <div className="w-full">
+                <CashflowDateFields control={form.control} />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Source Account */}
+                <FormField
+                  control={form.control}
+                  name="account_id"
+                  render={({ field }) => (
                     <FormItem className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <FormLabel className="text-xs font-semibold text-slate-700">
-                          Đến tài khoản / Đối tác
+                          Từ tài khoản (Của tôi)
                         </FormLabel>
-                        {field.value && (
-                          <span className="text-[11px] font-medium text-slate-400">
-                            {effectiveDestCurrency}
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrencySelect((v) => !v)}
+                          className="text-[11px] font-medium text-slate-400 hover:text-slate-600"
+                        >
+                          {currency} ▾
+                        </button>
                       </div>
                       <Select
                         value={field.value ?? undefined}
                         onValueChange={(val) => {
                           const nextVal = val === "none" ? null : val;
                           field.onChange(nextVal);
-                          const target = nextVal ? allTargetsMap.get(nextVal) : null;
-                          const targetCurr = target?.currency || "VND";
-                          form.setValue("destination_currency", targetCurr);
-                          if (targetCurr.toUpperCase() === currency.toUpperCase()) {
-                            form.setValue("destination_amount", amount);
-                            form.setValue("exchange_rate", 1);
-                          } else {
-                            const currentRate = form.getValues("exchange_rate");
-                            if (currentRate && currentRate > 0 && typeof amount === "number" && amount > 0) {
-                              const isVnd = targetCurr.toUpperCase() === "VND";
-                              form.setValue(
-                                "destination_amount",
-                                isVnd ? Math.round(amount * currentRate) : Math.round(amount * currentRate * 100) / 100
-                              );
-                            }
+                          const found = nextVal ? allTargetsMap.get(nextVal) : null;
+                          if (found?.currency) {
+                            form.setValue("currency", found.currency);
                           }
                         }}
                       >
                         <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm">
                           <div className="flex items-center gap-2 truncate">
-                            {selectedDest?.isPartner ? (
-                              <Users className="h-3.5 w-3.5 text-sky-500 shrink-0" />
-                            ) : selectedDest?.isOther ? (
-                              <User className="h-3.5 w-3.5 text-purple-500 shrink-0" />
-                            ) : (
-                              <CreditCard className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            )}
-                            <SelectValue placeholder="Chọn tài khoản / đối tác nhận" />
+                            <CreditCard className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <SelectValue placeholder="Chọn tài khoản nguồn của tôi..." />
                           </div>
                         </SelectTrigger>
                         <SelectContent>
-                          {availableMyAccounts.length > 0 && (
-                            <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
-                              💳 Tài khoản của tôi
-                            </div>
-                          )}
-                          {availableMyAccounts.map((acc) => (
+                          <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
+                            💳 Tài khoản của tôi
+                          </div>
+                          {myAccountOptions.map((acc) => (
                             <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
                               <div className="flex items-center justify-between gap-3 w-full">
                                 <span className="font-medium truncate">{acc.name}</span>
@@ -798,53 +1381,128 @@ export function CashflowQuickAddForm({
                               </div>
                             </SelectItem>
                           ))}
-
-                          {availableOtherAccounts.length > 0 && (
-                            <div className="mt-1 px-2 py-1 text-[11px] font-semibold text-purple-600 bg-purple-50 rounded-md">
-                              👤 Tài khoản khác (Người khác)
-                            </div>
-                          )}
-                          {availableOtherAccounts.map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
-                              <div className="flex items-center justify-between gap-3 w-full">
-                                <span className="font-medium truncate">{acc.name}</span>
-                                <span className="text-xs text-purple-600 whitespace-nowrap">
-                                  ({formatNumber(acc.balance, acc.currency)} {acc.currency})
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-
-                          {availablePartners.length > 0 && (
-                            <div className="mt-1 px-2 py-1 text-[11px] font-semibold text-sky-600 bg-sky-50 rounded-md">
-                              👥 Đối tác
-                            </div>
-                          )}
-                          {availablePartners.map((p) => (
-                            <SelectItem key={p.id} value={p.id} className="text-xs sm:text-sm">
-                              <span className="font-medium">{p.name}</span>{" "}
-                              <span className="text-xs text-sky-600 font-normal">(Đối tác · {p.currency})</span>
-                            </SelectItem>
-                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage className="text-xs text-rose-500 font-medium">
-                        {form.formState.errors.destination_account_id?.message}
+                        {form.formState.errors.account_id?.message}
                       </FormMessage>
                     </FormItem>
-                  );
-                }}
-              />
-            ) : (
-              /* Compact Date Picker */
-              <CashflowDateFields control={form.control} />
-            )}
-          </div>
+                  )}
+                />
 
-          {/* Compact Date Picker full width if transfer mode */}
-          {selectedType === "transfer" && (
-            <div className="w-full">
-              <CashflowDateFields control={form.control} />
+                {/* Destination Account */}
+                <FormField
+                  control={form.control}
+                  name="destination_account_id"
+                  render={({ field }) => {
+                    const selectedDest = field.value ? allTargetsMap.get(field.value) : null;
+                    const availableMyAccounts = myAccountOptions.filter((acc) => acc.id !== accountId);
+                    const availableOtherAccounts = otherAccountOptions.filter((acc) => acc.id !== accountId);
+                    const availablePartners = partnerOptions.filter((p) => p.id !== accountId);
+
+                    return (
+                      <FormItem className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-xs font-semibold text-slate-700">
+                            Đến tài khoản / Đối tác
+                          </FormLabel>
+                          {field.value && (
+                            <span className="text-[11px] font-medium text-slate-400">
+                              {effectiveDestCurrency}
+                            </span>
+                          )}
+                        </div>
+                        <Select
+                          value={field.value ?? undefined}
+                          onValueChange={(val) => {
+                            const nextVal = val === "none" ? null : val;
+                            field.onChange(nextVal);
+                            const target = nextVal ? allTargetsMap.get(nextVal) : null;
+                            const targetCurr = target?.currency || "VND";
+                            form.setValue("destination_currency", targetCurr);
+                            if (targetCurr.toUpperCase() === currency.toUpperCase()) {
+                              form.setValue("destination_amount", amount);
+                              form.setValue("exchange_rate", 1);
+                            } else {
+                              const currentRate = form.getValues("exchange_rate");
+                              if (currentRate && currentRate > 0 && typeof amount === "number" && amount > 0) {
+                                const isVnd = targetCurr.toUpperCase() === "VND";
+                                form.setValue(
+                                  "destination_amount",
+                                  isVnd ? Math.round(amount * currentRate) : Math.round(amount * currentRate * 100) / 100
+                                );
+                              }
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-xs sm:text-sm">
+                            <div className="flex items-center gap-2 truncate">
+                              {selectedDest?.isPartner ? (
+                                <Users className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                              ) : selectedDest?.isOther ? (
+                                <User className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                              ) : (
+                                <CreditCard className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                              )}
+                              <SelectValue placeholder="Chọn tài khoản / đối tác nhận" />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableMyAccounts.length > 0 && (
+                              <div className="px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100/70 rounded-md">
+                                💳 Tài khoản của tôi
+                              </div>
+                            )}
+                            {availableMyAccounts.map((acc) => (
+                              <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                                <div className="flex items-center justify-between gap-3 w-full">
+                                  <span className="font-medium truncate">{acc.name}</span>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    ({formatNumber(acc.balance, acc.currency)} {acc.currency})
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+
+                            {availableOtherAccounts.length > 0 && (
+                              <div className="mt-1 px-2 py-1 text-[11px] font-semibold text-purple-600 bg-purple-50 rounded-md">
+                                👤 Tài khoản khác (Người khác)
+                              </div>
+                            )}
+                            {availableOtherAccounts.map((acc) => (
+                              <SelectItem key={acc.id} value={acc.id} className="text-xs sm:text-sm">
+                                <div className="flex items-center justify-between gap-3 w-full">
+                                  <span className="font-medium truncate">{acc.name}</span>
+                                  <span className="text-xs text-purple-600 whitespace-nowrap">
+                                    ({formatNumber(acc.balance, acc.currency)} {acc.currency})
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+
+                            {availablePartners.length > 0 && (
+                              <div className="mt-1 px-2 py-1 text-[11px] font-semibold text-sky-600 bg-sky-50 rounded-md">
+                                👥 Đối tác
+                              </div>
+                            )}
+                            {availablePartners.map((p) => (
+                              <SelectItem key={p.id} value={p.id} className="text-xs sm:text-sm">
+                                <span className="font-medium">{p.name}</span>{" "}
+                                <span className="text-xs text-sky-600 font-normal">(Đối tác · {p.currency})</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-xs text-rose-500 font-medium">
+                          {form.formState.errors.destination_account_id?.message}
+                        </FormMessage>
+                      </FormItem>
+                    );
+                  }}
+                />
+              </div>
+
+
             </div>
           )}
 
@@ -998,139 +1656,6 @@ export function CashflowQuickAddForm({
             </div>
           )}
 
-          {/* Debt Expense Mode Selector (Chi từ tiền vay vs Mua hộ / Cho vay) */}
-          {selectedType === "expense" && (
-            <div className="space-y-2 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-slate-700">Mục đích / Nguồn chi</Label>
-                {debtMode !== "none" && (
-                  <span
-                    className={cn(
-                      "text-[11px] font-bold",
-                      debtMode === "borrowed_spent" ? "text-amber-700" : "text-sky-700"
-                    )}
-                  >
-                    {debtMode === "borrowed_spent" ? "⚡ Cần trả lại tiền" : "⚡ Cần thu lại tiền"}
-                  </span>
-                )}
-              </div>
-
-              {/* Segmented Option Control */}
-              <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-slate-200/70 p-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setDebtMode("none")}
-                  className={cn(
-                    "flex items-center justify-center gap-1 rounded-lg py-1.5 font-medium transition active:scale-95",
-                    debtMode === "none"
-                      ? "bg-white text-slate-800 shadow-2xs font-semibold"
-                      : "text-slate-600 hover:text-slate-900"
-                  )}
-                >
-                  <User className="h-3 w-3" />
-                  <span>Cá nhân</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDebtMode("borrowed_spent")}
-                  className={cn(
-                    "flex items-center justify-center gap-1 rounded-lg py-1.5 font-medium transition active:scale-95",
-                    debtMode === "borrowed_spent"
-                      ? "bg-amber-600 text-white shadow-2xs font-semibold"
-                      : "text-slate-600 hover:text-amber-800"
-                  )}
-                >
-                  <HandCoins className="h-3 w-3" />
-                  <span className="truncate">Chi từ vay</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDebtMode("lent_spent")}
-                  className={cn(
-                    "flex items-center justify-center gap-1 rounded-lg py-1.5 font-medium transition active:scale-95",
-                    debtMode === "lent_spent"
-                      ? "bg-sky-600 text-white shadow-2xs font-semibold"
-                      : "text-slate-600 hover:text-sky-800"
-                  )}
-                >
-                  <ShoppingBag className="h-3 w-3" />
-                  <span className="truncate">Mua hộ / Cho vay</span>
-                </button>
-              </div>
-
-              {/* Detail box when special mode selected */}
-              {debtMode !== "none" && (
-                <div
-                  className={cn(
-                    "space-y-2 rounded-xl border p-2.5 animate-in fade-in slide-in-from-top-1 duration-150",
-                    debtMode === "borrowed_spent"
-                      ? "border-amber-200 bg-amber-50/70"
-                      : "border-sky-200 bg-sky-50/70"
-                  )}
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-800">
-                      {debtMode === "borrowed_spent"
-                        ? "Vay tiền từ ai? (Người / Bên cho vay)"
-                        : "Mua hộ cho ai? (Người / Bên cần thu lại)"}
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] font-bold uppercase",
-                        debtMode === "borrowed_spent" ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900"
-                      )}
-                    >
-                      {debtMode === "borrowed_spent" ? "Cần trả lại" : "Cần thu lại"}
-                    </span>
-                  </div>
-
-                  {/* Suggestion Chips from existing debt partners */}
-                  {partners.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className="text-[10px] text-slate-400">Gợi ý:</span>
-                      {partners.slice(0, 6).map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setDebtPartnerName(p.name)}
-                          className={cn(
-                            "rounded-md px-2 py-0.5 text-[11px] font-medium transition active:scale-95",
-                            debtPartnerName === p.name
-                              ? debtMode === "borrowed_spent"
-                                ? "bg-amber-600 text-white font-semibold"
-                                : "bg-sky-600 text-white font-semibold"
-                              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                          )}
-                        >
-                          {p.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <Input
-                    value={debtPartnerName}
-                    onChange={(e) => setDebtPartnerName(e.target.value)}
-                    placeholder={
-                      debtMode === "borrowed_spent"
-                        ? "Nhập tên người/bên cho vay (vd: Nam, Vietcombank...)"
-                        : "Nhập tên người được mua hộ (vd: Lan, Huy, Team Ăn Trưa...)"
-                    }
-                    className="h-8.5 rounded-lg border-slate-200 bg-white text-xs"
-                  />
-
-                  <p className="text-[11px] text-slate-500 italic">
-                    {debtMode === "borrowed_spent"
-                      ? "Khoản này sẽ được theo dõi trong danh sách 'Chi từ tiền vay' để bạn nhớ trả lại."
-                      : "Khoản này sẽ được theo dõi trong danh sách 'Chi mua hộ' để bạn nhớ thu lại tiền."}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Note Input */}
           <FormField
             control={form.control}
@@ -1173,12 +1698,12 @@ export function CashflowQuickAddForm({
                 ? selectedType === "expense"
                   ? "bg-rose-600 text-white shadow-rose-600/25 hover:bg-rose-700 active:scale-[0.99]"
                   : selectedType === "income"
-                  ? "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-700 active:scale-[0.99]"
-                  : "bg-blue-600 text-white shadow-blue-600/25 hover:bg-blue-700 active:scale-[0.99]"
+                    ? "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-700 active:scale-[0.99]"
+                    : "bg-blue-600 text-white shadow-blue-600/25 hover:bg-blue-700 active:scale-[0.99]"
                 : "cursor-not-allowed bg-slate-200 text-slate-400 hover:bg-slate-200 shadow-none border-0"
             )}
           >
-            {isSubmitting ? (
+            {isFormSubmitting ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
                 Đang lưu...
@@ -1188,20 +1713,26 @@ export function CashflowQuickAddForm({
             ) : !hasCategory ? (
               <span>Chọn danh mục để tiếp tục</span>
             ) : !hasAccount ? (
-              <span>Chọn tài khoản thanh toán</span>
+              <span>
+                {selectedType === "expense" && debtMode === "borrowed_spent"
+                  ? "Chọn thẻ tín dụng"
+                  : "Chọn tài khoản thanh toán"}
+              </span>
+            ) : selectedType === "expense" && debtMode === "lent_spent" && !selectedPartnerId ? (
+              <span>Chọn đối tác mua hộ để tiếp tục</span>
             ) : (
               <span className="flex items-center justify-center gap-1.5">
                 <span>
                   Thêm{" "}
                   {selectedType === "expense"
                     ? debtMode === "borrowed_spent"
-                      ? "chi từ tiền vay"
+                      ? "chi từ thẻ tín dụng"
                       : debtMode === "lent_spent"
-                      ? "chi mua hộ / cho vay"
-                      : "chi tiêu"
+                        ? "chi mua hộ / cho vay"
+                        : "chi tiêu cá nhân"
                     : selectedType === "income"
-                    ? "thu nhập"
-                    : "chuyển khoản"}
+                      ? "thu nhập"
+                      : "chuyển khoản"}
                 </span>
                 <span className="font-bold opacity-90">
                   • {Number(amount).toLocaleString("vi-VN")} {currency}

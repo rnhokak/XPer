@@ -40,16 +40,20 @@ export async function POST(req: Request) {
   }
 
   const { name } = parsed.data;
-  const { error } = await supabase.from("accounts").insert({
-    user_id: user.id,
-    name: name.trim(),
-    type: "partner",
-    currency: "VND",
-    is_default: false,
-  });
+  const { data: newPartner, error } = await supabase
+    .from("accounts")
+    .insert({
+      user_id: user.id,
+      name: name.trim(),
+      type: "partner",
+      currency: "VND",
+      is_default: false,
+    })
+    .select("id,name,type,currency")
+    .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, partner: newPartner });
 }
 
 export async function PUT(req: Request) {

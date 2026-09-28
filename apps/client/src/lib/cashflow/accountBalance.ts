@@ -106,3 +106,9 @@ export function isPartnerAccount(type: string | null | undefined): boolean {
   if (!type) return false;
   return type.toLowerCase() === "partner";
 }
+
+export function isCreditCardAccount(type: string | null | undefined): boolean {
+  if (!type) return false;
+  const t = type.toLowerCase();
+  return t === "credit" || t === "credit_card";
+}
