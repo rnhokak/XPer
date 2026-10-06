@@ -447,14 +447,19 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       </div>
 
       <Dialog open={modalOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="w-full max-w-3xl sm:max-w-2xl">
+        <DialogContent
+          mode={editing ? "edit" : "create"}
+          disableAutoFocus={Boolean(editing)}
+          className="w-full max-w-3xl sm:max-w-2xl p-0 gap-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
+        >
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit category" : "New category"}</DialogTitle>
-            <DialogDescription>Type, metadata, and positioning are enforced hierarchically.</DialogDescription>
+            <DialogTitle>{editing ? "Chỉnh sửa danh mục" : "Thêm danh mục mới"}</DialogTitle>
+            <DialogDescription>Loại, nhóm và phân cấp danh mục thu chi.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form className="space-y-4" onSubmit={form.handleSubmit(upsert)}>
-              <div className="grid gap-3 sm:grid-cols-3">
+            <form className="flex-1 flex flex-col min-h-0 overflow-hidden" onSubmit={form.handleSubmit(upsert)}>
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="type"
@@ -641,35 +646,40 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                 }}
               />
 
-              {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-
-              <div className="flex gap-2">
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? "Saving..." : editing ? "Update category" : "Add category"}
-                </Button>
-                <Button type="button" variant="outline" onClick={closeModal}>
-                  Cancel
-                </Button>
+              {submitError ? <p className="text-sm text-red-500 font-medium">{submitError}</p> : null}
               </div>
+
+              <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={closeModal} className="rounded-xl">
+                  Hủy
+                </Button>
+                <Button type="submit" disabled={form.formState.isSubmitting} className="rounded-xl">
+                  {form.formState.isSubmitting ? "Đang lưu..." : editing ? "Cập nhật danh mục" : "Thêm danh mục"}
+                </Button>
+              </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent mode="view" disableAutoFocus={true} className="w-full sm:max-w-md p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Delete category</DialogTitle>
+            <DialogTitle>Xóa danh mục</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{categoryToDelete?.name}"? This action cannot be undone.
+              Bạn có chắc chắn muốn xóa "{categoryToDelete?.name}"? Thao tác này không thể hoàn tác.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
+          <div className="p-4 sm:p-6 text-xs text-muted-foreground">
+            Các giao dịch thuộc danh mục này có thể cần được phân loại lại sau khi xóa.
+          </div>
+          <DialogFooter className="px-5 py-3">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="rounded-xl">
+              Hủy
             </Button>
             <Button
               variant="destructive"
+              className="rounded-xl"
               onClick={() => {
                 if (categoryToDelete) {
                   remove(categoryToDelete.id, true);
@@ -678,7 +688,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                 }
               }}
             >
-              Delete
+              Xác nhận xóa
             </Button>
           </DialogFooter>
         </DialogContent>

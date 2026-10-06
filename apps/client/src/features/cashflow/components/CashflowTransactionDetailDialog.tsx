@@ -266,28 +266,37 @@ export function CashflowTransactionDetailDialog({
     <>
       <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
         <DialogContent
-          className="w-full max-w-[590px] mx-auto my-5 rounded-2xl overflow-hidden max-h-[92vh] overflow-y-auto scale-100 p-5 sm:p-6"
-          style={{
-            maxHeight: "calc(var(--full-vh, 100vh) - 2rem)",
-            WebkitOverflowScrolling: "touch",
-          }}
+          mode="edit"
+          disableAutoFocus={true}
+          className="w-full sm:max-w-[590px] p-0 gap-0 overflow-hidden sm:rounded-2xl flex flex-col"
         >
-          <DialogHeader className="space-y-1.5 pb-2 border-b border-slate-100">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">
-                Chỉnh sửa giao dịch
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Cập nhật số tiền, tài khoản hoặc thông tin chi tiết.
-            </DialogDescription>
-          </DialogHeader>
+          {/* Header with Dynamic Island Safe Area */}
+          <div className="pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:pt-5 px-5 pb-3 border-b border-slate-100 bg-white/95 backdrop-blur-md shrink-0">
+            <DialogHeader className="space-y-1 text-left p-0 border-0 bg-transparent">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">
+                  Chỉnh sửa giao dịch
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Cập nhật số tiền, tài khoản hoặc thông tin chi tiết.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
           {transaction ? (
             <Form {...form}>
-              <form className="space-y-4 pt-2" onSubmit={form.handleSubmit(handleSave)}>
-                {/* 1. Transaction Type Banner (LOCKED - Read only) */}
+              <form
+                className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                onSubmit={form.handleSubmit(handleSave)}
+              >
+                {/* Scrollable form body */}
                 <div
+                  className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-4"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                  {/* 1. Transaction Type Banner (LOCKED - Read only) */}
+                  <div
                   className={cn(
                     "flex items-center justify-between rounded-xl px-3.5 py-2.5 border transition-all",
                     selectedType === "expense" && "bg-rose-50/90 border-rose-200 text-rose-900",
@@ -322,6 +331,7 @@ export function CashflowTransactionDetailDialog({
                   onSelectCategory={(catId) => {
                     form.setValue("category_id", catId, { shouldValidate: true, shouldDirty: true });
                   }}
+                  autoFocus={false}
                 />
 
                 {/* 3. Transaction Date & Time */}
@@ -701,54 +711,58 @@ export function CashflowTransactionDetailDialog({
                   </div>
                 )}
 
-                {/* Footer Buttons */}
-                <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-3 border-t border-slate-100 sm:justify-between">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmDeleteOpen(true)}
-                    disabled={isDeleting || isSaving}
-                    className="gap-1.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Xoá giao dịch</span>
-                    <span className="sm:hidden">Xoá</span>
-                  </Button>
+                </div>
 
-                  <div className="flex items-center gap-2">
+                {/* Footer Buttons with Home Indicator Safe Area */}
+                <div className="px-5 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] sm:pb-4 border-t border-slate-100 bg-white/95 backdrop-blur shrink-0">
+                  <DialogFooter className="flex flex-row items-center justify-between gap-2 border-0 p-0 sm:justify-between">
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      onClick={onClose}
-                      disabled={isSaving}
-                      className="rounded-xl border-slate-200"
+                      onClick={() => setConfirmDeleteOpen(true)}
+                      disabled={isDeleting || isSaving}
+                      className="gap-1.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl"
                     >
-                      Huỷ
+                      <Trash2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Xoá giao dịch</span>
+                      <span className="sm:hidden">Xoá</span>
                     </Button>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={isSaving}
-                      className={cn(
-                        "rounded-xl font-semibold shadow-xs transition-all active:scale-95 text-white min-w-[120px]",
-                        selectedType === "expense" && "bg-rose-600 hover:bg-rose-700",
-                        selectedType === "income" && "bg-emerald-600 hover:bg-emerald-700",
-                        selectedType === "transfer" && "bg-blue-600 hover:bg-blue-700"
-                      )}
-                    >
-                      {isSaving ? (
-                        <span className="flex items-center gap-1.5">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Đang lưu...</span>
-                        </span>
-                      ) : (
-                        "Lưu thay đổi"
-                      )}
-                    </Button>
-                  </div>
-                </DialogFooter>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onClose}
+                        disabled={isSaving}
+                        className="rounded-xl border-slate-200"
+                      >
+                        Huỷ
+                      </Button>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={isSaving}
+                        className={cn(
+                          "rounded-xl font-semibold shadow-xs transition-all active:scale-95 text-white min-w-[120px]",
+                          selectedType === "expense" && "bg-rose-600 hover:bg-rose-700",
+                          selectedType === "income" && "bg-emerald-600 hover:bg-emerald-700",
+                          selectedType === "transfer" && "bg-blue-600 hover:bg-blue-700"
+                        )}
+                      >
+                        {isSaving ? (
+                          <span className="flex items-center gap-1.5">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Đang lưu...</span>
+                          </span>
+                        ) : (
+                          "Lưu thay đổi"
+                        )}
+                      </Button>
+                    </div>
+                  </DialogFooter>
+                </div>
               </form>
             </Form>
           ) : null}
@@ -757,7 +771,7 @@ export function CashflowTransactionDetailDialog({
 
       {/* Confirmation Dialog for Deletion */}
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-        <DialogContent className="w-full max-w-[440px] mx-auto rounded-2xl p-5 sm:p-6">
+        <DialogContent mode="view" disableAutoFocus={true} className="w-full sm:max-w-[440px] sm:rounded-2xl p-5 sm:p-6">
           <DialogHeader className="space-y-2">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
               <Trash2 className="h-5 w-5" />

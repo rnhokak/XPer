@@ -145,15 +145,15 @@ export function TradingOrderImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[calc(100vw-32px)] max-w-3xl sm:max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
-        {/* Fixed Header */}
-        <div className="p-6 pb-4 border-b">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
+      <DialogContent mode="create" className="w-full sm:max-w-3xl p-0 gap-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]">
+        {/* Fixed Header with Dynamic Island safe area */}
+        <div className="pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:pt-5 px-5 pb-3.5 border-b border-slate-100 bg-white/95 backdrop-blur-md shrink-0">
+          <DialogHeader className="p-0 border-0 bg-transparent space-y-1">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <FileUp className="h-5 w-5 text-primary" />
               Import Trading Orders từ CSV
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs">
               Tải lên file CSV chứa danh sách lệnh giao dịch để import vào hệ thống.
             </DialogDescription>
           </DialogHeader>
@@ -341,8 +341,8 @@ export function TradingOrderImportDialog({
           )}
         </div>
 
-        {/* Fixed Footer pinned at the bottom */}
-        <div className="p-4 px-6 border-t bg-muted/10 flex items-center justify-between gap-3">
+        {/* Fixed Footer pinned at the bottom with safe area */}
+        <div className="px-5 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] sm:pb-3.5 sm:px-6 border-t border-slate-100 bg-slate-50/80 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
             {parseResult?.validOrders.length ? (
               <span>
@@ -352,12 +352,13 @@ export function TradingOrderImportDialog({
               <span>Chưa có dữ liệu lệnh</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isImporting}>
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="outline" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" onClick={handleClose} disabled={isImporting}>
               Hủy
             </Button>
             <Button
               type="button"
+              className="rounded-xl h-9 text-xs sm:text-sm font-semibold"
               onClick={handleImport}
               disabled={!parseResult || parseResult.validOrders.length === 0 || !effectiveAccountId || isImporting}
             >

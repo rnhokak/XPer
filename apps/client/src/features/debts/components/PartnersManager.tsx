@@ -433,7 +433,11 @@ export function PartnersManager({
 
       {/* CREATE / EDIT DIALOG */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <DialogContent
+          mode={editingPartner ? "edit" : "create"}
+          disableAutoFocus={Boolean(editingPartner)}
+          className="max-w-md rounded-none sm:rounded-2xl p-0 gap-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
+        >
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-slate-900">
               {editingPartner ? "Cập nhật thông tin đối tác" : "Thêm đối tác mới"}
@@ -444,7 +448,8 @@ export function PartnersManager({
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
               <FormField
                 control={form.control}
                 name="name"
@@ -526,8 +531,9 @@ export function PartnersManager({
               />
 
               {submitError && <p className="text-xs font-medium text-rose-600">{submitError}</p>}
+              </div>
 
-              <DialogFooter className="gap-2 pt-2 sm:space-x-0">
+              <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex items-center justify-end gap-2">
                 <Button type="button" variant="outline" onClick={handleCloseModal} className="rounded-xl">
                   Hủy
                 </Button>
@@ -555,7 +561,7 @@ export function PartnersManager({
 
       {/* DELETE CONFIRMATION DIALOG */}
       <Dialog open={Boolean(deletingPartner)} onOpenChange={(open) => !open && setDeletingPartner(null)}>
-        <DialogContent className="max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <DialogContent mode="view" disableAutoFocus={true} className="max-w-sm rounded-none sm:rounded-2xl p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
               Xóa đối tác
@@ -565,13 +571,18 @@ export function PartnersManager({
             </DialogDescription>
           </DialogHeader>
 
-          {deleteError && (
-            <p className="rounded-lg bg-rose-50 p-2 text-xs font-medium text-rose-600">
-              {deleteError}
+          <div className="p-4 sm:p-6 space-y-2">
+            {deleteError && (
+              <p className="rounded-lg bg-rose-50 p-2 text-xs font-medium text-rose-600">
+                {deleteError}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Dữ liệu liên quan đến đối tác này sẽ được xử lý theo cấu hình hệ thống.
             </p>
-          )}
+          </div>
 
-          <DialogFooter className="gap-2 pt-2 sm:space-x-0">
+          <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"

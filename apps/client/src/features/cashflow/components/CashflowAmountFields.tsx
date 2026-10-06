@@ -140,6 +140,7 @@ type Props = {
   transactionType?: "expense" | "income" | "transfer";
   categories?: CategoryItem[];
   onSelectCategory?: (categoryId: string) => void;
+  autoFocus?: boolean;
 };
 
 export function CashflowAmountFields({
@@ -149,6 +150,7 @@ export function CashflowAmountFields({
   transactionType = "expense",
   categories = [],
   onSelectCategory,
+  autoFocus = false,
 }: Props) {
   const watchedCurrency = useWatch({ control, name: "currency" }) ?? currency ?? "VND";
   const amountValue = useWatch({ control, name: "amount" });
@@ -304,7 +306,7 @@ export function CashflowAmountFields({
                   type="text"
                   inputMode="decimal"
                   autoComplete="off"
-                  autoFocus={true}
+                  autoFocus={autoFocus}
                   className="h-11 flex-1 border-0 bg-transparent px-3 text-2xl font-bold tracking-tight text-slate-900 shadow-none focus-visible:ring-0 sm:h-12 sm:text-3xl"
                   value={amountInput}
                   onChange={(e) => {

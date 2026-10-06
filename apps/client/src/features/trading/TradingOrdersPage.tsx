@@ -397,7 +397,11 @@ export default function TradingOrdersPage() {
                 <span>Thêm lệnh</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[min(600px,calc(100vw-24px))] max-h-[85vh] p-4 sm:p-6 overflow-y-auto rounded-2xl">
+            <DialogContent
+              mode={editingOrder ? "edit" : "create"}
+              disableAutoFocus={Boolean(editingOrder)}
+              className="w-full sm:max-w-xl p-0 gap-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
+            >
               <DialogHeader>
                 <DialogTitle>{editingOrder ? 'Sửa lệnh giao dịch' : 'Thêm lệnh giao dịch mới'}</DialogTitle>
                 <DialogDescription className="text-xs">
@@ -406,8 +410,9 @@ export default function TradingOrdersPage() {
               </DialogHeader>
               {mounted ? (
                 <Form {...form}>
-                  <form className="space-y-3.5" onSubmit={form.handleSubmit(handleSubmit)}>
-                    <div className="grid gap-3 grid-cols-2">
+                  <form className="flex-1 flex flex-col min-h-0 overflow-hidden" onSubmit={form.handleSubmit(handleSubmit)}>
+                    <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-3.5">
+                      <div className="grid gap-3 grid-cols-2">
                       <FormField
                         control={form.control}
                         name="symbol"
@@ -640,12 +645,13 @@ export default function TradingOrdersPage() {
                         </FormItem>
                       )}
                     />
+                    </div>
 
-                    <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
-                      <Button type="button" variant="outline" className="w-full sm:w-auto h-9 text-xs" onClick={() => handleDialogChange(false)}>
+                    <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                      <Button type="button" variant="outline" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" onClick={() => handleDialogChange(false)}>
                         Hủy
                       </Button>
-                      <Button type="submit" className="w-full sm:w-auto h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" disabled={form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending}>
+                      <Button type="submit" className="rounded-xl h-9 text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white" disabled={form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending}>
                         {form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending ? 'Đang lưu...' : editingOrder ? 'Cập nhật lệnh' : 'Tạo lệnh'}
                       </Button>
                     </DialogFooter>
@@ -1105,18 +1111,21 @@ export default function TradingOrdersPage() {
 
       {deleteTarget && (
         <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-          <DialogContent className="w-[min(480px,calc(100vw-24px))] p-4 sm:p-6 rounded-2xl">
+          <DialogContent mode="view" disableAutoFocus={true} className="w-full sm:max-w-md p-0 gap-0 overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Xác nhận xóa lệnh</DialogTitle>
               <DialogDescription className="text-xs sm:text-sm">
                 Bạn có chắc chắn muốn xóa lệnh {deleteTarget.symbol} {deleteTarget.ticket ? `#${deleteTarget.ticket}` : ''}? Thao tác này không thể hoàn tác.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
-              <Button variant="outline" className="w-full sm:w-auto h-9 text-xs" onClick={() => setDeleteTarget(null)}>
+            <div className="p-4 sm:p-6 text-xs text-muted-foreground">
+              Thông tin lệnh giao dịch sẽ bị xóa vĩnh viễn khỏi hệ thống.
+            </div>
+            <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button variant="outline" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" onClick={() => setDeleteTarget(null)}>
                 Hủy
               </Button>
-              <Button variant="destructive" className="w-full sm:w-auto h-9 text-xs" onClick={confirmDelete} disabled={deleteMutation.isPending}>
+              <Button variant="destructive" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" onClick={confirmDelete} disabled={deleteMutation.isPending}>
                 {deleteMutation.isPending ? 'Đang xóa...' : 'Xóa lệnh'}
               </Button>
             </DialogFooter>

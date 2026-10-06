@@ -242,7 +242,7 @@ export function CashflowRangeFilter({ value, customRange }: Props) {
 
       {/* Date Range Modal */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-sm sm:max-w-md">
+        <DialogContent mode="view" disableAutoFocus={true} className="max-w-sm sm:max-w-md p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               <Calendar className="h-5 w-5 text-primary" />
@@ -253,7 +253,7 @@ export function CashflowRangeFilter({ value, customRange }: Props) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-3">
+          <div className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="from-date" className="text-xs font-semibold">
@@ -289,26 +289,39 @@ export function CashflowRangeFilter({ value, customRange }: Props) {
             )}
           </div>
 
-          <DialogFooter className="flex sm:justify-between gap-2">
+          <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => {
                 setIsDialogOpen(false);
                 resetToCurrentMonth();
               }}
+              className="rounded-xl text-xs"
             >
               Về tháng hiện tại
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={Boolean(dateError) || !fromInput || !toInput}
-              onClick={applyCustomRange}
-            >
-              Áp dụng tìm kiếm
-            </Button>
+            <div className="flex items-center gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDialogOpen(false)}
+                className="rounded-xl text-xs"
+              >
+                Đóng
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={Boolean(dateError) || !fromInput || !toInput}
+                onClick={applyCustomRange}
+                className="rounded-xl text-xs"
+              >
+                Áp dụng
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

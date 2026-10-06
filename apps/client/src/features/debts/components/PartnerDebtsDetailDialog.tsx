@@ -6,6 +6,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -181,9 +182,9 @@ export function PartnerDebtsDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92vh] w-full max-w-2xl overflow-y-auto p-0 rounded-3xl border-slate-200 shadow-xl">
+      <DialogContent mode="view" disableAutoFocus={true} className="w-full sm:max-w-2xl rounded-none sm:rounded-3xl border-0 sm:border border-slate-200 shadow-xl p-0 flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh] overflow-hidden">
         {/* Header */}
-        <div className="border-b border-slate-100 bg-slate-50/80 p-5 sm:p-6">
+        <div className="border-b border-slate-100 bg-slate-50/80 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:pt-5 px-5 pb-5 sm:px-6 shrink-0">
           <DialogHeader className="space-y-1 text-left">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -331,7 +332,7 @@ export function PartnerDebtsDetailDialog({
         </div>
 
         {/* Unified List of Items */}
-        <div className="p-5 sm:p-6 space-y-4">
+        <div className="p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] sm:pb-6 space-y-4 flex-1 overflow-y-auto overscroll-contain">
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -646,6 +647,18 @@ export function PartnerDebtsDetailDialog({
             </div>
           )}
         </div>
+
+        {/* Footer with Close Button */}
+        <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex items-center justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="rounded-xl border-slate-200 px-6 font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Đóng
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

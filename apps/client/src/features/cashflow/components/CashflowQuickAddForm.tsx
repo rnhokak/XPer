@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Modal } from "@/components/ui/modal";
 import {
   cashflowQuickAddSchema,
   type CashflowQuickAddValues,
@@ -129,7 +129,6 @@ export function CashflowQuickAddForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [customCurrency, setCustomCurrency] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [lastTransactionTime, setLastTransactionTime] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -241,24 +240,6 @@ export function CashflowQuickAddForm({
   const destinationAmount = useWatch({ control: form.control, name: "destination_amount" });
   const exchangeRate = useWatch({ control: form.control, name: "exchange_rate" });
 
-  useEffect(() => {
-    if (!useDialog) return;
-    if (typeof window === "undefined") return;
-
-    const updateViewportHeight = () => {
-      const nextHeight = window.visualViewport?.height ?? window.innerHeight;
-      setViewportHeight(nextHeight);
-    };
-
-    updateViewportHeight();
-    window.addEventListener("resize", updateViewportHeight);
-    const viewport = window.visualViewport;
-    viewport?.addEventListener("resize", updateViewportHeight);
-    return () => {
-      window.removeEventListener("resize", updateViewportHeight);
-      viewport?.removeEventListener("resize", updateViewportHeight);
-    };
-  }, [useDialog]);
 
   useEffect(() => {
     const current = form.getValues("account_id");
@@ -718,8 +699,6 @@ export function CashflowQuickAddForm({
       // ignore storage errors
     }
   };
-
-  const dialogMaxHeight = useDialog && viewportHeight ? Math.max(360, viewportHeight - 32) : null;
 
   const currentThemeColor: "rose" | "emerald" | "blue" =
     selectedType === "expense" ? "rose" : selectedType === "income" ? "emerald" : "blue";
@@ -1748,18 +1727,18 @@ export function CashflowQuickAddForm({
   if (useDialog) {
     return (
       <>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent
-            className="w-full max-w-lg"
-            style={{ maxHeight: dialogMaxHeight ? `${dialogMaxHeight}px` : undefined }}
-          >
-            <DialogHeader>
-              <DialogTitle>Thêm giao dịch</DialogTitle>
-              <DialogDescription>Ghi chép giao dịch tài chính nhanh chóng</DialogDescription>
-            </DialogHeader>
-            {formContent}
-          </DialogContent>
-        </Dialog>
+        <Modal
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onClose={() => setDialogOpen(false)}
+          title="Thêm giao dịch"
+          description="Ghi chép giao dịch tài chính nhanh chóng"
+          mode="create"
+          size="lg"
+          closeText="Đóng"
+        >
+          {formContent}
+        </Modal>
         <Button onClick={() => setDialogOpen(true)} disabled={isSubmitting}>
           Thêm giao dịch
         </Button>

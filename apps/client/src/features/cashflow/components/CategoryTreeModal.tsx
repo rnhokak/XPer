@@ -186,15 +186,17 @@ export function CategoryTreeModal({
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent
+        mode="view"
+        disableAutoFocus={true}
         onOpenAutoFocus={(e) => {
           // CRITICAL: Prevent auto-focusing on the search input to avoid opening mobile keyboard automatically!
           e.preventDefault();
         }}
-        className="w-[calc(100%-2rem)] max-w-lg rounded-2xl gap-0 p-0 overflow-hidden sm:max-w-xl max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] sm:max-h-[85vh] flex flex-col"
+        className="w-full sm:max-w-xl rounded-none sm:rounded-2xl gap-0 p-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[85vh]"
       >
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           {/* Header */}
-          <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
+          <div className="border-b border-slate-100 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:pt-3.5 px-4 pb-3.5 sm:px-5 bg-white/95 backdrop-blur-md shrink-0">
             <DialogHeader className="space-y-1 text-left">
               <div className="flex items-center justify-between">
                 <DialogTitle className="flex items-center gap-2 text-base font-bold sm:text-lg text-slate-900">
@@ -265,7 +267,7 @@ export function CategoryTreeModal({
           </div>
 
           {/* Footer */}
-          <DialogFooter className="border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 sm:px-5">
+          <DialogFooter className="border-t border-slate-100 bg-slate-50/60 px-4 pt-2.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] sm:pb-2.5 sm:px-5 shrink-0">
             <div className="flex w-full items-center justify-between gap-2">
               <span className="text-[11px] text-slate-400 truncate">
                 {selected ? "Đã chọn 1 danh mục" : "Vui lòng chọn 1 danh mục"}

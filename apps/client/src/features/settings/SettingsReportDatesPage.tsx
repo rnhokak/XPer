@@ -1,7 +1,7 @@
 import { type FormEvent, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -282,111 +282,115 @@ export default function SettingsReportDatesPage() {
       </div>
 
       <Dialog open={addModalOpen} onOpenChange={handleAddDialogChange}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent mode="create" className="sm:max-w-[520px] p-0 gap-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Thêm ngày báo cáo</DialogTitle>
             <DialogDescription>Chọn loại báo cáo và ngày bắt đầu để ghi nhận.</DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleAdd}>
-            <div>
-              <Label htmlFor="type">Loại</Label>
-              <Select
-                value={addState.type}
-                onValueChange={(value) => setAddState((prev) => ({ ...prev, type: value as ReportType }))}
-              >
-                <SelectTrigger id="type">
-                  <SelectValue placeholder="Chọn loại" />
-                </SelectTrigger>
-                <SelectContent>
-                  {reportTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {typeLabels[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <form className="flex-1 flex flex-col min-h-0 overflow-hidden" onSubmit={handleAdd}>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
+              <div>
+                <Label htmlFor="type">Loại</Label>
+                <Select
+                  value={addState.type}
+                  onValueChange={(value) => setAddState((prev) => ({ ...prev, type: value as ReportType }))}
+                >
+                  <SelectTrigger id="type">
+                    <SelectValue placeholder="Chọn loại" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reportTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {typeLabels[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="report-date">Ngày báo cáo</Label>
+                <Input
+                  id="report-date"
+                  type="date"
+                  value={addState.reportDate}
+                  onChange={(e) => setAddState((prev) => ({ ...prev, reportDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="note">Ghi chú (tuỳ chọn)</Label>
+                <Textarea
+                  id="note"
+                  value={addState.note}
+                  onChange={(e) => setAddState((prev) => ({ ...prev, note: e.target.value }))}
+                  rows={2}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="report-date">Ngày báo cáo</Label>
-              <Input
-                id="report-date"
-                type="date"
-                value={addState.reportDate}
-                onChange={(e) => setAddState((prev) => ({ ...prev, reportDate: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="note">Ghi chú (tuỳ chọn)</Label>
-              <Textarea
-                id="note"
-                value={addState.note}
-                onChange={(e) => setAddState((prev) => ({ ...prev, note: e.target.value }))}
-                rows={1}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" type="button" onClick={() => handleAddDialogChange(false)}>
+            <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex items-center justify-end gap-2">
+              <Button variant="outline" type="button" onClick={() => handleAddDialogChange(false)} className="rounded-xl">
                 Hủy
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" disabled={createMutation.isPending} className="rounded-xl">
                 {createMutation.isPending ? 'Đang lưu...' : 'Thêm mới'}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={editModalOpen} onOpenChange={handleEditDialogChange}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent mode="edit" disableAutoFocus={true} className="sm:max-w-[520px] p-0 gap-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Chỉnh sửa ngày báo cáo</DialogTitle>
             <DialogDescription>Điều chỉnh loại, ngày bắt đầu hoặc ghi chú hiện tại.</DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleUpdate}>
-            <div>
-              <Label htmlFor="edit-type">Loại</Label>
-              <Select
-                value={editValues.type}
-                onValueChange={(value) => setEditValues((prev) => ({ ...prev, type: value as ReportType }))}
-              >
-                <SelectTrigger id="edit-type">
-                  <SelectValue placeholder="Chọn loại" />
-                </SelectTrigger>
-                <SelectContent>
-                  {reportTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {typeLabels[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <form className="flex-1 flex flex-col min-h-0 overflow-hidden" onSubmit={handleUpdate}>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
+              <div>
+                <Label htmlFor="edit-type">Loại</Label>
+                <Select
+                  value={editValues.type}
+                  onValueChange={(value) => setEditValues((prev) => ({ ...prev, type: value as ReportType }))}
+                >
+                  <SelectTrigger id="edit-type">
+                    <SelectValue placeholder="Chọn loại" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reportTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {typeLabels[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-date">Ngày báo cáo</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editValues.reportDate}
+                  onChange={(e) => setEditValues((prev) => ({ ...prev, reportDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-note">Ghi chú</Label>
+                <Textarea
+                  id="edit-note"
+                  value={editValues.note}
+                  onChange={(e) => setEditValues((prev) => ({ ...prev, note: e.target.value }))}
+                  rows={2}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="edit-date">Ngày báo cáo</Label>
-              <Input
-                id="edit-date"
-                type="date"
-                value={editValues.reportDate}
-                onChange={(e) => setEditValues((prev) => ({ ...prev, reportDate: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-note">Ghi chú</Label>
-              <Textarea
-                id="edit-note"
-                value={editValues.note}
-                onChange={(e) => setEditValues((prev) => ({ ...prev, note: e.target.value }))}
-                rows={2}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" type="button" onClick={cancelEdit}>
+            <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex items-center justify-end gap-2">
+              <Button variant="outline" type="button" onClick={cancelEdit} className="rounded-xl">
                 Hủy
               </Button>
-              <Button type="submit" disabled={updateMutation.isPending}>
+              <Button type="submit" disabled={updateMutation.isPending} className="rounded-xl">
                 {updateMutation.isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

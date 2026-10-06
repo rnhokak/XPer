@@ -298,7 +298,11 @@ export default function TradingFundingPage() {
               New transaction
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-[min(520px,calc(100vw-20px))] max-h-[90vh] overflow-y-auto rounded-2xl">
+          <DialogContent
+            mode={editingRow ? "edit" : "create"}
+            disableAutoFocus={Boolean(editingRow)}
+            className="w-full sm:max-w-xl p-0 gap-0 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]"
+          >
             <DialogHeader>
               <DialogTitle>{editingRow ? 'Edit transaction' : 'Add transaction'}</DialogTitle>
               <DialogDescription>
@@ -309,8 +313,9 @@ export default function TradingFundingPage() {
             </DialogHeader>
             {mounted ? (
               <Form {...form}>
-                <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                <form className="flex-1 flex flex-col min-h-0 overflow-hidden" onSubmit={form.handleSubmit(handleSubmit)}>
+                  <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
                     <FormField
                       control={form.control}
                       name="type"
@@ -472,11 +477,13 @@ export default function TradingFundingPage() {
                       </FormItem>
                     )}
                   />
-                  <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                    <Button type="button" variant="ghost" onClick={() => handleDialogChange(false)}>
+                  </div>
+
+                  <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                    <Button type="button" variant="outline" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" onClick={() => handleDialogChange(false)}>
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending}>
+                    <Button type="submit" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" disabled={form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending}>
                       {form.formState.isSubmitting || createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingRow ? 'Update transaction' : 'Save transaction'}
                     </Button>
                   </DialogFooter>
@@ -608,18 +615,21 @@ export default function TradingFundingPage() {
 
       {deleteTarget && (
         <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-          <DialogContent>
+          <DialogContent mode="view" disableAutoFocus={true} className="w-full sm:max-w-md p-0 gap-0 overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Confirm Delete</DialogTitle>
               <DialogDescription>
                 Are you sure you want to delete this transaction? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+            <div className="p-4 sm:p-6 text-xs text-muted-foreground">
+              Funding transaction records affect account balance calculations.
+            </div>
+            <DialogFooter className="px-5 py-3 border-t border-slate-100 bg-slate-50/80 shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button variant="outline" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" onClick={() => setDeleteTarget(null)}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={confirmDelete} disabled={deleteMutation.isPending}>
+              <Button variant="destructive" className="rounded-xl h-9 text-xs sm:text-sm font-semibold" onClick={confirmDelete} disabled={deleteMutation.isPending}>
                 {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
               </Button>
             </DialogFooter>
