@@ -197,6 +197,16 @@ const getTransactionsForCustomRangeWithFallback = async (from: string, to: strin
   }
 }
 
+const getTransactionsForCustomRangeFromLocal = async (from: string, to: string) => {
+  const fromTime = new Date(`${from}T00:00:00`).getTime()
+  const toTime = new Date(`${to}T23:59:59.999`).getTime()
+  const localTransactions = (await db.transactions.toArray()) as unknown as CashflowTransaction[]
+  return localTransactions.filter((tx) => {
+    const time = new Date(tx.transaction_time).getTime()
+    return !Number.isNaN(time) && time >= fromTime && time <= toTime
+  })
+}
+
 export function useCashflowTransactions(
   range: string,
   shift: number,
@@ -209,9 +219,15 @@ export function useCashflowTransactions(
 
   return useApiQuery({
     queryKey: cashflowTransactionsQueryKey(normalizedRange, normalizedShift, customRange),
-    queryFn: () => {
+    queryFn: async () => {
       if (isCustom && customRange) {
+        const local = await getTransactionsForCustomRangeFromLocal(customRange.from, customRange.to)
+        if (local.length > 0) return local
         return getTransactionsForCustomRangeWithFallback(customRange.from, customRange.to)
+      }
+      const local = await getLocalTransactionsForRange(normalizedRange, normalizedShift)
+      if (local.length > 0) {
+        return local
       }
       return isCurrentMonthQuery(normalizedRange, normalizedShift)
         ? getAndCacheCurrentMonthTransactions()
@@ -226,7 +242,13 @@ export const cashflowReportTransactionsQueryKey = ['cashflow-report-transactions
 export function useCashflowReportTransactions() {
   return useApiQuery({
     queryKey: cashflowReportTransactionsQueryKey,
-    queryFn: getReportTransactionsFromLocalDb,
+    queryFn: async () => {
+      const currentLocal = (await db.transactions.toArray()) as unknown as CashflowTransaction[]
+      if (currentLocal.length > 0) {
+        return currentLocal
+      }
+      return getReportTransactionsFromLocalDb()
+    },
   })
 }
 
@@ -234,13 +256,16 @@ export function useCashflowAccounts() {
   return useApiQuery({
     queryKey: ['cashflow-accounts'],
     queryFn: async () => {
+      const localAccounts = await db.accounts.toArray()
+      if (localAccounts.length > 0) {
+        return localAccounts as unknown as CashflowAccount[]
+      }
       try {
         const accounts = await getAccounts()
         await db.accounts.bulkPut(accounts)
         return accounts
       } catch {
-        const localAccounts = await db.accounts.toArray()
-        return localAccounts as unknown as CashflowAccount[]
+        return []
       }
     },
   })
@@ -250,13 +275,16 @@ export function useCashflowCategories() {
   return useApiQuery({
     queryKey: ['cashflow-categories'],
     queryFn: async () => {
+      const localCategories = await db.categories.toArray()
+      if (localCategories.length > 0) {
+        return localCategories as unknown as CashflowCategory[]
+      }
       try {
         const categories = await getCategories()
         await db.categories.bulkPut(categories)
         return categories
       } catch {
-        const localCategories = await db.categories.toArray()
-        return localCategories as unknown as CashflowCategory[]
+        return []
       }
     },
   })

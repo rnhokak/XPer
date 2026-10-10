@@ -7,6 +7,7 @@ import { RefreshCw, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNotificationsStore } from './store/notifications'
 import { RELOAD_FLAG_KEY } from './lib/pwa/reloadLatestVersion'
+import { syncLocalDatabase } from './lib/sync/syncService'
 
 type UpdateAvailableDetail = {
   update: () => Promise<void> | undefined
@@ -89,6 +90,9 @@ function App() {
     } catch {
       // ignore
     }
+
+    // Tự động kiểm tra và sync ngầm dữ liệu với local DB (nếu cách lần sync trước > 2 phút)
+    void syncLocalDatabase().catch(() => {})
   }, [])
 
   return (

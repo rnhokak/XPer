@@ -36,6 +36,7 @@ export interface ModalContentProps
   mode?: ModalMode;
   disableAutoFocus?: boolean;
   hideHeaderClose?: boolean;
+  mobileMargin?: boolean;
 }
 
 export const ModalOverlay = React.forwardRef<
@@ -66,6 +67,7 @@ export const ModalContent = React.forwardRef<
       mode,
       disableAutoFocus,
       onOpenAutoFocus,
+      mobileMargin = false,
       ...props
     },
     ref
@@ -89,14 +91,16 @@ export const ModalContent = React.forwardRef<
             onOpenAutoFocus?.(event);
           }}
           className={cn(
-            // Mobile full screen with dynamic viewport height & zero border/radius bleed
-            "fixed inset-0 z-50 flex flex-col w-full h-full h-[100dvh] max-h-[100dvh] bg-background border-0 rounded-none m-0 shadow-none overflow-hidden outline-none",
+            // Mobile full screen vs mobile with top/bottom 10px margin
+            mobileMargin
+              ? "fixed inset-x-0 top-[10px] bottom-[10px] z-50 flex flex-col w-full h-[calc(100dvh-20px)] max-h-[calc(100dvh-20px)] bg-background border border-slate-200/80 rounded-2xl m-0 shadow-2xl overflow-hidden outline-none"
+              : "fixed inset-0 z-50 flex flex-col w-full h-full h-[100dvh] max-h-[100dvh] bg-background border-0 rounded-none m-0 shadow-none overflow-hidden outline-none",
             // Mobile animations
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-4 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4 duration-200",
             // Desktop / Tablet dialog modal (sm: >= 640px)
             "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:h-auto sm:max-h-[90vh] sm:rounded-2xl sm:border sm:border-slate-200/80 sm:shadow-2xl sm:overflow-hidden",
             "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:slide-in-from-bottom-0",
-            "dialog-mobile-fullscreen",
+            !mobileMargin && "dialog-mobile-fullscreen",
             sizeClasses[size],
             className
           )}
@@ -293,6 +297,7 @@ export interface ModalProps {
   closeText?: string;
   showCloseButton?: boolean;
   hideHeaderClose?: boolean;
+  mobileMargin?: boolean;
   className?: string;
   headerClassName?: string;
   bodyClassName?: string;
@@ -316,6 +321,7 @@ export function Modal({
   closeText = "Đóng",
   showCloseButton = true,
   hideHeaderClose = false,
+  mobileMargin = false,
   className,
   headerClassName,
   bodyClassName,
@@ -345,6 +351,7 @@ export function Modal({
           size={size}
           mode={mode}
           disableAutoFocus={disableAutoFocus}
+          mobileMargin={mobileMargin}
           className={className}
         >
           {title ? (

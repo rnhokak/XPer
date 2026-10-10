@@ -1,9 +1,12 @@
+import { useNavigate } from "react-router-dom";
 import { CashflowQuickAddForm } from "./components/CashflowQuickAddForm";
+import CashflowPage from "./CashflowPage";
 import { useCashflowAccounts, useCashflowCategories } from "@/hooks/useCashflowTransactions";
 import { useDebtPartners } from "@/hooks/useDebtsData";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function CashflowNewPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { data: accounts = [], isLoading: accountsLoading } = useCashflowAccounts();
   const { data: categories = [], isLoading: categoriesLoading } = useCashflowCategories();
@@ -12,25 +15,32 @@ export default function CashflowNewPage() {
   const defaultAccount = accounts.find((a) => a.is_default) ?? accounts[0] ?? null;
   const defaultCurrency = defaultAccount?.currency ?? "VND";
 
+  const handleClose = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/cashflow");
+    }
+  };
+
   return (
-    <div className="mx-auto w-full max-w-xl overflow-x-hidden px-1 sm:px-4 pb-28 md:pb-6">
-      <div className="mb-3.5">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Thêm giao dịch</h1>
-        <p className="text-xs text-muted-foreground sm:text-sm">Ghi chép chi tiêu & thu nhập nhanh chóng</p>
+    <>
+      {/* Background cashflow page behind the modal popup */}
+      <div className="opacity-40 pointer-events-none select-none" aria-hidden="true">
+        <CashflowPage />
       </div>
 
-      <div className="rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-6 shadow-xs">
-        <CashflowQuickAddForm
-          categories={categories}
-          accounts={accounts}
-          partners={partners}
-          defaultAccountId={defaultAccount?.id ?? null}
-          defaultCurrency={defaultCurrency}
-          useDialog={false}
-          range="month"
-          isLoading={accountsLoading || categoriesLoading}
-        />
-      </div>
-    </div>
+      <CashflowQuickAddForm
+        categories={categories}
+        accounts={accounts}
+        partners={partners}
+        defaultAccountId={defaultAccount?.id ?? null}
+        defaultCurrency={defaultCurrency}
+        range="month"
+        isLoading={accountsLoading || categoriesLoading}
+        isModal={true}
+        onClose={handleClose}
+      />
+    </>
   );
 }

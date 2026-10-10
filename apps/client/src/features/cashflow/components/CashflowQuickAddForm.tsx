@@ -89,6 +89,9 @@ type Props = {
   useDialog?: boolean;
   range: string;
   isLoading?: boolean;
+  isModal?: boolean;
+  open?: boolean;
+  onClose?: () => void;
 };
 
 const CUSTOM_CURRENCY = "__custom__";
@@ -125,6 +128,9 @@ export function CashflowQuickAddForm({
   useDialog = false,
   range,
   isLoading = false,
+  isModal = false,
+  open,
+  onClose,
 }: Props) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [customCurrency, setCustomCurrency] = useState("");
@@ -548,7 +554,7 @@ export function CashflowQuickAddForm({
           }
         } catch { }
 
-        if (useDialog) {
+        if (useDialog && !isModal) {
           setDialogOpen(false);
         }
         persistRecentAmount(values.amount ?? 0, values.currency ?? defaultCurrency);
@@ -663,7 +669,7 @@ export function CashflowQuickAddForm({
         } catch {
           // ignore storage errors
         }
-        if (useDialog) {
+        if (useDialog && !isModal) {
           setDialogOpen(false);
         }
         persistRecentAmount(values.amount ?? 0, payload.currency ?? defaultCurrency);
@@ -1664,65 +1670,134 @@ export function CashflowQuickAddForm({
         </form>
       </Form>
 
-      {/* Docked Submit Action Bar on Mobile - Snuggly positioned right above bottom nav bar (no 125px gap) */}
-      <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+3.5rem)] z-20 border-t border-slate-200/90 bg-white/95 px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.07)] backdrop-blur-xl md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 md:shadow-none">
-        <div className="mx-auto max-w-2xl">
-          <Button
-            type="submit"
-            form="cashflow-form"
-            disabled={!canSubmit}
-            className={cn(
-              "h-12 w-full rounded-2xl text-sm sm:text-base font-semibold shadow-sm transition-all duration-200",
-              canSubmit
-                ? selectedType === "expense"
-                  ? "bg-rose-600 text-white shadow-rose-600/25 hover:bg-rose-700 active:scale-[0.99]"
-                  : selectedType === "income"
-                    ? "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-700 active:scale-[0.99]"
-                    : "bg-blue-600 text-white shadow-blue-600/25 hover:bg-blue-700 active:scale-[0.99]"
-                : "cursor-not-allowed bg-slate-200 text-slate-400 hover:bg-slate-200 shadow-none border-0"
-            )}
-          >
-            {isFormSubmitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
-                Đang lưu...
-              </span>
-            ) : !isValidAmount ? (
-              <span>Nhập số tiền để tiếp tục</span>
-            ) : !hasCategory ? (
-              <span>Chọn danh mục để tiếp tục</span>
-            ) : !hasAccount ? (
-              <span>
-                {selectedType === "expense" && debtMode === "borrowed_spent"
-                  ? "Chọn thẻ tín dụng"
-                  : "Chọn tài khoản thanh toán"}
-              </span>
-            ) : selectedType === "expense" && debtMode === "lent_spent" && !selectedPartnerId ? (
-              <span>Chọn đối tác mua hộ để tiếp tục</span>
-            ) : (
-              <span className="flex items-center justify-center gap-1.5">
-                <span>
-                  Thêm{" "}
-                  {selectedType === "expense"
-                    ? debtMode === "borrowed_spent"
-                      ? "chi từ thẻ tín dụng"
-                      : debtMode === "lent_spent"
-                        ? "chi mua hộ / cho vay"
-                        : "chi tiêu cá nhân"
+      {/* Docked Submit Action Bar on Mobile - only shown in non-modal full page mode */}
+      {!isModal && (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+3.5rem)] z-20 border-t border-slate-200/90 bg-white/95 px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.07)] backdrop-blur-xl md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 md:shadow-none">
+          <div className="mx-auto max-w-2xl">
+            <Button
+              type="submit"
+              form="cashflow-form"
+              disabled={!canSubmit || isFormSubmitting}
+              className={cn(
+                "h-12 w-full rounded-2xl text-sm sm:text-base font-semibold shadow-sm transition-all duration-200",
+                canSubmit
+                  ? selectedType === "expense"
+                    ? "bg-rose-600 text-white shadow-rose-600/25 hover:bg-rose-700 active:scale-[0.99]"
                     : selectedType === "income"
-                      ? "thu nhập"
-                      : "chuyển khoản"}
+                      ? "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-700 active:scale-[0.99]"
+                      : "bg-blue-600 text-white shadow-blue-600/25 hover:bg-blue-700 active:scale-[0.99]"
+                  : "cursor-not-allowed bg-slate-200 text-slate-400 hover:bg-slate-200 shadow-none border-0"
+              )}
+            >
+              {isFormSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/60 border-t-white" />
+                  Đang lưu...
                 </span>
-                <span className="font-bold opacity-90">
-                  • {Number(amount).toLocaleString("vi-VN")} {currency}
+              ) : !isValidAmount ? (
+                <span>Nhập số tiền để tiếp tục</span>
+              ) : !hasCategory ? (
+                <span>Chọn danh mục để tiếp tục</span>
+              ) : !hasAccount ? (
+                <span>
+                  {selectedType === "expense" && debtMode === "borrowed_spent"
+                    ? "Chọn thẻ tín dụng"
+                    : "Chọn tài khoản thanh toán"}
                 </span>
-              </span>
-            )}
-          </Button>
+              ) : selectedType === "expense" && debtMode === "lent_spent" && !selectedPartnerId ? (
+                <span>Chọn đối tác mua hộ để tiếp tục</span>
+              ) : (
+                <span className="flex items-center justify-center gap-1.5">
+                  <span>
+                    Thêm{" "}
+                    {selectedType === "expense"
+                      ? debtMode === "borrowed_spent"
+                        ? "chi từ thẻ tín dụng"
+                        : debtMode === "lent_spent"
+                          ? "chi mua hộ / cho vay"
+                          : "chi tiêu cá nhân"
+                      : selectedType === "income"
+                        ? "thu nhập"
+                        : "chuyển khoản"}
+                  </span>
+                  <span className="font-bold opacity-90">
+                    • {Number(amount).toLocaleString("vi-VN")} {currency}
+                  </span>
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
+
+  const modalSubmitButton = (
+    <Button
+      type="submit"
+      form="cashflow-form"
+      disabled={!canSubmit || isFormSubmitting}
+      className={cn(
+        "h-11 sm:h-12 w-full rounded-xl sm:rounded-2xl text-sm sm:text-base font-semibold shadow-sm transition-all duration-200",
+        canSubmit
+          ? selectedType === "expense"
+            ? "bg-rose-600 text-white shadow-rose-600/25 hover:bg-rose-700 active:scale-[0.99]"
+            : selectedType === "income"
+              ? "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-700 active:scale-[0.99]"
+              : "bg-blue-600 text-white shadow-blue-600/25 hover:bg-blue-700 active:scale-[0.99]"
+          : "cursor-not-allowed bg-slate-200 text-slate-400 hover:bg-slate-200 shadow-none border-0"
+      )}
+    >
+      {isFormSubmitting ? (
+        <span className="flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-white" />
+          Đang lưu...
+        </span>
+      ) : !isValidAmount ? (
+        <span>Lưu giao dịch</span>
+      ) : !hasCategory ? (
+        <span>Chọn danh mục để lưu</span>
+      ) : !hasAccount ? (
+        <span>
+          {selectedType === "expense" && debtMode === "borrowed_spent"
+            ? "Chọn thẻ tín dụng"
+            : "Chọn tài khoản thanh toán"}
+        </span>
+      ) : selectedType === "expense" && debtMode === "lent_spent" && !selectedPartnerId ? (
+        <span>Chọn đối tác mua hộ</span>
+      ) : (
+        <span className="flex items-center justify-center gap-1.5">
+          <span>Lưu giao dịch</span>
+          <span className="font-bold opacity-90">
+            • {Number(amount).toLocaleString("vi-VN")} {currency}
+          </span>
+        </span>
+      )}
+    </Button>
+  );
+
+  if (isModal) {
+    return (
+      <Modal
+        open={open ?? true}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && onClose) {
+            onClose();
+          }
+        }}
+        onClose={onClose}
+        title="Thêm giao dịch"
+        description="Ghi chép chi tiêu & thu nhập nhanh chóng"
+        mode="create"
+        size="xl"
+        mobileMargin={true}
+        showCloseButton={false}
+        footer={modalSubmitButton}
+      >
+        {formContent}
+      </Modal>
+    );
+  }
 
   if (useDialog) {
     return (
@@ -1735,7 +1810,9 @@ export function CashflowQuickAddForm({
           description="Ghi chép giao dịch tài chính nhanh chóng"
           mode="create"
           size="lg"
-          closeText="Đóng"
+          mobileMargin={true}
+          showCloseButton={false}
+          footer={modalSubmitButton}
         >
           {formContent}
         </Modal>

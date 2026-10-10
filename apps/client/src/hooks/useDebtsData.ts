@@ -87,6 +87,22 @@ export function useDebtsOverviewData(userId: string) {
   return useApiQuery({
     queryKey: debtsOverviewQueryKey(userId),
     queryFn: async () => {
+      const [localPartners, localAccounts, localCategories, localDebts] = await Promise.all([
+        db.debtPartners.toArray(),
+        db.accounts.toArray(),
+        db.categories.toArray(),
+        db.debts.toArray(),
+      ])
+
+      if (localPartners.length > 0 || localAccounts.length > 0 || localCategories.length > 0 || localDebts.length > 0) {
+        return {
+          partners: localPartners as unknown as Partner[],
+          accounts: localAccounts as unknown as Account[],
+          categories: localCategories as unknown as Category[],
+          debts: localDebts as unknown as DebtRow[],
+        }
+      }
+
       try {
         const [partners, accounts, categories, debts] = await Promise.all([
           getDebtPartners(),
@@ -110,23 +126,13 @@ export function useDebtsOverviewData(userId: string) {
           categories,
           debts,
         }
-      } catch (err) {
-        const [partners, accounts, categories, debts] = await Promise.all([
-          db.debtPartners.toArray(),
-          db.accounts.toArray(),
-          db.categories.toArray(),
-          db.debts.toArray(),
-        ])
-
-        if (partners.length > 0 || accounts.length > 0 || categories.length > 0 || debts.length > 0) {
-          return {
-            partners: partners as unknown as Partner[],
-            accounts: accounts as unknown as Account[],
-            categories: categories as unknown as Category[],
-            debts: debts as unknown as DebtRow[],
-          }
+      } catch {
+        return {
+          partners: [],
+          accounts: [],
+          categories: [],
+          debts: [],
         }
-        throw err
       }
     },
     enabled: Boolean(userId),
@@ -137,6 +143,20 @@ export function useDebtsFormData(userId: string) {
   return useApiQuery({
     queryKey: debtsFormQueryKey(userId),
     queryFn: async () => {
+      const [localPartners, localAccounts, localCategories] = await Promise.all([
+        db.debtPartners.toArray(),
+        db.accounts.toArray(),
+        db.categories.toArray(),
+      ])
+
+      if (localPartners.length > 0 || localAccounts.length > 0 || localCategories.length > 0) {
+        return {
+          partners: localPartners as unknown as Partner[],
+          accounts: localAccounts as unknown as Account[],
+          categories: localCategories as unknown as Category[],
+        }
+      }
+
       try {
         const [partners, accounts, categories] = await Promise.all([
           getDebtPartners(),
@@ -153,21 +173,12 @@ export function useDebtsFormData(userId: string) {
         } catch {}
 
         return { partners, accounts, categories }
-      } catch (err) {
-        const [partners, accounts, categories] = await Promise.all([
-          db.debtPartners.toArray(),
-          db.accounts.toArray(),
-          db.categories.toArray(),
-        ])
-
-        if (partners.length > 0 || accounts.length > 0 || categories.length > 0) {
-          return {
-            partners: partners as unknown as Partner[],
-            accounts: accounts as unknown as Account[],
-            categories: categories as unknown as Category[],
-          }
+      } catch {
+        return {
+          partners: [],
+          accounts: [],
+          categories: [],
         }
-        throw err
       }
     },
     enabled: Boolean(userId),
@@ -178,16 +189,17 @@ export function useDebtPartners(userId: string) {
   return useApiQuery({
     queryKey: debtPartnersQueryKey(userId),
     queryFn: async () => {
+      const local = await db.debtPartners.toArray()
+      if (local.length > 0) return local as unknown as Partner[]
+
       try {
         const partners = await getDebtPartners()
         try {
           await db.debtPartners.bulkPut(partners)
         } catch {}
         return partners
-      } catch (err) {
-        const local = await db.debtPartners.toArray()
-        if (local.length > 0) return local as unknown as Partner[]
-        throw err
+      } catch {
+        return []
       }
     },
     enabled: Boolean(userId),
